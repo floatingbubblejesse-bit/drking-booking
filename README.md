@@ -1,7 +1,11 @@
 # 金鶯診所 減重診預約
 
-新版預約網站開發中。線上預約服務即將開放，現階段請由[診所官網](https://www.drking.com.tw/info_all.html)聯絡院區安排看診。
+[預約首頁](https://floatingbubblejesse-bit.github.io/drking-booking/) · [預約介面](https://floatingbubblejesse-bit.github.io/drking-booking/booking.html)
 
-本版本僅提供網站介面；預約、查詢與員工登入尚未開放，不會讀取或提交看診資料。
+手機優先的三步驟介面：選擇院區 → 選擇醫師 → 選擇日期與時段。
 
-版本：v32.0-owner-preview
+正式預約尚未開放，目前可確認操作流程。頁面使用示範時段，送出資料可供查詢與取消，但不成立正式掛號，也不會發送簡訊或 LINE 通知。
+
+本儲存庫僅提供公開入口與品牌圖片。預約資料與後端設定不存放於此。
+
+更新：2026-09-18；手機正式視覺、刪除每週班表區塊。
