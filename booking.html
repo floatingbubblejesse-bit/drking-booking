@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<meta name="theme-color" content="#f5f9f8">
+<title>手機操作測試｜金鶯診所 減重診預約</title>
+<style>*{box-sizing:border-box}body{margin:0;padding:28px 18px;background:#f5f9f8;color:#183e40;font:16px/1.8 -apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}main{max-width:520px;margin:7vh auto}img{display:block;width:190px;height:auto;margin-bottom:32px}.card{background:#fff;border:1px solid #dfeae7;border-radius:20px;padding:27px 24px}.tag{display:inline-block;border-radius:8px;background:#fbf5e8;color:#916326;padding:5px 10px;font-size:12px}h1{font-size:25px;line-height:1.4;margin:17px 0 12px}p{font-size:14px;color:#5e7977;margin:0 0 18px}.primary{display:flex;align-items:center;justify-content:center;min-height:50px;padding:11px 15px;border-radius:11px;text-decoration:none;background:#167e82;color:white;font-weight:600}.links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 22px;margin-top:16px}.links a{display:flex;align-items:center;min-height:44px;color:#167e82;font-size:13px;text-underline-offset:4px}a:focus-visible{outline:3px solid #58b8af;outline-offset:4px}.small{font-size:12px;margin:15px 0 0;text-align:center}.brand{color:inherit;text-decoration:none}</style>
+</head><body><main>
+<a class="brand" href="index.html" aria-label="返回金鶯診所預約首頁"><img src="booking-logo.jpg" width="1000" height="311" alt="金鶯診所・金鶯健康志業"></a>
+<section class="card"><span class="tag">操作測試 · 非正式掛號</span><h1>手機操作測試</h1>
+<p>可新增、查詢與取消測試預約。測試資料會保存，請使用測試姓名；不會發送簡訊或 LINE 通知。</p>
+<a class="primary" id="continue" href="https://script.google.com/macros/s/AKfycbzgeiK1cQ1KQk2q_pI_TmKcERHUtbXTIWyYx-0FVhqOwnD2ixFjask6wj42-O3SmoAg/exec" rel="noreferrer">進入手機操作測試 →</a>
+<p class="small" id="status" role="status">即將前往 Google 測試頁；若未自動開啟，請點上方按鈕。</p>
+<noscript><p class="small">請點上方按鈕進入 Google 測試頁。</p></noscript></section>
+<div class="links"><a href="index.html">返回預約首頁</a><a href="mobile-preview.html">查看設計預覽</a></div>
+</main><script>
+'use strict';
+const GAS_EXEC = "https://script.google.com/macros/s/AKfycbzgeiK1cQ1KQk2q_pI_TmKcERHUtbXTIWyYx-0FVhqOwnD2ixFjask6wj42-O3SmoAg/exec";
+const target = new URL(GAS_EXEC);
+// Pass only this supported source marker, never arbitrary query data.
+if (new URLSearchParams(window.location.search).get('source') === 'line') target.searchParams.set('source', 'line');
+document.getElementById('continue').href = target.href;
+window.setTimeout(function () { window.location.replace(target.href); }, 900);
+</script></body></html>
