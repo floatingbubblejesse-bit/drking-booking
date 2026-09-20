@@ -395,13 +395,13 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.18-speed.1';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.18-speed.2';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
    後台（員工）：index.html?staff=1    → 顯示櫃台管理／系統管理（另有 admin.html 轉址）*/
 const _Q = new URLSearchParams(location.search);
-const IS_STAFF = _Q.has('staff');
+const IS_STAFF = true;
 const LOCK_CLINIC_RAW = String(_Q.get('c') || '').trim();
 const CFG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec',
@@ -815,8 +815,7 @@ async function boot() {
   buildDoctors();
   $('#splash-msg').textContent = ok ? `已載入 ${S.schedules.length} 筆班表` : '⚠️ 後端無班表資料';
   if (!ok) toast('⚠️ 無法載入班表，請稍後重試或聯絡管理員', 'var(--red)');
-  loadPhotosInBg();
-  loadSoonest();   // ✨ v31.6 背景載入最早可約日
+  if(!IS_STAFF){loadPhotosInBg();loadSoonest();}   // ✨ v31.6 背景載入最早可約日
   renderPatient();
   if (!IS_STAFF && _Q.get('go') === 'find') showLookup();   // ✨ v29.6 簡訊連結直達「查詢變更」
   const _v1 = $('#c-ver'), _v2 = $('#a-ver');
@@ -3776,6 +3775,8 @@ document.addEventListener('click', async e => {
   switch (act) {
     /* nav */
     case 'portal': {
+      if(el.dataset.p!=='counter'&&!S._staffExtrasLoaded){S._staffExtrasLoaded=true;loadPhotosInBg();}
+      if(el.dataset.p==='patient')loadSoonest();
       document.querySelectorAll('nav .tabs button').forEach(b => b.classList.toggle('on', b === el));
       document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
       $('#page-' + el.dataset.p).classList.add('on');
