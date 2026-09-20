@@ -4,9 +4,29 @@
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <script id="early-bootstrap">
+// Public schedule only. Never extend the server's original 60-second validity,
+// and never persist patient details, appointments, credentials, or slot counts.
 if(new URLSearchParams(location.search).get('view')!=='staff'){
- const control=new AbortController(),timer=setTimeout(()=>control.abort(),45000);
- window.EARLY_BOOTSTRAP=fetch("https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec?action=v2Bootstrap",{credentials:'omit',signal:control.signal,redirect:'follow'}).then(r=>{if(!r.ok)throw Error('network');return r.json();}).catch(()=>({ok:false,error:{code:'TRANSPORT',message:'連線未完成，請重新載入。'}})).finally(()=>clearTimeout(timer));
+ const key='drking-public-bootstrap-v1';
+ const taipeiToday=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+ function publicOnly(r){
+  const d=r&&r.ok&&r.data,c=d&&d.publicCatalog,now=Date.now();
+  if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||d.today!==taipeiToday()||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||c.expiresAt<=now||c.expiresAt-c.at>60000||c.expiresAt-now>60000||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
+  const clinics=d.clinics.map(x=>({id:x.id,name:x.name,sourceCode:x.sourceCode}));
+  const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank}));
+  const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
+  const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
+  const config=x=>({initMin:x.initMin,followMin:x.followMin});
+  const configs=x=>Object.fromEntries(Object.entries(x||{}).map(([k,v])=>[k,config(v)]));
+  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at}}};
+ }
+ window.REMEMBER_PUBLIC_BOOTSTRAP=function(r){try{const safe=publicOnly(r);if(safe)localStorage.setItem(key,JSON.stringify(safe));else localStorage.removeItem(key);}catch(_){}};
+ let cached=null;try{cached=publicOnly(JSON.parse(localStorage.getItem(key)||'null'));if(!cached)localStorage.removeItem(key);}catch(_){}
+ if(cached){window.EARLY_BOOTSTRAP=Promise.resolve(cached);}
+ else {
+  const control=new AbortController(),timer=setTimeout(()=>control.abort(),45000);
+  window.EARLY_BOOTSTRAP=fetch('https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec?action=v2Bootstrap',{credentials:'omit',signal:control.signal,redirect:'follow'}).then(r=>{if(!r.ok)throw Error('network');return r.json();}).then(r=>{window.REMEMBER_PUBLIC_BOOTSTRAP(r);return r;}).catch(()=>({ok:false,error:{code:'TRANSPORT',message:'連線未完成，請重新載入。'}})).finally(()=>clearTimeout(timer));
+ }
 }
 </script>
 <meta name="referrer" content="no-referrer">
@@ -251,7 +271,7 @@ async function rpc(method,payload,timeout=45000){
  const action={getBootstrap:'v2Bootstrap',getLegacyDateSlots:'v2Slots',createBooking:'v2Create',lookupBooking:'v2Lookup',cancelBooking:'v2Cancel'}[method];if(!action)return {ok:false,error:{code:'INVALID_INPUT',message:'請由原櫃檯入口操作此功能。'}};
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
  try{const read=['v2Bootstrap','v2Slots'].includes(action),url=new URL(BACKEND_URL);url.searchParams.set('action',action);if(read)Object.entries(payload||{}).forEach(([k,v])=>url.searchParams.set(k,String(v)));
- const response=await fetch(url.href,read?{credentials:'omit',signal:controller.signal,redirect:'follow'}:{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,payload:payload||{}}),credentials:'omit',signal:controller.signal,redirect:'follow'});if(!response.ok)throw Error('network');const r=await response.json();return r&&typeof r.ok==='boolean'?r:{ok:false,error:{code:'TRANSPORT',message:'回應不完整，請重新確認。'}};
+ const response=await fetch(url.href,read?{credentials:'omit',signal:controller.signal,redirect:'follow'}:{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,payload:payload||{}}),credentials:'omit',signal:controller.signal,redirect:'follow'});if(!response.ok)throw Error('network');const r=await response.json();if(method==='getBootstrap'&&window.REMEMBER_PUBLIC_BOOTSTRAP)window.REMEMBER_PUBLIC_BOOTSTRAP(r);return r&&typeof r.ok==='boolean'?r:{ok:false,error:{code:'TRANSPORT',message:'回應不完整，請重新確認。'}};
  }catch(e){return {ok:false,error:{code:e.name==='AbortError'?'CLIENT_TIMEOUT':'TRANSPORT',message:'連線未完成，請重新確認上次操作結果。'}};}finally{clearTimeout(timer);}
 }
 
