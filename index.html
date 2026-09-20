@@ -4,29 +4,54 @@
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <script id="early-bootstrap">
-// Public schedule only. Never extend the server's original 60-second validity,
-// and never persist patient details, appointments, credentials, or slot counts.
+// A public directory snapshot can be displayed for 30 days. Its availability validity
+// is NEVER extended: live slots and final booking still require the backend.
 if(new URLSearchParams(location.search).get('view')!=='staff'){
- const key='drking-public-bootstrap-v1';
+ const key='drking-public-bootstrap-v2',oldKey='drking-public-bootstrap-v1';
  const taipeiToday=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
  function publicOnly(r){
   const d=r&&r.ok&&r.data,c=d&&d.publicCatalog,now=Date.now();
-  if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||d.today!==taipeiToday()||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||c.expiresAt<=now||c.expiresAt-c.at>60000||c.expiresAt-now>60000||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
+  if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||now-c.at>30*86400000||c.expiresAt-c.at>60000||c.expiresAt<c.at||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
   const clinics=d.clinics.map(x=>({id:x.id,name:x.name,sourceCode:x.sourceCode}));
   const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank}));
   const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const config=x=>({initMin:x.initMin,followMin:x.followMin});
   const configs=x=>Object.fromEntries(Object.entries(x||{}).map(([k,v])=>[k,config(v)]));
-  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at}}};
+  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,publicVersion:typeof d.publicVersion==='string'?d.publicVersion:'',clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at}}};
  }
- window.REMEMBER_PUBLIC_BOOTSTRAP=function(r){try{const safe=publicOnly(r);if(safe)localStorage.setItem(key,JSON.stringify(safe));else localStorage.removeItem(key);}catch(_){}};
- let cached=null;try{cached=publicOnly(JSON.parse(localStorage.getItem(key)||'null'));if(!cached)localStorage.removeItem(key);}catch(_){}
- if(cached){window.EARLY_BOOTSTRAP=Promise.resolve(cached);}
- else {
-  const control=new AbortController(),timer=setTimeout(()=>control.abort(),45000);
-  window.EARLY_BOOTSTRAP=fetch('https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec?action=v2Bootstrap',{credentials:'omit',signal:control.signal,redirect:'follow'}).then(r=>{if(!r.ok)throw Error('network');return r.json();}).then(r=>{window.REMEMBER_PUBLIC_BOOTSTRAP(r);return r;}).catch(()=>({ok:false,error:{code:'TRANSPORT',message:'連線未完成，請重新載入。'}})).finally(()=>clearTimeout(timer));
+
+ let latest=null,inflight=null;
+ try{latest=publicOnly(JSON.parse(localStorage.getItem(key)||localStorage.getItem(oldKey)||'null'));localStorage.removeItem(oldKey);if(!latest)localStorage.removeItem(key);}catch(_){}
+ function remember(r){const safe=publicOnly(r);if(!safe)return null;latest=safe;try{localStorage.setItem(key,JSON.stringify(safe));}catch(_){}return safe;}
+ function isFresh(r){const d=r&&r.data,c=d&&d.publicCatalog;return !!c&&d.today===taipeiToday()&&c.expiresAt>Date.now();}
+ async function refresh(force=false){
+  if(inflight)return inflight;
+  if(!force&&isFresh(latest))return latest;
+  inflight=(async()=>{
+   const control=new AbortController(),timer=setTimeout(()=>control.abort(),45000);
+   try{
+    const known=latest,url=new URL('https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec');url.searchParams.set('action','v2Bootstrap');
+    if(known&&known.data.publicVersion)url.searchParams.set('knownVersion',known.data.publicVersion);
+    const response=await fetch(url.href,{credentials:'omit',cache:'no-store',signal:control.signal,redirect:'follow'});if(!response.ok)throw Error('network');
+    let r=await response.json();
+    if(r&&r.ok&&r.data&&r.data.notModified){
+     const d=r.data,c=known&&known.data.publicCatalog;
+     if(!c||d.publicVersion!==known.data.publicVersion||d.today!==known.data.today||!Number.isFinite(d.at)||!Number.isFinite(d.expiresAt)||d.at<c.at||d.expiresAt-d.at>60000||d.expiresAt<=Date.now()||d.at>Date.now())throw Error('invalid version');
+     r={ok:true,data:{...known.data,publicCatalog:{...c,at:d.at,expiresAt:d.expiresAt},scheduleState:{source:'EXTERNAL',verifiedAt:d.at}}};
+    }
+    if(!r||!r.ok)return r&&r.error?r:{ok:false,error:{code:'TRANSPORT',message:'連線未完成，請重新載入。'}};
+    const safe=publicOnly(r);if(!safe||!isFresh(safe))throw Error('invalid catalog');return remember(safe);
+   }catch(_){return {ok:false,error:{code:'TRANSPORT',message:'無法確認最新班表，請連線後重試。'}};}finally{clearTimeout(timer);}
+  })().finally(()=>{inflight=null;});
+  return inflight;
  }
+ window.PUBLIC_BOOTSTRAP={refresh};
+ window.REMEMBER_PUBLIC_BOOTSTRAP=remember;
+ const cached=latest;
+ window.PUBLIC_BOOTSTRAP_UPDATE=refresh(true);
+ // Only the display date is adjusted across midnight; the catalog expiry remains stale.
+ window.EARLY_BOOTSTRAP=cached?Promise.resolve({ok:true,data:{...cached.data,today:taipeiToday()}}):window.PUBLIC_BOOTSTRAP_UPDATE;
 }
 </script>
 <meta name="referrer" content="no-referrer">
@@ -247,7 +272,7 @@ const LEGACY_DATE={key:'',request:0,busy:false,error:'',at:0};
 function legacyDateKey(){return [STATE.clinic,STATE.date,STATE.visitType].join('|');}
 function legacyDateReady(){return !!STATE.date&&!LEGACY_DATE.busy&&LEGACY_DATE.key===legacyDateKey();}
 let LEGACY_CATALOG_LOADING=null;
-async function legacyLocalSlots(p){let c=APP.data.publicCatalog;if(!c||c.expiresAt<=Date.now()){if(!LEGACY_CATALOG_LOADING)LEGACY_CATALOG_LOADING=rpc('getBootstrap').finally(()=>{LEGACY_CATALOG_LOADING=null;});const r=await LEGACY_CATALOG_LOADING;if(!r.ok)return r;if(!r.data||r.data.backend!=='LEGACY')return {ok:false,error:{code:'INVALID_STATE',message:'資料來源已更新，請重新載入。'}};c=r.data.publicCatalog;APP.data.publicCatalog=c;}try{return {ok:true,data:{slots:legacyCandidateSlots_(c,p),candidatesOnly:true}};}catch(e){return {ok:false,error:{code:'INVALID_STATE',message:'班表資料有誤，請重新載入。'}};}}
+async function legacyLocalSlots(p){let c=APP.data.publicCatalog;if(!c||c.expiresAt<=Date.now()){if(!LEGACY_CATALOG_LOADING)LEGACY_CATALOG_LOADING=(window.PUBLIC_BOOTSTRAP?window.PUBLIC_BOOTSTRAP.refresh():rpc('getBootstrap')).finally(()=>{LEGACY_CATALOG_LOADING=null;});const r=await LEGACY_CATALOG_LOADING;if(!r.ok)return r;if(!r.data||r.data.backend!=='LEGACY')return {ok:false,error:{code:'INVALID_STATE',message:'資料來源已更新，請重新載入。'}};c=r.data.publicCatalog;Object.assign(APP.data,r.data,{slots:APP.data.slots});APP.today=parseDate(r.data.today);}try{return {ok:true,data:{slots:legacyCandidateSlots_(c,p),candidatesOnly:true}};}catch(e){return {ok:false,error:{code:'INVALID_STATE',message:'班表資料有誤，請重新載入。'}};}}
 async function refreshLegacyDate(){if(!legacyView()||!STATE.date||!STATE.clinic)return;const key=legacyDateKey(),ticket=++LEGACY_DATE.request,date=STATE.date,clinic=STATE.clinic;LEGACY_DATE.key='';LEGACY_DATE.busy=true;LEGACY_DATE.error='';STATE.time='';STATE.slotId='';renderDate();renderSummary();const r=await rpc('getLegacyDateSlots',{clinicId:clinic,date,visitType:STATE.visitType});if(ticket!==LEGACY_DATE.request||key!==legacyDateKey())return;LEGACY_DATE.busy=false;if(!r.ok||!r.data||!Array.isArray(r.data.slots)||r.data.slots.some(s=>s.clinicId!==clinic||s.date!==date||s.visitType!==STATE.visitType||s.availabilityVerified!==true)){LEGACY_DATE.error=r.ok?'無法確認名額，請重新點選日期。':errorInfo(r).message;renderDate();return;}APP.data.slots=APP.data.slots.filter(s=>s.clinicId!==clinic||s.date!==date).concat(r.data.slots);LEGACY_DATE.key=key;LEGACY_DATE.at=Date.now();renderDate();renderSummary();}
 function pilotToday_(){return APP.data.today;}
 function pilotFail_(code,text){throw Error(text);}
@@ -268,6 +293,7 @@ function legacyCandidateSlots_(catalog,input){
 const BACKEND_URL='https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec';
 async function rpc(method,payload,timeout=45000){
  if(method==='getBootstrap'&&window.EARLY_BOOTSTRAP){const pending=window.EARLY_BOOTSTRAP;window.EARLY_BOOTSTRAP=null;return await pending;}
+ if(method==='getBootstrap'&&window.PUBLIC_BOOTSTRAP)return window.PUBLIC_BOOTSTRAP.refresh(true);
  const action={getBootstrap:'v2Bootstrap',getLegacyDateSlots:'v2Slots',createBooking:'v2Create',lookupBooking:'v2Lookup',cancelBooking:'v2Cancel'}[method];if(!action)return {ok:false,error:{code:'INVALID_INPUT',message:'請由原櫃檯入口操作此功能。'}};
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
  try{const read=['v2Bootstrap','v2Slots'].includes(action),url=new URL(BACKEND_URL);url.searchParams.set('action',action);if(read)Object.entries(payload||{}).forEach(([k,v])=>url.searchParams.set(k,String(v)));
@@ -434,6 +460,15 @@ function invalidateStaff(messageText){if(window.StaffUI)window.StaffUI.clear();c
 function switchView(v){if(window.StaffUI&&v!=='staff')window.StaffUI.hide();if(!['booking','lookup','staff'].includes(v))return;if(v==='staff'&&!canUseStaff()){showStaffAccess('請使用已授權的 Google 帳號登入後，再重新確認權限。');return;}APP.view=v;['booking','lookup','staff','staff-access'].forEach(x=>{$(x+'-view').hidden=x!==v;});$('header-lookup').setAttribute('aria-pressed',String(v==='lookup'));if(v==='staff')loadStaff();}
 function startStaffEntry(source){if(!canUseStaff())return;if(APP.pending){showCreateDialog();return;}if(!['PHONE','LINE','COUNTER'].includes(source))return;APP.staffEntry=true;APP.staffSource=source;$('create-auto-followup').checked=false;$('staff-source').value=source;STATE.entry='doctor';STATE.clinic='';STATE.doctor='';STATE.date='';STATE.time='';STATE.slotId='';STATE.doctorQuery='';$('doctor-search').value='';DOCTOR_SLOTS.list=[];DOCTOR_SLOTS.doctorId='';DOCTOR_SLOTS.request++;DOCTOR_SLOTS.busy=false;switchView('booking');render();}
 function returnToStaff(){if(APP.pending){showCreateDialog();return;}if(APP.loading){APP.staffEntry=false;APP.staffRoutePending=true;$('success-dialog').close();showStaffAccess('正在確認使用權限…',true);return;}if(!canUseStaff()){invalidateStaff();return;}APP.staffEntry=false;$('success-dialog').close();switchView('staff');render();}
+
+async function applyBackgroundDirectory(){
+ const pending=window.PUBLIC_BOOTSTRAP_UPDATE;if(!pending)return;
+ const r=await pending;if(!r||!r.ok||!APP.ready||APP.loading||APP.pending||APP.createBusy||STATE.clinic||STATE.doctor)return;
+ Object.assign(APP.data,r.data,{slots:APP.data.slots});APP.today=parseDate(r.data.today);
+ $('clinic-select').innerHTML='<option value="">選醫師不選院區</option>'+APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');
+ render();
+}
+
 async function loadBootstrap(){if(APP.loading)return;const restoreStaff=APP.view==='staff';APP.loading=true;APP.ready=false;SLOT_CACHE.clear();if(window.StaffUI)window.StaffUI.clear();APP.data.canStaff=false;APP.staffRequest++;APP.listBusy=false;$('staff-list').innerHTML='';if(APP.view==='staff'||APP.staffRoutePending)showStaffAccess('正在確認使用權限…',true);$('app-status').textContent='正在取得可選時段…';render();const r=await rpc('getBootstrap');APP.loading=false;if(!r.ok||!r.data||!['TEST','LIVE'].includes(r.data.mode)||!['OFF','SMS'].includes(r.data.notificationMode)||!Array.isArray(r.data.slots)||!Array.isArray(r.data.clinics)||!Array.isArray(r.data.doctors)||!parseDate(r.data.today)){invalidateStaff();$('app-status').innerHTML='<strong>可選時段暫時無法載入。</strong><br>'+esc(r.ok?'系統模式或資料不完整，請管理者確認。':errorInfo(r).message)+' <button class="small-btn" data-reload>重新載入</button>';if(APP.staffRoutePending||APP.view==='staff-access')showStaffAccess('目前無法確認權限，請稍後重新確認。');return;}APP.data=r.data;$('line-account-entry').hidden=!r.data.lineEnabled;$('line-contact-entry').hidden=!r.data.lineEnabled;APP.today=parseDate(r.data.today);APP.data.slots=APP.data.slots.filter(s=>s&&s.id&&parseDate(s.date)&&/^\d{2}:\d{2}$/.test(s.time)&&APP.data.clinics.some(c=>c.id===s.clinicId)&&APP.data.doctors.some(d=>d.id===s.doctorId));APP.ready=true;if(STATE.clinic)refreshPublicSlots();if(doctorMode()&&STATE.doctor)refreshDoctorSlots();if(!STATE.month)STATE.month=new Date(APP.today.getFullYear(),APP.today.getMonth(),1);if(!currentClinic())STATE.clinic='';if(STATE.doctor!=='any'&&!currentDoctor())STATE.doctor='';if(STATE.slotId&&!selectedSlot()){STATE.date='';STATE.time='';STATE.slotId='';}$('clinic-select').innerHTML='<option value="">選醫師不選院區</option>'+APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');$('app-status').textContent='';updateModeCopy();loadDoctorCatalog();if(!canUseStaff())invalidateStaff();render();if(APP.staffRoutePending||restoreStaff){APP.staffRoutePending=false;if(canUseStaff())switchView('staff');else showStaffAccess('請使用已授權的 Google 帳號登入後，再重新確認權限。');}}
 function isLive(){return APP.data.mode==='LIVE';}
 function bookingStatusLabel(b){return {CANCELLED:'已取消',CHECKED_IN:'已報到',NO_SHOW:'未到',HELD:'待補登',CONFIRMED:'預約成功'}[b&&b.status]||'預約成功';}
@@ -500,8 +535,21 @@ if(INITIAL_VIEW==='lookup')switchView('lookup');else if(INITIAL_VIEW==='staff')s
 $('line-account-entry').addEventListener('click',()=>{if(window.LineUI)window.LineUI.open();});
 $('line-contact-entry').addEventListener('click',()=>{if(!APP.pending&&!APP.createBusy&&window.LineUI)window.LineUI.open();});
 window.addEventListener('line-contact-selected',event=>{const contact=event.detail||{};if(APP.pending||APP.createBusy)return;if(typeof contact.name!=='string'||typeof contact.phone!=='string')return;$('create-name').value=contact.name;$('create-phone').value=contact.phone;});
-if(new URLSearchParams(location.search).get('view')==='staff'){location.replace('https://sherrychen1999.github.io/drkingbooking/index.html?staff=1');}else{loadBootstrap();}
+if(new URLSearchParams(location.search).get('view')==='staff'){location.replace('https://sherrychen1999.github.io/drkingbooking/index.html?staff=1');}else{loadBootstrap().then(applyBackgroundDirectory);}
 </script>
 
+
+<script id="public-photo-cache">
+// Background pre-download only public, hash-named doctor photos; no patient data.
+if('serviceWorker' in navigator&&location.protocol==='https:'&&new URLSearchParams(location.search).get('view')!=='staff'){
+ window.addEventListener('load',()=>{
+  const start=()=>navigator.serviceWorker.register('./photo-cache.js',{scope:'./',updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready).then(reg=>{
+   if(navigator.connection&&navigator.connection.saveData)return;
+   if(reg.active)reg.active.postMessage({type:'WARM_PUBLIC_PHOTOS'});
+  }).catch(()=>{});
+  if('requestIdleCallback' in window)requestIdleCallback(start,{timeout:4000});else setTimeout(start,1500);
+ });
+}
+</script>
 </body>
 </html>
