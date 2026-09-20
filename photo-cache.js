@@ -4,13 +4,13 @@ const PHOTO_FILES=["image-084ce356e12a9d9f.webp", "image-0c82cc6f0a59cc22.webp",
 const root=new URL('./',self.location.href),allowed=new Set(PHOTO_FILES.map(p=>new URL(p,root).href));
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
- const cache=await caches.open(PHOTO_CACHE);for(const req of await cache.keys())if(!allowed.has(req.url))await cache.delete(req);
+ try{const cache=await caches.open(PHOTO_CACHE);for(const req of await cache.keys())if(!allowed.has(req.url))await cache.delete(req);}catch(_){}
  await self.clients.claim();
 })()));
 const pending=new Map();
 async function photo(url){
- const cache=await caches.open(PHOTO_CACHE),saved=await cache.match(url);if(saved)return saved;
- if(!pending.has(url))pending.set(url,(async()=>{const r=await fetch(url,{credentials:'omit',cache:'force-cache'});if(r.ok&&/^image\//i.test(r.headers.get('Content-Type')||''))await cache.put(url,r.clone());return r;})().finally(()=>pending.delete(url)));
+ let cache=null;try{cache=await caches.open(PHOTO_CACHE);const saved=await cache.match(url);if(saved)return saved;}catch(_){}
+ if(!pending.has(url))pending.set(url,(async()=>{const r=await fetch(url,{credentials:'omit',cache:'force-cache'});if(cache&&r.ok&&/^image\//i.test(r.headers.get('Content-Type')||'')){try{await cache.put(url,r.clone());}catch(_){}}return r;})().finally(()=>pending.delete(url)));
  return (await pending.get(url)).clone();
 }
 self.addEventListener('fetch',event=>{
