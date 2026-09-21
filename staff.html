@@ -441,8 +441,14 @@ function _friendlyErr(e) {
 /* 工作階段失效（過期、被登出、後端重新部署）→ 清乾淨並退回登入畫面。
    前端刻意不保留任何長期憑證，所以這裡沒有東西可以「續期」，
    重新登入是唯一的路，這是設計，不是缺陷。 */
+/* 2026-09-21：把後台 session 同步到同分頁的 sessionStorage，讓內嵌的手機入口
+   （同網域 iframe，共用同一個 sessionStorage）切成全院區測試模式。
+   只在同一個分頁內有效；關掉分頁就沒了。登出或失效時一併清除。 */
+function syncStaffSession() {
+  try { if (S.session) sessionStorage.setItem('drking-staff-session', S.session); else sessionStorage.removeItem('drking-staff-session'); } catch(_){}
+}
 function authLost() {
-  S.session = ''; S.cUser = null; S.aUser = null;
+  S.session = ''; S.cUser = null; S.aUser = null; syncStaffSession();
   try {
     const cm=$('#c-main'), cl=$('#c-login'), am=$('#a-main'), al=$('#a-login');
     if (cm && cm.style.display !== 'none') { cm.style.display='none'; if (cl) cl.style.display='block'; }
@@ -1799,6 +1805,7 @@ async function counterLogin(idEl, pwEl, errEl, isAdmin) {
     /* 舊後端不會回 session；留空即可，讓新舊版切換期間不中斷。
        新後端部署後沒有 session 的呼叫會被擋下並退回登入。 */
     S.session = d.session || '';
+    syncStaffSession();
     return { employeeId:id, name:d.name||d['員工姓名']||id, role:d.role||'counter', roleLabel:d.roleLabel||'',
              clinics:d.clinics||[], clinic:d.clinic||d['所屬院區']||'' };
   }
@@ -3801,7 +3808,7 @@ document.addEventListener('click', async e => {
     /* nav */
     case 'portal': {
       if(el.dataset.p!=='counter'&&!S._staffExtrasLoaded){S._staffExtrasLoaded=true;loadPhotosInBg();}
-      if(el.dataset.p==='portal'){const pf=document.getElementById('portal-frame');if(pf&&!pf.getAttribute('src'))pf.setAttribute('src','index.html');}
+      if(el.dataset.p==='portal'){const pf=document.getElementById('portal-frame');if(pf){const want=S.session||'';if(!pf.getAttribute('src')||pf.dataset.sess!==want){syncStaffSession();const first=!pf.getAttribute('src');pf.dataset.sess=want;pf.setAttribute('src',first?'index.html':'index.html?r='+Date.now());}}}
       if(el.dataset.p==='patient')loadSoonest();
       document.querySelectorAll('nav .tabs button').forEach(b => b.classList.toggle('on', b === el));
       document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
@@ -3985,7 +3992,7 @@ document.addEventListener('click', async e => {
     case 'close-modal': (m || el.closest('.mask'))?.remove(); break;
     /* counter */
     case 'c-login': { const u = await counterLogin('#cl-id','#cl-pw','#cl-err', false); if (u) { S.cUser = u; cShow(); } break; }
-    case 'c-logout': api.post('staffLogout', {}, true); S.session=''; S.cUser = null; $('#c-main').style.display='none'; $('#c-login').style.display='block'; break;
+    case 'c-logout': api.post('staffLogout', {}, true); S.session=''; syncStaffSession(); S.cUser = null; $('#c-main').style.display='none'; $('#c-login').style.display='block'; break;
     case 'c-menu': {
       S.cView = el.dataset.v;
       if (el.dataset.v === 'call') { const t = new Date(); t.setDate(t.getDate() + 1); S.cDate = fmtD(t); }
@@ -4272,7 +4279,7 @@ document.addEventListener('click', async e => {
     /* admin */
     case 'a-login': { const u = await counterLogin('#al-id','#al-pw','#al-err', true);
       if (u) { S.aUser = u; aShow(); } break; }   // 權限暫全開，之後再依職位收斂
-    case 'a-logout': api.post('staffLogout', {}, true); S.session=''; S.aUser = null; $('#a-main').style.display='none'; $('#a-login').style.display='block'; break;
+    case 'a-logout': api.post('staffLogout', {}, true); S.session=''; syncStaffSession(); S.aUser = null; $('#a-main').style.display='none'; $('#a-login').style.display='block'; break;
     case 'a-menu': S.aView = el.dataset.v; renderAdmin(); break;
     case 'a-sync': aSync(el); break;
     case 'ap-edit': openProfileEdit(el.dataset.d); break;
