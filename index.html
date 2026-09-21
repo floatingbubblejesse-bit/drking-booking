@@ -20,7 +20,7 @@ if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SES
   const d=r&&r.ok&&r.data,c=d&&d.publicCatalog,now=Date.now();
   if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||now-c.at>30*86400000||c.expiresAt-c.at>60000||c.expiresAt<c.at||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
   const clinics=d.clinics.map(x=>({id:x.id,name:x.name,sourceCode:x.sourceCode}));
-  const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank}));
+  const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank,specialties:Array.isArray(x.specialties)?x.specialties.filter(s=>typeof s==='string'&&s.length<=30).slice(0,8):undefined}));
   const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const config=x=>({initMin:x.initMin,followMin:x.followMin});
@@ -81,7 +81,8 @@ dialog h2:focus{outline:none}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
 .any-doctor{display:flex;flex-direction:column;align-items:center;justify-content:center;align-self:stretch;width:100%;color:#70a798;gap:14px}.any-doctor svg{width:56px;height:56px;color:inherit}.any-doctor span{font-size:10px;letter-spacing:.035em;color:#769a8f}
 [hidden]{display:none!important}.notice{background:#edf6f3;border:1.5px solid var(--line);border-radius:12px;padding:13px 15px;margin:0 0 15px;font-size:12px;color:#416d5a;line-height:1.8}
-.pilot-badge{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--teal);border:1.5px solid var(--teal);border-radius:999px;padding:1px 9px;line-height:1.6}
+.pilot-badge{display:inline-block;vertical-align:.18em;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--teal);border:1.5px solid var(--teal);border-radius:999px;padding:0 8px;line-height:1.6}
+.pilot-badge[hidden]{display:none}
 .pilot-note{margin-top:10px;border:1.5px solid var(--line);border-radius:12px;background:#f3f8f7;padding:10px 13px;font-size:12px;line-height:1.7;color:#416d5a;display:flex;flex-direction:column;gap:1px}
 .pilot-note[hidden]{display:none}
 .pilot-note.staff{background:#fbf6ea;border-color:#eadfc8;color:#7a6331}
@@ -244,10 +245,10 @@ dialog h2:focus{outline:none}
 </head>
 <body>
 <div class="page">
-<header class="brand-header"><button class="brand-mark brand-home" type="button" data-view="booking" aria-label="返回預約首頁"><img fetchpriority="high" decoding="async" src="image-24ae883abca41cd4.jpg" width="1000" height="311" alt="金鶯診所鳥標"></button><h1 class="brand-title"><strong>金鶯診所</strong><span>減重診預約</span></h1><button class="header-lookup" id="header-lookup" type="button" data-view="lookup" aria-label="查詢／取消預約" title="查詢／取消預約" aria-pressed="false"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M7 2v4m8-4v4M3 9h16"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m19 19 3 3"/></svg></button></header>
+<header class="brand-header"><button class="brand-mark brand-home" type="button" data-view="booking" aria-label="返回預約首頁"><img fetchpriority="high" decoding="async" src="image-24ae883abca41cd4.jpg" width="1000" height="311" alt="金鶯診所鳥標"></button><h1 class="brand-title"><strong>金鶯診所</strong><span>減重診預約<small id="pilot-badge" class="pilot-badge" hidden>Beta</small></span></h1><button class="header-lookup" id="header-lookup" type="button" data-view="lookup" aria-label="查詢／取消預約" title="查詢／取消預約" aria-pressed="false"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M7 2v4m8-4v4M3 9h16"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m19 19 3 3"/></svg></button></header>
 
 <main id="booking-view">
-<section class="panel" id="clinic-section" aria-labelledby="clinic-heading"><div class="section-top"><span class="step-no">1</span><h2 id="clinic-heading">選擇院區</h2><span id="pilot-badge" class="pilot-badge" hidden>Beta</span><div id="clinic-contact" class="clinic-tools icon-row" hidden></div></div><div id="app-status" class="notice" role="status">正在取得可選時段…</div>
+<section class="panel" id="clinic-section" aria-labelledby="clinic-heading"><div class="section-top"><span class="step-no">1</span><h2 id="clinic-heading">選擇院區</h2><div id="clinic-contact" class="clinic-tools icon-row" hidden></div></div><div id="app-status" class="notice" role="status">正在取得可選時段…</div>
 <div id="pending-alert" class="notice warning" hidden><strong>有一筆送出結果尚待確認。</strong><p>請勿重新建立另一筆；請以相同送出編號查回結果。</p><button class="small-btn" id="recover-create">重新確認上次送出</button></div>
 <div id="staff-entry-banner" class="notice staff-entry-banner" hidden><span id="staff-entry-source">櫃檯代填</span><button class="small-btn" id="leave-staff-entry" type="button">返回櫃檯</button></div>
 <label class="sr-only" for="clinic-select">看診院區</label><div class="select-wrap"><select id="clinic-select"><option value="">選醫師不選院區</option></select><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 9 6 6 6-6"/></svg></div><div id="pilot-note" class="pilot-note" role="note" hidden></div></section>
@@ -331,12 +332,15 @@ function doctorMode(){return STATE.entry==='doctor';}
 /* 2026-09-21 分院區試點：後端只開放一個院區時，院區欄固定不可改，
    也不提供「選醫師不選院區」。真正的限制在後端（非試點院區一律擋下），
    這裡只是讓畫面和後端一致，不要讓病人選了一個約不到的院區。 */
+/* 其他院區：導到擇木良食正式 LINE 官方帳號（@selectgoodfood，rich menu 有「減重門診預約」）加好友；已是好友則直接開聊天室。
+   後端指令碼屬性 PILOT_OTHER_URL 有設定時以後端為準。 */
+const PILOT_LINE_ADD_FRIEND='https://line.me/R/ti/p/@selectgoodfood';
 function pilotLocked(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1);}
 function clinicOptionsHtml(){const opts=APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');return pilotLocked()?opts:'<option value="">選醫師不選院區</option>'+opts;}
 function applyPilotLock(){if(!pilotLocked())return false;const id=APP.data.clinics[0].id;if(STATE.entry==='clinic'&&STATE.clinic===id)return false;STATE.entry='clinic';STATE.clinic=id;STATE.doctor='any';STATE.doctorQuery='';STATE.date='';STATE.time='';STATE.slotId='';STATE.slotFrom=APP.data.today;return true;}
 function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',on);
  if(staff){el.innerHTML='<strong>全院區測試模式</strong><span>後台已登入，可以測試所有院區。病人從 LINE 進來看到的是試點版。</span>';return;}
- if(!on){el.innerHTML='';return;}const p=APP.data.pilot,name=APP.data.clinics[0].name;el.innerHTML=(expired?'<span class="pilot-warn">後台登入已過期，目前是病人看到的版本。請回後台重新登入。</span>':'')+'<strong>手機預約目前僅開放'+esc(name)+'</strong><span>'+(p.otherUrl?'其他院區請<a href="'+esc(p.otherUrl)+'" rel="noopener">使用原本的預約方式</a>':'其他院區請使用原本的 LINE 預約或來電')+'</span>';}
+ if(!on){el.innerHTML='';return;}const p=APP.data.pilot,name=APP.data.clinics[0].name;el.innerHTML=(expired?'<span class="pilot-warn">後台登入已過期，目前是病人看到的版本。請回後台重新登入。</span>':'')+'<strong>手機預約目前僅開放'+esc(name)+'</strong><span>'+'其他院區請<a href="'+esc(p.otherUrl||PILOT_LINE_ADD_FRIEND)+'" rel="noopener">使用原本的 LINE 預約</a>'+'</span>';}
 /* 院區醫師排序覆寫（2026-09-19）：head 依序排最前、tail 依序排最後、其餘依後端 rank。三樹院區：張慧馨、闕壯理、黃允玫 ｜（其他）｜ 蕭捷健、蕭捷存、黃錦崧。其他院區與「選醫師不選院區」不受影響 */
 const CLINIC_DOCTOR_ORDER={c1:{head:['doc_f63d073785','doc_899a7d80e0','doc_8112d4e1f2'],tail:['hsiao_chieh_chien','hsiao_chieh_tsuen','huang_chin_sung']}};
 function clinicOrderKey(id,clinicId){const o=CLINIC_DOCTOR_ORDER[clinicId||STATE.clinic];if(!o)return [1,0];let i=o.head.indexOf(id);if(i>=0)return [0,i];i=o.tail.indexOf(id);if(i>=0)return [2,i];return [1,0];}
@@ -400,8 +404,11 @@ const ANY_DOCTOR_ICON='<svg width="60" height="60" viewBox="0 0 64 64" fill="non
 const SPECIALTY_PLACEHOLDER=['女性肥胖','停經肥胖','內臟脂肪','腰臀肥胖'];/* 暫用：尚未有醫師專長資料前，依醫師 ID 固定指派一項 */
 /* 專長池（2026-09-19 診所提供 20 項）：每位醫師依 id 決定性地抽 3 項，同一位醫師每次開啟都相同 */
 const SPECIALTY_POOL=['內臟脂肪','更年期肥胖','暴食症／情緒飲食','泡芙人（隱性肥胖）','頑固型肥胖','中央型（腹部）肥胖','腰臀比超標','臀腿（梨型）肥胖','青少年肥胖','賀爾蒙失調肥胖','基礎代謝低下','多囊性卵巢肥胖','產後體態復原','代謝症候群','脂肪肝調理','GLP-1 藥物減重','應酬外食型肥胖','水腫型肥胖','抗復胖管理','代謝修復'];
-function doctorSpecialties(d){return Array.isArray(d&&d.specialties)?d.specialties.filter(x=>typeof x==='string'):[];}
-function doctorSpecialty(d){return d&&typeof d.specialty==='string'?d.specialty.trim():'';}
+/* 2026-09-21 依院長決定恢復 9/19 版：每位醫師依 id 從專長池固定抽 3 項。
+   9/20 接上舊後端時這段被換成讀後端的 specialties 欄位，但舊後端沒有這個欄位，
+   導致專長按鈕全部消失。注意：這不是醫師本人登記的專長，是依 id 決定性指派。 */
+function doctorSpecialties(d){/* 後台「系統管理 → 醫師排序」有填專長就用後台的（單一來源），沒填才用自動指派 */if(Array.isArray(d&&d.specialties)){const own=d.specialties.filter(x=>typeof x==='string'&&x.trim()).slice(0,8);if(own.length)return own;}let h=2166136261;for(const ch of String(d&&d.id||''))h=Math.imul(h^ch.charCodeAt(0),16777619)>>>0;const pool=SPECIALTY_POOL.slice(),out=[];while(out.length<3&&pool.length){h=(Math.imul(h,1664525)+1013904223)>>>0;out.push(pool.splice(h%pool.length,1)[0]);}return out;}
+function doctorSpecialty(d){if(d&&typeof d.specialty==='string'&&d.specialty.trim())return d.specialty.trim();let h=0;for(const ch of String(d&&d.id||''))h=(h*31+ch.charCodeAt(0))>>>0;return SPECIALTY_PLACEHOLDER[h%SPECIALTY_PLACEHOLDER.length];}
 function doctorCardHtml(d){const selected=STATE.doctor===d.id,any=d.id==='any',photo=DOCTOR_IMAGES[d.id],frame={WHITE:'white',WARM:'warm',MINT:'mint'}[d.photo&&d.photo.frame]||'white';return '<div class="dcard'+(selected?' selected':'')+'"><button type="button" class="dphoto" data-doctor="'+esc(d.id)+'" aria-pressed="'+selected+'" aria-label="'+esc(any?'不指定醫師':'選擇 '+d.name+' 醫師')+'"><div class="photo-frame frame-'+frame+'">'+(photo?'<img src="'+photo+'" alt="" loading="lazy" decoding="async">':'<div class="any-doctor" aria-hidden="true">'+ANY_DOCTOR_ICON+'</div>')+'</div></button>'+'<div class="dcard-name">'+esc(d.name)+(any?'':' 醫師')+'</div>'+(any?'':doctorSpecialties(d).length?'<button type="button" class="dspec" data-doctor-info="'+esc(d.id)+'" aria-label="'+esc(d.name)+' 醫師專長與資歷">專長</button>':'')+'</div>';}
 function renderDoctorNav(){const pages=DOCTOR_VIEW.pages,page=DOCTOR_VIEW.page;$('doctor-prev').hidden=pages<=1;$('doctor-next').hidden=pages<=1;$('doctor-prev').disabled=page<=0;$('doctor-next').disabled=page>=pages-1;$('doctor-dots').innerHTML=pages>1?Array.from({length:pages},(_,i)=>'<button type="button" class="dot'+(i===page?' on':'')+'" data-doctor-page="'+i+'" role="tab" aria-selected="'+(i===page)+'" aria-label="第 '+(i+1)+' 頁">'+(i+1)+'</button>').join(''):'';}
 function goDoctorPage(i){const pages=DOCTOR_VIEW.pages;i=Math.max(0,Math.min(pages-1,Number(i)||0));DOCTOR_VIEW.page=i;renderDoctorNav();const t=$('doctor-list');try{if(t&&typeof t.clientWidth==='number'&&t.clientWidth>0){if(typeof t.scrollTo==='function')t.scrollTo({left:i*t.clientWidth,behavior:'smooth'});else t.scrollLeft=i*t.clientWidth;}}catch(e){}}
