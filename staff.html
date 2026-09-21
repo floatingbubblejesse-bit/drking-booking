@@ -407,7 +407,9 @@ const IS_STAFF = true;
 const LOCK_CLINIC_RAW = String(_Q.get('c') || '').trim();
 const CFG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec',
-  TOKEN: 'kw_jingying_R9x2mQ7kL4nP8vH3aB6cD1eF5g',
+  /* 2026-09-21：這裡原本放一組共用 TOKEN。這個檔案是 GitHub Pages 上的
+     公開檔案，任何人打開原始碼就看得到，等於把鑰匙印在門板上。
+     改成登入後由後端發短效 session，前端不再持有任何長期憑證。 */
   LIFF_ID: '',
   CACHE_TTL: 10 * 60 * 1000,   // 班表快取 10 分鐘
 };
@@ -436,15 +438,29 @@ function _friendlyErr(e) {
     ? '系統繁忙逾時。請先重新整理並查詢確認是否已成功，避免重複送出'
     : String(e);
 }
+/* 工作階段失效（過期、被登出、後端重新部署）→ 清乾淨並退回登入畫面。
+   前端刻意不保留任何長期憑證，所以這裡沒有東西可以「續期」，
+   重新登入是唯一的路，這是設計，不是缺陷。 */
+function authLost() {
+  S.session = ''; S.cUser = null; S.aUser = null;
+  try {
+    const cm=$('#c-main'), cl=$('#c-login'), am=$('#a-main'), al=$('#a-login');
+    if (cm && cm.style.display !== 'none') { cm.style.display='none'; if (cl) cl.style.display='block'; }
+    if (am && am.style.display !== 'none') { am.style.display='none'; if (al) al.style.display='block'; }
+  } catch(_){}
+}
+
 const api = {
   async post(action, payload, withToken) {
     const body = { action, payload: payload || {} };
-    if (withToken) body.token = CFG.TOKEN;
+    if (withToken) body.token = S.session || '';
     const ctl = new AbortController();
     const tm = setTimeout(() => ctl.abort(), API_TIMEOUT);
     try {
       const r = await fetch(CFG.GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body), signal: ctl.signal });
-      return await r.json();
+      const j = await r.json();
+      if (withToken && j && j.ok === false && /unauthorized/.test(String(j.error || ''))) authLost();
+      return j;
     } catch (e) { return { ok:false, error:_friendlyErr(e) }; }
     finally { clearTimeout(tm); }
   },
@@ -487,6 +503,7 @@ const S = {
   cUser: null, cView:'day', cMode:'day', cDate: null, cClinic: null, cSession:'all',
   // 管理
   aUser: null, aView:'dash',
+  session: '',            // 登入後由後端發的短效憑證；只放記憶體，重新整理就要重登
 };
 function resetBk() {
   S.bk = { step:1, view:'doctor', doctor:null, clinic:null, anyDoc:false,
@@ -1772,19 +1789,25 @@ async function counterLogin(idEl, pwEl, errEl, isAdmin) {
   const id = $(idEl).value.trim(), pw = $(pwEl).value.trim();
   if (!id || !pw) { $(errEl).textContent = '請輸入帳密'; return null; }
   $(errEl).textContent = '驗證中…';
-  // 系統後門帳號（離線可用）
-  if (id === '0006' && pw === '4916') {
-    $(errEl).textContent = '';
-    return { employeeId:'0006', name:'金鶯主管理員', role:'admin', clinics:[], clinic:'全院區' };
-  }
+  /* 2026-09-21：這裡原本寫死一組「離線可用」的管理員帳密，而這個檔案是
+     公開的 —— 任何人看原始碼就能拿到管理員權限，而且根本不經過後端。
+     已移除；0006 現在一律走「員工」表驗證。 */
   const res = await api.post('verifyEmployee', { employeeId:id, password:pw }, false);
   if (res.ok && res.data) {
     $(errEl).textContent = '';
     const d = res.data;
+    /* 舊後端不會回 session；留空即可，讓新舊版切換期間不中斷。
+       新後端部署後沒有 session 的呼叫會被擋下並退回登入。 */
+    S.session = d.session || '';
     return { employeeId:id, name:d.name||d['員工姓名']||id, role:d.role||'counter', roleLabel:d.roleLabel||'',
              clinics:d.clinics||[], clinic:d.clinic||d['所屬院區']||'' };
   }
-  $(errEl).textContent = res.error === 'cloud_disabled' ? '雲端未啟用' : '帳號或密碼錯誤';
+  $(errEl).textContent =
+      res.error === 'locked'              ? '連續失敗太多次，請 15 分鐘後再試'
+    : res.error === 'session_unavailable' ? '帳密正確，但工作階段建立失敗，請再試一次'
+    : res.error === 'inactive'            ? '此帳號已停用'
+    : res.error === 'cloud_disabled'      ? '雲端未啟用'
+    : '帳號或密碼錯誤';
   return null;
 }
 /* 員工所屬院區 → 系統院區名（容錯：「三樹」「三樹院區」都認得；全院區/空白回傳空） */
@@ -3962,7 +3985,7 @@ document.addEventListener('click', async e => {
     case 'close-modal': (m || el.closest('.mask'))?.remove(); break;
     /* counter */
     case 'c-login': { const u = await counterLogin('#cl-id','#cl-pw','#cl-err', false); if (u) { S.cUser = u; cShow(); } break; }
-    case 'c-logout': S.cUser = null; $('#c-main').style.display='none'; $('#c-login').style.display='block'; break;
+    case 'c-logout': api.post('staffLogout', {}, true); S.session=''; S.cUser = null; $('#c-main').style.display='none'; $('#c-login').style.display='block'; break;
     case 'c-menu': {
       S.cView = el.dataset.v;
       if (el.dataset.v === 'call') { const t = new Date(); t.setDate(t.getDate() + 1); S.cDate = fmtD(t); }
@@ -4183,7 +4206,7 @@ document.addEventListener('click', async e => {
       const msg = box.querySelector('.bkb-msg');
       if (!caseNo) { msg.textContent = '請先輸入病歷號'; break; }
       msg.textContent = '查詢中…';
-      const res = await api.get('lookupPatient', { keyword: caseNo, clinic: S.cClinic });
+      const res = await api.post('lookupPatient', { keyword: caseNo, clinic: S.cClinic }, true);
       const hit = (res.ok && res.data && res.data[0]) || null;
       if (hit) {
         box.querySelector('#bkb-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
@@ -4206,7 +4229,7 @@ document.addEventListener('click', async e => {
       const msg = m.querySelector('#qk-case-msg');
       if (!caseNo) { msg.textContent = '請先輸入病歷號'; break; }
       msg.textContent = '查詢中…';
-      const res = await api.get('lookupPatient', { keyword: caseNo, clinic: S.cClinic });
+      const res = await api.post('lookupPatient', { keyword: caseNo, clinic: S.cClinic }, true);
       const hit = (res.ok && res.data && res.data[0]) || null;
       if (hit) {
         m.querySelector('#qk-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
@@ -4249,7 +4272,7 @@ document.addEventListener('click', async e => {
     /* admin */
     case 'a-login': { const u = await counterLogin('#al-id','#al-pw','#al-err', true);
       if (u) { S.aUser = u; aShow(); } break; }   // 權限暫全開，之後再依職位收斂
-    case 'a-logout': S.aUser = null; $('#a-main').style.display='none'; $('#a-login').style.display='block'; break;
+    case 'a-logout': api.post('staffLogout', {}, true); S.session=''; S.aUser = null; $('#a-main').style.display='none'; $('#a-login').style.display='block'; break;
     case 'a-menu': S.aView = el.dataset.v; renderAdmin(); break;
     case 'a-sync': aSync(el); break;
     case 'ap-edit': openProfileEdit(el.dataset.d); break;
