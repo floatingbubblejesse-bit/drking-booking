@@ -23,9 +23,11 @@ if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SES
   const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank,specialties:Array.isArray(x.specialties)?x.specialties.filter(s=>typeof s==='string'&&s.length<=30).slice(0,8):undefined}));
   const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
+  /* 2026-09-21 v87：後端隨班表附上滿診／停診的日子；只收合法欄位，沒有就不加（舊後端） */
+  const closed=Array.isArray(c.closed)?c.closed.filter(x=>x&&typeof x.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&typeof x.clinicId==='string'&&typeof x.doctorId==='string'&&(x.status==='滿診'||x.status==='停診')).slice(0,5000).map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,status:x.status})):null;
   const config=x=>({initMin:x.initMin,followMin:x.followMin});
   const configs=x=>Object.fromEntries(Object.entries(x||{}).map(([k,v])=>[k,config(v)]));
-  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,publicVersion:typeof d.publicVersion==='string'?d.publicVersion:'',clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,pilot:pilotOf(d.pilot),staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at}}};
+  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,publicVersion:typeof d.publicVersion==='string'?d.publicVersion:'',clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays,...(closed?{closed}:{})},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,pilot:pilotOf(d.pilot),staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at}}};
  }
 
  let latest=null,inflight=null;
@@ -296,7 +298,8 @@ function legacyDateReady(){return !!STATE.date&&!LEGACY_DATE.busy&&LEGACY_DATE.k
 let LEGACY_CATALOG_LOADING=null;
 async function legacyLocalSlots(p){let c=APP.data.publicCatalog;if(!c||c.expiresAt<=Date.now()){if(!LEGACY_CATALOG_LOADING)LEGACY_CATALOG_LOADING=(window.PUBLIC_BOOTSTRAP?window.PUBLIC_BOOTSTRAP.refresh():rpc('getBootstrap')).finally(()=>{LEGACY_CATALOG_LOADING=null;});const r=await LEGACY_CATALOG_LOADING;if(!r.ok)return r;if(!r.data||r.data.backend!=='LEGACY')return {ok:false,error:{code:'INVALID_STATE',message:'資料來源已更新，請重新載入。'}};c=r.data.publicCatalog;Object.assign(APP.data,r.data,{slots:APP.data.slots});APP.today=parseDate(r.data.today);}try{return {ok:true,data:{slots:legacyCandidateSlots_(c,p),candidatesOnly:true}};}catch(e){return {ok:false,error:{code:'INVALID_STATE',message:'班表資料有誤，請重新載入。'}};}}
 /* ===== 2026-09-21 名額預先確認＋滿診／停診立即判定 =====
-   1. 開入口就在背景讀「診次狀態」（後台設的滿診／停診，例如蕭捷健 11 月前全鎖），
+   1. 滿診／停診（後台「診次狀態」，例如蕭捷健 11 月前全鎖）：v87 後端隨班表一起給（publicCatalog.closed）；
+      舊後端沒給時，開入口在背景讀一次 getPublicConfig 補上。
       那些日子直接當作沒有時段：日期不能點、門診表標成額滿，不必等後端逐日確認。
    2. 背景默默確認最近幾天的名額（開入口先確認複診最近 4 天；選好診別後確認目前醫師最近 8 天），
       點日期時若 2 分鐘內確認過就直接顯示時段。每次最多同時 2 筆、同一天同一診別只預讀一次，
@@ -310,8 +313,10 @@ function verifyDate(clinic,date,type){const k=verifyKey(clinic,date,type);if(VER
  const pr=rpc('getLegacyDateSlots',{clinicId:clinic,date,visitType:type}).then(r=>{if(r&&r.ok&&r.data&&Array.isArray(r.data.slots)&&r.data.slots.every(s=>s.clinicId===clinic&&s.date===date&&s.visitType===type&&s.availabilityVerified===true))VERIFY_CACHE.set(k,{at:Date.now(),slots:r.data.slots});return r;}).finally(()=>{VERIFY_INFLIGHT.delete(k);});VERIFY_INFLIGHT.set(k,pr);return pr;}
 function mergeVerified(clinic,date,type,slots){if(STATE.clinic!==clinic||STATE.visitType!==type)return false;APP.data.slots=APP.data.slots.filter(s=>s.clinicId!==clinic||s.date!==date).concat(slots);return true;}
 function dayClosedKey(clinicName,date,doctorName){return String(clinicName||'')+'|'+String(date||'').slice(0,10)+'|'+String(doctorName||'').replace(/\s*醫師\s*$/,'').trim();}
-function slotClosed(s){if(!DAY_CLOSED.size||!s)return false;const k=s.clinicId+'|'+s.date+'|'+s.doctorId;if(DAY_CLOSED_SLOT.has(k))return DAY_CLOSED_SLOT.get(k);const c=APP.data.clinics.find(x=>x.id===s.clinicId),d=APP.data.doctors.find(x=>x.id===s.doctorId),v=!!(c&&d&&DAY_CLOSED.has(dayClosedKey(c.name,s.date,d.name)));DAY_CLOSED_SLOT.set(k,v);return v;}
-async function loadDayStatus(){if(DAY_STATUS.loading||!APP.data||!parseDate(APP.data.today))return;DAY_STATUS.loading=true;
+const CAT_CLOSED={ref:undefined,set:null};
+function catalogClosed(){const c=APP.data&&APP.data.publicCatalog;if(c!==CAT_CLOSED.ref){CAT_CLOSED.ref=c;CAT_CLOSED.set=c&&Array.isArray(c.closed)?new Set(c.closed.map(x=>x.clinicId+'|'+x.date+'|'+x.doctorId)):null;DAY_CLOSED_SLOT.clear();}return CAT_CLOSED.set;}
+function slotClosed(s){if(!s)return false;const k=s.clinicId+'|'+s.date+'|'+s.doctorId,cat=catalogClosed();if(cat&&cat.has(k))return true;/* v87 後端已隨班表給 */if(!DAY_CLOSED.size)return false;if(DAY_CLOSED_SLOT.has(k))return DAY_CLOSED_SLOT.get(k);const c=APP.data.clinics.find(x=>x.id===s.clinicId),d=APP.data.doctors.find(x=>x.id===s.doctorId),v=!!(c&&d&&DAY_CLOSED.has(dayClosedKey(c.name,s.date,d.name)));DAY_CLOSED_SLOT.set(k,v);return v;}
+async function loadDayStatus(){if(DAY_STATUS.loading||!APP.data||!parseDate(APP.data.today)||catalogClosed())return;/* 班表已附滿診／停診（v87 後端）就不必另外讀 */DAY_STATUS.loading=true;
  try{const url=new URL(BACKEND_URL),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);url.searchParams.set('action','getPublicConfig');url.searchParams.set('from',APP.data.today);url.searchParams.set('to',iso(addDays(parseDate(APP.data.today),50)));
   let r;try{const res=await fetch(url.href,{credentials:'omit',signal:controller.signal,redirect:'follow'});r=res&&res.ok?await res.json():null;}finally{clearTimeout(timer);}
   const rows=r&&r.ok&&r.data&&Array.isArray(r.data.dayStatus)?r.data.dayStatus:null;if(!rows)return;
