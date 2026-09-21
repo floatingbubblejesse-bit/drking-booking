@@ -313,7 +313,18 @@ function legacyCandidateSlots_(catalog,input){
 }
 
 const BACKEND_URL='https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec';
+/* 2026-09-21 LINE LIFF：從 rich menu（https://liff.line.me/…）打開時取得 LINE 身分。
+   只在 LINE App 內才載入 LIFF SDK；一般瀏覽器完全不受影響。
+   送出預約時只附上 ID Token（1 小時有效），由後端向 LINE 驗證換出 userId——
+   依 LINE 官方建議，不從前端直接傳 userId。驗證不過就只發簡訊，預約照常成立。 */
+const LIFF_ID='';   /* ← 在 LINE Developers 建好 LIFF 後填入，例如 2000123456-AbCdEfGh */
+const LIFF_STATE={ready:false};
+function inLineApp(){return /\bLine\//i.test(navigator.userAgent||'');}
+async function initLiff(){if(!LIFF_ID||!inLineApp())return;try{if(!window.liff){await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://static.line-scdn.net/liff/edge/2/sdk.js';s.async=true;s.onload=ok;s.onerror=()=>no(new Error('liff sdk'));document.head.appendChild(s);});}await window.liff.init({liffId:LIFF_ID});LIFF_STATE.ready=!!window.liff.isLoggedIn();}catch(_){LIFF_STATE.ready=false;}}
+function lineIdTokenNow(){try{if(!LIFF_STATE.ready)return '';const d=window.liff.getDecodedIDToken();if(!d||!d.exp||d.exp*1000<Date.now()+60000)return '';return window.liff.getIDToken()||'';}catch(_){return '';}}
 async function rpc(method,payload,timeout=45000){
+ /* 送出預約時才取 ID Token（重試時也是當下重取），不存進待確認的送出內容 */
+ if(method==='createBooking'){const tok=lineIdTokenNow();if(tok)payload=Object.assign({},payload,{lineIdToken:tok});}
  if(method==='getBootstrap'&&window.EARLY_BOOTSTRAP){const pending=window.EARLY_BOOTSTRAP;window.EARLY_BOOTSTRAP=null;return await pending;}
  if(method==='getBootstrap'&&window.PUBLIC_BOOTSTRAP)return window.PUBLIC_BOOTSTRAP.refresh(true);
  const action={getBootstrap:'v2Bootstrap',getLegacyDateSlots:'v2Slots',createBooking:'v2Create',lookupBooking:'v2Lookup',cancelBooking:'v2Cancel'}[method];if(!action)return {ok:false,error:{code:'INVALID_INPUT',message:'請由原櫃檯入口操作此功能。'}};
@@ -573,7 +584,7 @@ if(INITIAL_VIEW==='lookup')switchView('lookup');else if(INITIAL_VIEW==='staff')s
 $('line-account-entry').addEventListener('click',()=>{if(window.LineUI)window.LineUI.open();});
 $('line-contact-entry').addEventListener('click',()=>{if(!APP.pending&&!APP.createBusy&&window.LineUI)window.LineUI.open();});
 window.addEventListener('line-contact-selected',event=>{const contact=event.detail||{};if(APP.pending||APP.createBusy)return;if(typeof contact.name!=='string'||typeof contact.phone!=='string')return;$('create-name').value=contact.name;$('create-phone').value=contact.phone;});
-if(new URLSearchParams(location.search).get('view')==='staff'){location.replace('https://sherrychen1999.github.io/drkingbooking/index.html?staff=1');}else{loadBootstrap().then(applyBackgroundDirectory);}
+if(new URLSearchParams(location.search).get('view')==='staff'){location.replace('https://sherrychen1999.github.io/drkingbooking/index.html?staff=1');}else{initLiff();loadBootstrap().then(applyBackgroundDirectory);}
 </script>
 
 
