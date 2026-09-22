@@ -158,6 +158,21 @@ nav .tabs button.on{background:var(--blue);color:#fff}
 .side .who{font-size:15px;color:var(--txt3)}.side .whon{font-weight:700;font-size:17px;margin:2px 0 10px}
 .side .mi{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;font-size:16px;color:var(--txt2);cursor:pointer;margin-bottom:2px}
 .side .mi:hover{background:#f1f5f9}.side .mi.on{background:#dbeafe;color:#1e40af;font-weight:700}
+/* ✨ v31.22 選單分組＋收合 */
+.side .mgrp{font-size:12.5px;font-weight:800;color:#94a3b8;letter-spacing:.08em;margin:12px 0 5px;padding-left:4px}
+.side .mfold{margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
+.side .mfold>summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:800;color:#94a3b8;letter-spacing:.08em;padding-left:4px;margin-bottom:5px;user-select:none}
+.side .mfold>summary::-webkit-details-marker{display:none}
+.side .mfold>summary::before{content:'▸ '}
+.side .mfold[open]>summary::before{content:'▾ '}
+.side .mfold>summary:hover{color:#475569}
+/* ✨ v31.22 說明文字改成可收合，預設收起 */
+details.hint{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;margin-bottom:11px}
+details.hint>summary{list-style:none;cursor:pointer;padding:8px 13px;font-size:14px;font-weight:700;color:#1e40af;user-select:none}
+details.hint>summary::-webkit-details-marker{display:none}
+details.hint>summary::before{content:'▸ '}
+details.hint[open]>summary::before{content:'▾ '}
+details.hint>div{padding:0 13px 11px;font-size:14px;line-height:1.75;color:#1e3a5f}
 .login-card{max-width:360px;margin:60px auto;text-align:center}
 .login-card input{width:100%;margin-bottom:10px;text-align:center}
 /* counter grid */
@@ -346,15 +361,20 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="who">當前登入</div><div class="whon" id="c-who">—</div>
       <button class="btn btn-o btn-sm" data-act="c-logout" style="margin-bottom:12px">登出</button>
       <div class="muted" style="font-size:13px;margin-bottom:8px" id="c-ver"></div>
+      <div class="mgrp">每天必做</div>
+      <div class="mi" data-act="c-menu" data-v="daily">📋 每日必查</div>
       <div class="mi on" data-act="c-menu" data-v="day">📅 今日看診表</div>
-      <div class="mi" data-act="c-menu" data-v="call">📞 明日通知</div>
+      <div class="mgrp">當下處理</div>
       <div class="mi" data-act="c-menu" data-v="blood">🩸 抽血名單</div>
-      <div class="mi" data-act="c-menu" data-v="meds">💊 拿藥需求</div>
-      <div class="mi" data-act="c-menu" data-v="black">⛔ 黑名單</div>
       <div class="mi" data-act="c-menu" data-v="quick">📞 電話預約登錄</div>
-      <div class="mi" data-act="c-menu" data-v="find">🔎 病人查詢</div>
-      <div class="mi" data-act="c-menu" data-v="notify">📨 通知紀錄</div>
-      <div class="mi" data-act="c-menu" data-v="report">📊 當日報表</div>
+      <details class="mfold" id="m-more"><summary>遇到再查</summary>
+        <div class="mi" data-act="c-menu" data-v="call">📞 明日通知</div>
+        <div class="mi" data-act="c-menu" data-v="notify">📨 通知紀錄</div>
+        <div class="mi" data-act="c-menu" data-v="meds">💊 拿藥需求</div>
+        <div class="mi" data-act="c-menu" data-v="black">⛔ 黑名單</div>
+        <div class="mi" data-act="c-menu" data-v="find">🔎 病人查詢</div>
+        <div class="mi" data-act="c-menu" data-v="report">📊 當日報表</div>
+      </details>
     </div>
     <div id="c-content"></div>
   </div>
@@ -397,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.20-counter';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.22-clean';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1847,16 +1867,20 @@ function cShow() {
 }
 function renderCounter() {
   document.querySelectorAll('#c-main .mi').forEach(el => el.classList.toggle('on', el.dataset.v === S.cView));
+  /* ✨ v31.22 目前頁面若藏在「遇到再查」裡，自動展開，免得看不到自己在哪 */
+  const _more = document.querySelector('#m-more');
+  if (_more) _more.open = !!_more.querySelector('.mi[data-v="' + S.cView + '"]');
   const c = $('#c-content');
   if (S.cView === 'day') {
     if (S.cMode === 'week') { c.innerHTML = htmlCWeek(); loadCWeek(); }
     else { c.innerHTML = htmlCDay(); loadCDayGrid(); fillMedBanner(); }
   }
+  else if (S.cView === 'daily') { c.innerHTML = htmlCDaily(); loadCDaily(); }
   else if (S.cView === 'call') { c.innerHTML = htmlCCall(); loadCCall(); }
   else if (S.cView === 'blood') { c.innerHTML = htmlCBlood(); loadCBlood(); }
   else if (S.cView === 'black') {
     c.innerHTML = `<div class="card"><h3>⛔ 黑名單</h3>
-      <p class="muted" style="margin:6px 0 10px">自動規則：<b>初診未到 2 次以上</b>的手機號碼，網路預約自動封鎖（只能來電）。此頁可手動加入／解除；解除同時豁免自動規則。</p>
+      <details class="hint"><summary>💡 黑名單規則</summary><div>自動規則：<b>初診未到 2 次以上</b>的手機號碼，網路預約自動封鎖（只能來電）。此頁可手動加入／解除；解除同時豁免自動規則。</div></details>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
         <input id="bl-phone" placeholder="手機號碼" style="width:140px;padding:8px">
         <input id="bl-name" placeholder="姓名(可空)" style="width:110px;padding:8px">
@@ -1878,6 +1902,91 @@ function renderCounter() {
   else if (S.cView === 'find') c.innerHTML = htmlCFind();
   else if (S.cView === 'notify') { c.innerHTML = htmlCNotify(); loadCNotify(); }
   else if (S.cView === 'report') { c.innerHTML = `<div class="card"><h3>📊 當日報表</h3><div id="cr-box" class="muted" style="padding:14px">載入中…</div></div>`; loadCReport(); }
+}
+/* ══════════════ 📋 每日必查（v31.22）══════════════
+   把櫃檯每天下午要確認的四件事收在同一頁，不用在四個頁籤之間跑。
+   資料全部來自既有 API，後端沒有任何改動。 */
+function dcShift(ds, n) {
+  const d = new Date(ds + 'T00:00');
+  d.setDate(d.getDate() + n);
+  return fmtD(d);
+}
+function htmlCDaily() {
+  const today = fmtD(new Date());
+  const d = new Date(today + 'T00:00');
+  return '<div class="card">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<h3 style="margin:0">📋 每日必查</h3>'
+    + '<span class="muted" style="font-size:14.5px">建議每天 <b>14:30–15:00</b> 走一次，四塊都變綠就完成</span>'
+    + '<span style="flex:1"></span>'
+    + '<select id="cd-clinic" data-act2="cd-clinic">' + clinicOpts() + '</select>'
+    + '<button class="btn btn-o btn-sm" data-act="dc-reload">🔄 重新檢查</button></div>'
+    + '<div class="muted" style="font-size:14px;margin-top:4px">' + esc(today.replace(/-/g,'/')) + '（週' + WDS[d.getDay()] + '）· ' + esc(S.cClinic) + '</div>'
+    + '<div id="dc-sum" style="display:flex;gap:9px;flex-wrap:wrap;margin:13px 0 4px"></div>'
+    + '<div id="dc-box" class="muted" style="padding:14px">檢查中…</div></div>';
+}
+function dcCard(n, icon, title, hint, body, gotoV, gotoLabel, gotoDate) {
+  const ok = n === 0;
+  return '<div style="border:2px solid ' + (ok?'#bbf7d0':'#fca5a5') + ';background:' + (ok?'#f0fdf4':'#fff') + ';border-radius:12px;padding:13px 15px;margin-bottom:13px">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:' + (ok?'0':'9px') + '">'
+    + '<b style="font-size:17px;color:' + (ok?'#166534':'#b91c1c') + '">' + (ok?'✅':'⚠️') + ' ' + icon + ' ' + title + '</b>'
+    + '<span class="tag ' + (ok?'tag-g':'tag-r') + '" style="font-weight:800;font-size:15px">' + (ok?'0 筆，已完成':n + ' 筆待處理') + '</span>'
+    + '<span style="flex:1"></span>'
+    + (gotoV ? '<button class="btn btn-o btn-sm" data-act="dc-goto" data-v="' + gotoV + '"' + (gotoDate?' data-d="' + gotoDate + '"':'') + '>' + gotoLabel + ' →</button>' : '')
+    + '</div>'
+    + (ok ? '' : '<details class="hint" style="margin-bottom:9px"><summary>這塊在做什麼</summary><div>' + hint + '</div></details>' + body)
+    + '</div>';
+}
+async function loadCDaily() {
+  const clinic = S.cClinic;
+  const today = fmtD(new Date());
+  const tomo = dcShift(today, 1), yest = dcShift(today, -1);
+  const box0 = $('#dc-box');
+  if (box0) box0.innerHTML = '<p class="muted">檢查中…（約 5 秒）</p>';
+  const [aRes, tmAppts, rsRes, bY, bT] = await Promise.all([
+    api.post('auditUnsentBookings', {}, true),
+    getAppts(clinic, tomo).catch(function(){ return []; }),
+    api.post('getReminderStatus', { date: tomo, clinic: clinic }, true),
+    api.post('getBloodList', { clinic: clinic, date: yest }, true),
+    api.post('getBloodList', { clinic: clinic, date: today }, true)
+  ]);
+  if (!$('#dc-box') || S.cClinic !== clinic) return;
+  const audit = ((aRes.ok && aRes.data) || []).filter(function(x){ return String(x.clinic || '') === clinic; });
+  const need = audit.filter(function(x){ return /資料不齊/.test(String(x.why || '')); });
+  const unsent = audit.filter(function(x){ return !/資料不齊/.test(String(x.why || '')); });
+  const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
+  const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
+  const t1 = !need.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>缺什麼</th></tr></thead><tbody>'
+    + need.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(normDoc(x.doctor||'')) + '</td><td>' + esc(x.name||'(未填)') + '</td><td style="color:var(--red);font-weight:700">' + esc(String(x.why).replace('資料不齊：','')) + '</td></tr>'; }).join('') + '</tbody></table>';
+  const sendable = unsent.filter(function(x){ return x.canSend; }).map(function(x){ return x.apptId; });
+  const t2 = !unsent.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>姓名</th><th>電話</th><th>原因</th><th>補發</th></tr></thead><tbody>'
+    + unsent.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(x.why||'') + '</td><td>' + (x.canSend ? '<button class="btn btn-p btn-sm" data-act="resend-one" data-id="' + esc(x.apptId) + '">📨 補發</button>' : '<span class="muted">需先補資料</span>') + '</td></tr>'; }).join('') + '</tbody></table>'
+    + (sendable.length > 1 ? '<div style="margin-top:9px"><button class="btn btn-g btn-sm" data-act="resend-all" data-ids="' + esc(sendable.join(',')) + '">📨 全部補發（' + sendable.length + ' 筆）</button></div>' : '');
+  const rsMap = (rsRes.ok && rsRes.data) || {};
+  const fails = (tmAppts || []).filter(function(a){
+    if (isDead(a)) return false;
+    const rec = (rsMap[String(a.apptId || a.id || a['預約編號'] || '')] || {}).reminder;
+    return rec && !rec.ok;
+  });
+  const t3 = !fails.length ? '' : '<table class="tbl"><thead><tr><th>時段</th><th>姓名</th><th>電話</th><th>醫師</th><th>類型</th><th>已聯繫？</th></tr></thead><tbody>'
+    + fails.map(function(a){ const note = String(a.note || a['備註'] || ''); const done = /☎已通知/.test(note), noans = /☎未接聽/.test(note);
+      return '<tr><td>' + esc(apptTime(a)) + '</td><td>' + esc(a.name||a['病人姓名']||'(未填)') + '</td><td>' + tel(String(a.phone||a['電話']||'')) + '</td><td>' + esc(normDoc(a.doctor||a['醫師']||'')) + '</td><td>' + esc(a.type||a['類型']||'') + '</td><td>' + (done ? '<span class="tag tag-g">✓ 已通知</span>' : noans ? '<span class="tag tag-a">✗ 未接聽</span>' : '<span style="color:var(--red);font-weight:700">尚未</span>') + '</td></tr>'; }).join('') + '</tbody></table>';
+  const bYd = (bY.ok && bY.data) || [], bTd = (bT.ok && bT.data) || [];
+  const bl = [].concat(bYd, bTd).map(function(x, i){ return Object.assign({ _bd: i < bYd.length ? yest : today }, x); })
+    .filter(function(x){ return !String(x.caseNo || '').trim() || !String(x.birthday || '').trim(); });
+  const t4 = !bl.length ? '' : '<table class="tbl"><thead><tr><th>抽血日</th><th>姓名</th><th>電話</th><th>看診日</th><th>缺什麼</th></tr></thead><tbody>'
+    + bl.map(function(x){ const miss = []; if (!String(x.caseNo||'').trim()) miss.push('病歷號'); if (!String(x.birthday||'').trim()) miss.push('出生年月日');
+      return '<tr><td>' + esc(md(x._bd)) + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(md(x.visitDate)) + ' ' + esc(x.time||'') + '</td><td style="color:var(--red);font-weight:700">' + miss.join('、') + '</td></tr>'; }).join('') + '</tbody></table>';
+  const pill = function(n, label){ return '<div style="border:2px solid ' + (n?'#fca5a5':'#bbf7d0') + ';background:' + (n?'#fef2f2':'#f0fdf4') + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (n?'#b91c1c':'#166534') + '">' + (n?'⚠️':'✅') + ' ' + label + ' ' + n + '</div>'; };
+  const sum = $('#dc-sum');
+  if (sum) sum.innerHTML = pill(need.length,'待補登') + pill(unsent.length,'簡訊未送達') + pill(fails.length,'明日待電話') + pill(bl.length,'抽血未補登');
+  const total = need.length + unsent.length + fails.length + bl.length;
+  $('#dc-box').innerHTML =
+    (total === 0 ? '<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:800;color:#166534;margin-bottom:13px">🎉 今天四項全部正常，不需要處理</div>' : '')
+    + dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去。點右上角到看診表用 ✏️ 補登。', t1, 'day', '前往補登')
+    + dcCard(unsent.length, '📵', '簡訊未發送成功', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '')
+    + dcCard(fails.length, '☎', '明日需電話通知（' + md(tomo) + '）', '系統每天中午 12:00 自動發提醒，這些是發送失敗的，要人工打電話或 LINE。', t3, 'call', '前往明日通知', tomo)
+    + dcCard(bl.length, '🩸', '抽血未補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。看診日前一天要找得到報告，請先聯繫確認。', t4, 'blood', '前往抽血名單');
 }
 /* ── 今日看診表 ── */
 function clinicOpts() {
@@ -2838,11 +2947,11 @@ async function loadCCall() {
     <span style="color:#b45309">待發送 <b>${autoPend}</b></span>
     <span class="muted">｜ 人工已補 ${notified} 筆</span>
   </div>
-  <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:9px 13px;margin-bottom:12px;font-size:14px;line-height:1.7">
-    💡 <b>系統每天中午 12:00 自動發送明日提醒</b>（有 LINE 走 LINE、沒有發簡訊）。<br>
+  <details class="hint"><summary>💡 這頁怎麼用</summary><div>
+    <b>系統每天中午 12:00 自動發送明日提醒</b>（有 LINE 走 LINE、沒有發簡訊）。<br>
     櫃檯 <b>14:00–16:00</b> 處理本頁：只需電話補通知<b style="color:var(--red)">「✗ 失敗」</b>的（排在最上面）；
     綠色「✓ 已通知」的不用再打。<b>中午 12 點前</b>看到整排「⏳ 待發送」是正常現象、不是系統異常。
-  </div>` + rows;
+  </div></details>` + rows;
 }
 
 /* ── 電話預約快速登錄 ── */
@@ -2911,7 +3020,7 @@ function htmlCBlood() {
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
     </div>
-    <p class="muted" style="margin-bottom:10px">🩸 本日到院抽血的初診名單。病人掛號取得病歷號後，在此補登「病歷號＋出生年月日（民國）」；看診名單與病人資料會自動帶入，找抽血報告（依生日排序）更快。</p>
+    <details class="hint"><summary>💡 抽血名單怎麼用</summary><div>本日到院抽血的初診名單。病人掛號取得病歷號後，在此補登「病歷號＋出生年月日（民國）」；看診名單與病人資料會自動帶入，找抽血報告（依生日排序）更快。</div></details>
     <div id="cb-box" class="muted" style="padding:14px;text-align:center">載入中…</div></div>`;
 }
 async function loadCBlood() {
@@ -3047,15 +3156,21 @@ async function rosterPrint(btn) {
     h2{margin:0 0 4px;font-size:20px} .sub{color:#555;margin-bottom:14px;font-size:13px}
     table{border-collapse:collapse;width:100%} th,td{border:1px solid #888;padding:6px 9px;font-size:13.5px;text-align:left}
     th{background:#efefef} .init{color:#b91c1c;font-weight:700}
+    td.nt{padding:4px 6px;vertical-align:top}
+    .dk{font-size:12.5px;color:#111;line-height:1.45;padding-bottom:3px;border-bottom:1px dashed #bbb}
+    .wr{height:20px} .wr2{height:34px}
     @media print{button{display:none}}
   </style></head><body>
     <h2>當日看診名單 · ${esc(S.cClinic)}</h2>
     <div class="sub">${esc(S.cDate)}（共 ${rows.length} 位）· 產生於 ${new Date().toLocaleString('zh-TW')}</div>
     <button onclick="print()" style="margin-bottom:12px;padding:8px 20px;cursor:pointer;font-size:14px">🖨 列印</button>
-    <table><thead><tr><th>時段</th><th>醫師</th><th>初/複診</th><th>姓名</th><th>病歷號</th><th>出生年月日</th><th>院內抽血報告</th><th>手機號碼</th><th style="width:200px">備註（謄寫）</th></tr></thead><tbody>
+    <table><thead><tr><th>時段</th><th>醫師</th><th>初/複診</th><th>姓名</th><th>病歷號</th><th>出生年月日</th><th>院內抽血報告</th><th>手機號碼</th><th style="width:230px">備註</th></tr></thead><tbody>
     ${rows.map(r => `<tr><td>${esc(r.time||'')}</td><td>${esc(r.doctor||'')}</td>
-      <td class="${r.type==='初診'?'init':''}">${esc(r.type||'')}</td><td>${esc(r.name||'')}</td>
-      <td>${esc(r.caseNo||'')}</td><td>${esc(r.birthday ? isoToRoc(r.birthday) : '')}</td><td>${esc(blood(r.note))}</td><td>${esc(r.phone||'')}</td><td></td></tr>`).join('')}
+      <td class="${r.type==='初診'?'init':''}">${esc(r.type||'')}${(() => { const c = courseInfo(r.note); return c ? `<br><span style="color:#6d28d9;font-weight:700;font-size:12px">💊${esc(c.name)} ${c.cur}${c.total?'/'+c.total:''}</span>` : ''; })()}</td><td>${esc(r.name||'')}</td>
+      <td>${esc(r.caseNo||'')}</td><td>${esc(r.birthday ? isoToRoc(r.birthday) : '')}</td><td>${esc(blood(r.note))}</td><td>${esc(r.phone||'')}</td><td class="nt">${(() => {
+        const dd = (String(r.note||'').match(/📝[^·]+/g)||[]).map(x=>x.trim());
+        return dd.length ? `<div class="dk">${dd.map(esc).join('<br>')}</div><div class="wr"></div>` : '<div class="wr2"></div>';
+      })()}</td></tr>`).join('')}
     </tbody></table></body></html>`;
   w.document.open(); w.document.write(html); w.document.close();
 }
@@ -4221,6 +4336,10 @@ document.addEventListener('click', async e => {
         loadSchedules(true).then(() => { buildDoctors(); });
       } else toast('同步失敗：' + (r.error || ''), 'var(--red)');
       break; }
+    case 'dc-reload': S.apptCache.clear(); window.__auditCache = null; loadCDaily(); break;
+    case 'dc-goto': {   /* ✨ v31.22 從每日必查跳到對應的完整功能頁 */
+      if (el.dataset.d) S.cDate = el.dataset.d;
+      S.cView = el.dataset.v; S.apptCache.clear(); renderCounter(); break; }
     case 'cd-refresh': S.apptCache.clear(); renderCounter(); break;
     case 'cd-mode': S.cMode = el.dataset.m; renderCounter(); break;
     case 'cd-pill': openMiniCal(); break;
