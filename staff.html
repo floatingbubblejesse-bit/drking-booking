@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.22-clean';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.23-fast';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1942,26 +1942,23 @@ async function loadCDaily() {
   const today = fmtD(new Date());
   const tomo = dcShift(today, 1), yest = dcShift(today, -1);
   const box0 = $('#dc-box');
-  if (box0) box0.innerHTML = '<p class="muted">檢查中…（約 5 秒）</p>';
-  const [aRes, tmAppts, rsRes, bY, bT] = await Promise.all([
-    api.post('auditUnsentBookings', {}, true),
+  if (!box0) return;
+  box0.innerHTML = '<div id="dc-12"></div><div id="dc-34"><p class="muted" style="padding:10px">檢查中…</p></div>';
+  const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
+  const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
+  const cnt = { need:null, unsent:null, fails:0, bl:0 };
+  const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'明日待電話') + pill(cnt.bl,'抽血未補登'); };
+  paintSum();
+
+  /* ── 階段一：快的四支（約 3 秒）→ 先把 ③④ 畫出來 ── */
+  const [tmAppts, rsRes, bY, bT] = await Promise.all([
     getAppts(clinic, tomo).catch(function(){ return []; }),
     api.post('getReminderStatus', { date: tomo, clinic: clinic }, true),
     api.post('getBloodList', { clinic: clinic, date: yest }, true),
     api.post('getBloodList', { clinic: clinic, date: today }, true)
   ]);
-  if (!$('#dc-box') || S.cClinic !== clinic) return;
-  const audit = ((aRes.ok && aRes.data) || []).filter(function(x){ return String(x.clinic || '') === clinic; });
-  const need = audit.filter(function(x){ return /資料不齊/.test(String(x.why || '')); });
-  const unsent = audit.filter(function(x){ return !/資料不齊/.test(String(x.why || '')); });
-  const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
-  const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
-  const t1 = !need.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>缺什麼</th></tr></thead><tbody>'
-    + need.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(normDoc(x.doctor||'')) + '</td><td>' + esc(x.name||'(未填)') + '</td><td style="color:var(--red);font-weight:700">' + esc(String(x.why).replace('資料不齊：','')) + '</td></tr>'; }).join('') + '</tbody></table>';
-  const sendable = unsent.filter(function(x){ return x.canSend; }).map(function(x){ return x.apptId; });
-  const t2 = !unsent.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>姓名</th><th>電話</th><th>原因</th><th>補發</th></tr></thead><tbody>'
-    + unsent.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(x.why||'') + '</td><td>' + (x.canSend ? '<button class="btn btn-p btn-sm" data-act="resend-one" data-id="' + esc(x.apptId) + '">📨 補發</button>' : '<span class="muted">需先補資料</span>') + '</td></tr>'; }).join('') + '</tbody></table>'
-    + (sendable.length > 1 ? '<div style="margin-top:9px"><button class="btn btn-g btn-sm" data-act="resend-all" data-ids="' + esc(sendable.join(',')) + '">📨 全部補發（' + sendable.length + ' 筆）</button></div>' : '');
+  if (!$('#dc-34') || S.cClinic !== clinic) return;
   const rsMap = (rsRes.ok && rsRes.data) || {};
   const fails = (tmAppts || []).filter(function(a){
     if (isDead(a)) return false;
@@ -1977,16 +1974,37 @@ async function loadCDaily() {
   const t4 = !bl.length ? '' : '<table class="tbl"><thead><tr><th>抽血日</th><th>姓名</th><th>電話</th><th>看診日</th><th>缺什麼</th></tr></thead><tbody>'
     + bl.map(function(x){ const miss = []; if (!String(x.caseNo||'').trim()) miss.push('病歷號'); if (!String(x.birthday||'').trim()) miss.push('出生年月日');
       return '<tr><td>' + esc(md(x._bd)) + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(md(x.visitDate)) + ' ' + esc(x.time||'') + '</td><td style="color:var(--red);font-weight:700">' + miss.join('、') + '</td></tr>'; }).join('') + '</tbody></table>';
-  const pill = function(n, label){ return '<div style="border:2px solid ' + (n?'#fca5a5':'#bbf7d0') + ';background:' + (n?'#fef2f2':'#f0fdf4') + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (n?'#b91c1c':'#166534') + '">' + (n?'⚠️':'✅') + ' ' + label + ' ' + n + '</div>'; };
-  const sum = $('#dc-sum');
-  if (sum) sum.innerHTML = pill(need.length,'待補登') + pill(unsent.length,'簡訊未送達') + pill(fails.length,'明日待電話') + pill(bl.length,'抽血未補登');
-  const total = need.length + unsent.length + fails.length + bl.length;
-  $('#dc-box').innerHTML =
-    (total === 0 ? '<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:800;color:#166534;margin-bottom:13px">🎉 今天四項全部正常，不需要處理</div>' : '')
-    + dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去。點右上角到看診表用 ✏️ 補登。', t1, 'day', '前往補登')
-    + dcCard(unsent.length, '📵', '簡訊未發送成功', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '')
-    + dcCard(fails.length, '☎', '明日需電話通知（' + md(tomo) + '）', '系統每天中午 12:00 自動發提醒，這些是發送失敗的，要人工打電話或 LINE。', t3, 'call', '前往明日通知', tomo)
+  cnt.fails = fails.length; cnt.bl = bl.length; paintSum();
+  $('#dc-34').innerHTML =
+      dcCard(fails.length, '☎', '明日需電話通知（' + md(tomo) + '）', '系統每天中午 12:00 自動發提醒，這些是發送失敗的，要人工打電話或 LINE。', t3, 'call', '前往明日通知', tomo)
     + dcCard(bl.length, '🩸', '抽血未補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。看診日前一天要找得到報告，請先聯繫確認。', t4, 'blood', '前往抽血名單');
+
+  /* ── 階段二：慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒）── */
+  const paint12 = function(list){
+    if (!$('#dc-12') || S.cClinic !== clinic) return;
+    const audit = (list || []).filter(function(x){ return String(x.clinic || '') === clinic; });
+    const need = audit.filter(function(x){ return /資料不齊/.test(String(x.why || '')); });
+    const unsent = audit.filter(function(x){ return !/資料不齊/.test(String(x.why || '')); });
+    const t1 = !need.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>缺什麼</th></tr></thead><tbody>'
+      + need.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(normDoc(x.doctor||'')) + '</td><td>' + esc(x.name||'(未填)') + '</td><td style="color:var(--red);font-weight:700">' + esc(String(x.why).replace('資料不齊：','')) + '</td></tr>'; }).join('') + '</tbody></table>';
+    const sendable = unsent.filter(function(x){ return x.canSend; }).map(function(x){ return x.apptId; });
+    const t2 = !unsent.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>姓名</th><th>電話</th><th>原因</th><th>補發</th></tr></thead><tbody>'
+      + unsent.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(x.why||'') + '</td><td>' + (x.canSend ? '<button class="btn btn-p btn-sm" data-act="resend-one" data-id="' + esc(x.apptId) + '">📨 補發</button>' : '<span class="muted">需先補資料</span>') + '</td></tr>'; }).join('') + '</tbody></table>'
+      + (sendable.length > 1 ? '<div style="margin-top:9px"><button class="btn btn-g btn-sm" data-act="resend-all" data-ids="' + esc(sendable.join(',')) + '">📨 全部補發（' + sendable.length + ' 筆）</button></div>' : '');
+    cnt.need = need.length; cnt.unsent = unsent.length; paintSum();
+    $('#dc-12').innerHTML =
+        dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去。點右上角到看診表用 ✏️ 補登。', t1, 'day', '前往補登')
+      + dcCard(unsent.length, '📵', '簡訊未發送成功', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '');
+  };
+  const c = window.__auditCache;
+  if (c && Date.now() - c.at < 300e3) { paint12(c.list || []); return; }
+  $('#dc-12').innerHTML = '<div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:15px;margin-bottom:13px;font-size:15px;color:#475569">⏳ <b>正在檢查「待補登」與「簡訊未送達」…</b><br><span style="font-size:14px">這兩項要掃全部通知紀錄，約需 40 秒。<b>下面兩項已經可以先處理</b>，結果出來會自動補上。</span></div>';
+  api.post('auditUnsentBookings', {}, true).then(function(r){
+    if (r.ok) window.__auditCache = { at: Date.now(), list: r.data || [] };
+    if (!$('#dc-12') || S.cClinic !== clinic) return;
+    if (r.ok) paint12(r.data || []);
+    else $('#dc-12').innerHTML = '<div style="border:2px solid #fca5a5;background:#fef2f2;border-radius:12px;padding:14px;margin-bottom:13px;color:#b91c1c;font-weight:700">⚠️ 簡訊檢查失敗：' + esc(r.error || '') + '　<button class="btn btn-o btn-sm" data-act="dc-reload">重試</button></div>';
+  });
 }
 /* ── 今日看診表 ── */
 function clinicOpts() {
