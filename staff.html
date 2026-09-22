@@ -397,7 +397,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.18-speed.2';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.20-counter';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2251,7 +2251,8 @@ function renderBkb(selDoc, selT) {
         <option value="猛健樂8週療程|8" ${keep('#bkb-course')==='猛健樂8週療程|8'?'selected':''}>猛健樂 8 週療程</option>
         <option value="胰妥讚6週療程|6" ${keep('#bkb-course')==='胰妥讚6週療程|6'?'selected':''}>胰妥讚 6 週療程</option>
         <option value="胰妥讚4週療程|4" ${keep('#bkb-course')==='胰妥讚4週療程|4'?'selected':''}>胰妥讚 4 週療程</option>
-      </select>` : ''}
+      </select>
+      <select id="bkb-course-start" title="從第幾週開始（例：客人已打過 2 針，選第 3 週）" style="display:none"></select>` : ''}
       <input id="bkb-note" class="grow" placeholder="備註" value="${esc(keep('#bkb-note'))}">
       ${type === '複診' ? `<label style="display:flex;align-items:center;gap:5px;font-size:13.5px;color:#7f1d1d;white-space:nowrap;cursor:pointer">
         <input type="checkbox" id="bkb-rpt" ${prev && prev.querySelector('#bkb-rpt')?.checked ? 'checked' : ''}>🩸 下次需看抽血報告</label>` : ''}
@@ -2260,6 +2261,10 @@ function renderBkb(selDoc, selT) {
     <div class="bkb-blood" style="display:none"></div>
   </div>`;
   bkbRefresh(selT);
+  /* ✨ v31.19 療程起始週：選了療程才出現，選項依療程週數產生 */
+  const _cs = box.querySelector('#bkb-course');
+  if (_cs && !_cs.dataset.startBound) { _cs.dataset.startBound = '1'; _cs.addEventListener('change', bkbCourseStart); }
+  bkbCourseStart();
 }
 function bkbRefresh(preferT) {
   const box = $('#cd-book');
@@ -2312,6 +2317,20 @@ function bkbSet(doc, t) {
   bkb.scrollIntoView({ behavior:'smooth', block:'nearest' });
   bkb.querySelector('#bkb-phone').focus();
 }
+/* ✨ v31.19 依所選療程產生「從第幾週開始」選項 */
+function bkbCourseStart() {
+  const sel = document.querySelector('#bkb-course');
+  const st  = document.querySelector('#bkb-course-start');
+  if (!sel || !st) return;
+  const raw = String(sel.value || '');
+  if (!raw) { st.style.display = 'none'; st.innerHTML = ''; return; }
+  const weeks = +(raw.split('|')[1]) || 0;
+  const cur = Math.min(+st.value || 1, weeks || 1);
+  st.innerHTML = Array.from({ length: weeks }, (_, i) =>
+    `<option value="${i+1}" ${i+1===cur?'selected':''}>從第 ${i+1} 週開始（建立 ${weeks-i} 次）</option>`).join('');
+  st.style.display = '';
+}
+
 async function bkbSave(btn) {
   const box = $('#cd-book');
   const bkb = box.querySelector('.bkb');
@@ -2326,8 +2345,9 @@ async function bkbSave(btn) {
   const name = bkb.querySelector('#bkb-name').value.trim();
   const caseVerified = box.dataset.caseVerified === caseNo && caseNo;
   const msg = bkb.querySelector('.bkb-msg');
-  if (!phoneOK(phone) && !caseVerified) {
-    msg.innerHTML = `<span style="color:#b45309;font-weight:700">${caseNo ? '病歷號未帶入成功（按 🔍）' : '請填電話，或病歷號按 🔍 帶入'}</span>`;
+  /* ✨ v31.19 有電話或有病歷號就能卡位（含查無病歷號的老客）；姓名/電話稍後從待補清單補齊 */
+  if (!phoneOK(phone) && !caseNo) {
+    msg.innerHTML = `<span style="color:#b45309;font-weight:700">請填電話或病歷號（擇一即可先卡位）</span>`;
     return;
   }
   btn.disabled = true; btn.textContent = '建立中…';
@@ -2344,11 +2364,12 @@ async function bkbSave(btn) {
   if (courseRaw && type === '複診') {
     const [cName, cWeeksS] = courseRaw.split('|');
     const cWeeks = +cWeeksS || 0;
-    btn.textContent = `💊 建立 ${cWeeks} 週療程中…`;
+    const cStart = Math.min(Math.max(+(bkb.querySelector('#bkb-course-start')?.value) || 1, 1), cWeeks || 1);   // ✨ v31.19
+    btn.textContent = `💊 建立第 ${cStart}～${cWeeks} 週療程中…`;
     const r0 = await api.post('createCounterBooking', {
       clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
       name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
-      course: { name: cName.replace(/療程$/, ''), weeks: cWeeks },
+      course: { name: cName.replace(/療程$/, ''), weeks: cWeeks, startWeek: cStart },
       employeeId: S.cUser.employeeId, employeeName: S.cUser.name, source: 'walk_in'
     }, true);
     btn.disabled = false; btn.textContent = '✓ 建立';
@@ -2488,8 +2509,9 @@ async function qkSave(m, btn) {
   const caseNo = m.querySelector('#qk-case').value.trim();
   const name = m.querySelector('#qk-name').value.trim();
   const caseVerified = m.dataset.caseVerified === caseNo && caseNo;
-  if (!phoneOK(phone) && !caseVerified) {
-    toast(caseNo ? '病歷號尚未帶入成功（按 🔍 帶入驗證）' : '請填電話，或填病歷號按 🔍 帶入', 'var(--amber)');
+  /* ✨ v31.19 有電話或有病歷號就能卡位 */
+  if (!phoneOK(phone) && !caseNo) {
+    toast('請填電話或病歷號（擇一即可先卡位）', 'var(--amber)');
     return;
   }
   btn.disabled = true; btn.textContent = '建立中…';
@@ -2601,6 +2623,19 @@ function incompleteBanner(items) {
     + `</div></div>`;
 }
 
+/* ✨ v31.20 從備註解析療程進度
+   認得兩種寫法：
+     系統建立的  💊猛健樂(第3/8週)、💊胰妥讚6週(第1/6週)
+     人工打的    猛健樂第7週、胰妥讚 第 2 次                         */
+function courseInfo(note) {
+  const n = String(note || '');
+  let m = n.match(/💊\s*([^\s(（]*?)\s*[(（]\s*第\s*(\d+)\s*\/\s*(\d+)\s*週\s*[)）]/);
+  if (m) return { name: m[1].replace(/\d+\s*週$/, '') || '療程', cur: +m[2], total: +m[3] };
+  m = n.match(/(猛健樂|胰妥讚)[^\d]{0,6}第\s*(\d+)\s*(?:\/\s*(\d+)\s*)?[週次]/);
+  if (m) return { name: m[1], cur: +m[2], total: m[3] ? +m[3] : 0 };
+  return null;
+}
+
 /* 預約詳情 modal */
 function openApptDetail(key) {
   const list = (window.__cdApptIndex || {})[key] || [];
@@ -2617,11 +2652,21 @@ function openApptDetailFromObj(a, dateStr) {
     ${row('病人姓名', esc(a.name||a['病人姓名']||'(未填)'))}
     ${row('電話', esc(a.phone||a['電話']||'—'))}
     ${row('預約類型', `<span class="tag tag-b">${esc(a.type||a['類型']||'複診')}</span>`)}
+    ${(() => { const c = courseInfo(a.note||a['備註']); return c ? row('療程',
+        `<span style="color:#6d28d9;font-weight:800;font-size:17px">💊 ${esc(c.name)}　第 ${c.cur}${c.total ? ' ／ 共 ' + c.total : ''} 次</span>`) : ''; })()}
     ${row('看診時間', `${esc(a.date||dateStr)} ${esc(t)}`)}
     ${row('狀態', st ? `<span class="tag tag-g">${esc(st)}</span>` : '未報到')}
     ${src ? row('預約來源', esc(src)) : ''}
     ${(a.medicationWeeks||a['拿藥週數']) ? row('拿藥週數', esc(a.medicationWeeks||a['拿藥週數'])+' 週') : ''}
-    ${(a.note||a['備註']) ? row('備註', esc(a.note||a['備註'])) : ''}
+    ${(a.note||a['備註']) ? row('備註', `<span id="cd-note-cur" style="font-weight:600;line-height:1.5">${esc(a.note||a['備註'])}</span>`) : `<span id="cd-note-cur" style="display:none"></span>`}
+    <div style="padding:12px 0 2px;margin-top:4px;border-top:2px dashed var(--line)">
+      <div style="font-size:15px;color:var(--txt3);font-weight:700;margin-bottom:6px">📝 櫃檯備註<span style="font-weight:400">（附加在備註最後，不會蓋掉原本內容）</span></div>
+      <textarea id="cd-note-in" rows="2" placeholder="例：客人說會晚到 10 分鐘／已電話確認會來／想加自費療程" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;line-height:1.5;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+        <button class="btn btn-p btn-sm" data-act="cd-note-save">💾 儲存備註</button>
+        <span id="cd-note-msg" style="font-size:14px;font-weight:700"></span>
+      </div>
+    </div>
     </div>
     <div style="padding:0 20px 4px;display:flex;gap:6px;flex-wrap:wrap">
       ${(a.type||a['類型'])==='初診' ? `<span style="font-size:14px;font-weight:700;color:#7f1d1d;align-self:center">🩸院內報告：</span>
@@ -4219,10 +4264,12 @@ document.addEventListener('click', async e => {
         box.querySelector('#bkb-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
         box.querySelector('#bkb-phone').value = hit.phone || hit['電話'] || '';
         box.dataset.caseVerified = caseNo;
-        msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已帶入</span>';
+        msg.innerHTML = box.querySelector('#bkb-phone').value.trim()
+          ? '<span style="color:var(--green);font-weight:700">✓ 已帶入</span>'
+          : '<span style="color:var(--red);font-weight:700">✓ 已帶入，但此病歷號從未登錄手機 → 電話必填（否則收不到簡訊）</span>';
       } else {
         box.dataset.caseVerified = '';
-        msg.innerHTML = '<span style="color:var(--red)">✗ 查無此病歷號</span>';
+        msg.innerHTML = '<span style="color:var(--red)">✗ 查無此病歷號</span><span style="color:#b45309">｜仍可先卡位，建議補電話</span>';
       }
       break; }
     case 'bkb-save': bkbSave(el); break;
@@ -4242,10 +4289,11 @@ document.addEventListener('click', async e => {
         m.querySelector('#qk-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
         m.querySelector('#qk-phone').value = hit.phone || hit['電話'] || '';
         m.dataset.caseVerified = caseNo;
-        msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已帶入：' + esc(m.querySelector('#qk-name').value || '(後台無姓名)') + '</span>';
+        msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已帶入：' + esc(m.querySelector('#qk-name').value || '(後台無姓名)') + '</span>'
+          + (m.querySelector('#qk-phone').value.trim() ? '' : '<span style="color:var(--red);font-weight:700">｜此病歷號從未登錄手機 → 電話必填</span>');
       } else {
         m.dataset.caseVerified = '';
-        msg.innerHTML = '<span style="color:var(--red)">✗ 後台查無此病歷號（初診請改填電話）</span>';
+        msg.innerHTML = '<span style="color:var(--red)">✗ 後台查無此病歷號</span><span style="color:#b45309">｜仍可先卡位，建議補電話</span>';
       }
       break; }
     case 'qk-blood': {
@@ -4263,6 +4311,31 @@ document.addEventListener('click', async e => {
       if (x) openFixAppt(x.a, x.ds);
       break; }
     case 'fx-save': fxSave(m, el); break;
+    case 'cd-note-save': {   /* ✨ v31.20 櫃檯自填備註（附加，不覆蓋系統標記） */
+      const a = window.__cdCurAppt;
+      const box = m.querySelector('#cd-note-in'), msg = m.querySelector('#cd-note-msg');
+      if (!a || !box) break;
+      const txt = box.value.trim().replace(/\s+/g, ' ');
+      if (!txt) { if (msg) msg.innerHTML = '<span style="color:var(--amber)">請先輸入內容</span>'; break; }
+      el.disabled = true;
+      if (msg) msg.innerHTML = '<span style="color:var(--txt3)">儲存中…</span>';
+      const _n = new Date();
+      const _who = (S.cUser || {}).name || '櫃檯';
+      const _stamp = `📝${_n.getMonth()+1}/${_n.getDate()} ${_who}：${txt}`;
+      const _old = String(a.note || a['備註'] || '').trim();
+      const _ok = await apptSetNote(a, (_old ? _old + ' · ' : '') + _stamp);
+      if (_ok) {
+        if (msg) msg.innerHTML = '<span style="color:var(--green);font-weight:800">✓ 已儲存</span>';
+        const cur = m.querySelector('#cd-note-cur');
+        if (cur) { cur.textContent = a.note; cur.style.display = ''; }
+        box.value = '';
+        toast('✓ 備註已儲存');
+        setTimeout(() => { closeModals(); renderCounter(); }, 700);
+      } else {
+        el.disabled = false;
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">儲存失敗，請再試一次</span>';
+      }
+      break; }
     case 'cd-mark': {
       const a = window.__cdCurAppt;
       if (!a) break;
