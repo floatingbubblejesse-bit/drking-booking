@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.32-nosms';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.33-slowq';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -453,10 +453,19 @@ const WDS = ['日','一','二','三','四','五','六'];
 
 /* ───── API 層 ───── */
 const API_TIMEOUT = 30000;   // ✨ v19.1 逾時保護：請求不再無限卡住
-function _friendlyErr(e) {
-  return (e && e.name === 'AbortError')
-    ? '系統繁忙逾時。請先重新整理並查詢確認是否已成功，避免重複送出'
-    : String(e);
+/* ✨ v31.33 少數「要掃整張表」的唯讀查詢放寬逾時。
+   auditUnsentBookings 實測 41.9 秒（會隨通知紀錄成長而變慢），
+   在 30 秒就被 AbortController 掐斷，所以「待補登／簡訊未送達」這塊
+   一直顯示「簡訊檢查失敗：系統繁忙逾時」，按幾次重試都一樣 —— 後端其實是好的。
+   這些都是唯讀查詢，逾時不會造成重複送出，訊息也一併改掉。
+   根本解法（在預約表存簡訊狀態，不再掃通知紀錄）另案處理。 */
+const API_TIMEOUT_SLOW = 120000;
+const SLOW_ACTIONS = { auditUnsentBookings: 1 };
+function _friendlyErr(e, action) {
+  if (!(e && e.name === 'AbortError')) return String(e);
+  return SLOW_ACTIONS[action]
+    ? '查詢逾時（這項要掃整張通知紀錄，會隨資料成長變慢）。請按重試；若一直失敗請回報。'
+    : '系統繁忙逾時。請先重新整理並查詢確認是否已成功，避免重複送出';
 }
 /* 工作階段失效（過期、被登出、後端重新部署）→ 清乾淨並退回登入畫面。
    前端刻意不保留任何長期憑證，所以這裡沒有東西可以「續期」，
@@ -481,23 +490,23 @@ const api = {
     const body = { action, payload: payload || {} };
     if (withToken) body.token = S.session || '';
     const ctl = new AbortController();
-    const tm = setTimeout(() => ctl.abort(), API_TIMEOUT);
+    const tm = setTimeout(() => ctl.abort(), SLOW_ACTIONS[action] ? API_TIMEOUT_SLOW : API_TIMEOUT);
     try {
       const r = await fetch(CFG.GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body), signal: ctl.signal });
       const j = await r.json();
       if (withToken && j && j.ok === false && /unauthorized/.test(String(j.error || ''))) authLost();
       return j;
-    } catch (e) { return { ok:false, error:_friendlyErr(e) }; }
+    } catch (e) { return { ok:false, error:_friendlyErr(e, action) }; }
     finally { clearTimeout(tm); }
   },
   async get(action, params) {
     const q = new URLSearchParams({ action, ...(params||{}) });
     const ctl = new AbortController();
-    const tm = setTimeout(() => ctl.abort(), API_TIMEOUT);
+    const tm = setTimeout(() => ctl.abort(), SLOW_ACTIONS[action] ? API_TIMEOUT_SLOW : API_TIMEOUT);
     try {
       const r = await fetch(CFG.GAS_URL + '?' + q, { signal: ctl.signal });
       return await r.json();
-    } catch (e) { return { ok:false, error:_friendlyErr(e) }; }
+    } catch (e) { return { ok:false, error:_friendlyErr(e, action) }; }
     finally { clearTimeout(tm); }
   }
 };
@@ -2098,7 +2107,7 @@ async function loadCDaily() {
   };
   const c = window.__auditCache;
   if (c && Date.now() - c.at < 300e3) { paint12(c.list || []); return; }
-  $('#dc-12').innerHTML = '<div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:15px;margin-bottom:13px;font-size:15px;color:#475569">⏳ <b>正在檢查「待補登」與「簡訊未送達」…</b><br><span style="font-size:14px">這兩項要掃全部通知紀錄，約需 40 秒。<b>下面三項已經可以先處理</b>，結果出來會自動補上。</span></div>';
+  $('#dc-12').innerHTML = '<div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:15px;margin-bottom:13px;font-size:15px;color:#475569">⏳ <b>正在檢查「待補登」與「簡訊未送達」…</b><br><span style="font-size:14px">這兩項要掃全部通知紀錄，<b>約需 40～60 秒</b>。<b>下面幾項已經可以先處理</b>，結果出來會自動補上。</span></div>';
   api.post('auditUnsentBookings', {}, true).then(function(r){
     if (r.ok) window.__auditCache = { at: Date.now(), list: r.data || [] };
     if (!$('#dc-12') || S.cClinic !== clinic) return;
