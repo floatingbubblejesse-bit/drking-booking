@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.30-blood';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.31-noprompt';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -620,6 +620,40 @@ function modal(html) {
   return m;
 }
 function closeModals() { $('#modals').innerHTML = ''; }
+
+/* ✨ v31.31 取代 prompt()
+   prompt() 在 LINE／FB 內建瀏覽器、部分 Android WebView、iOS 開啟「阻擋彈出式視窗」時
+   會直接丟出例外（不是回傳 null），導致「取消／改約／改抽血日」按下去完全沒反應、
+   也沒有任何錯誤提示。改用頁內 modal 後所有瀏覽器行為一致，也能用日期選擇器。 */
+function ask(title, fields, okText) {
+  return new Promise(resolve => {
+    const body = fields.map((f, i) => `
+      <div style="margin-bottom:11px">
+        <div style="font-size:15px;color:var(--txt3);font-weight:700;margin-bottom:5px">${f.label}</div>
+        ${f.type === 'select'
+          ? `<select id="ask-${i}" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px">${(f.options || []).map(o => `<option value="${esc(o.v)}"${String(o.v) === String(f.value) ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select>`
+          : `<input id="ask-${i}" type="${f.type || 'text'}" value="${esc(f.value == null ? '' : f.value)}"${f.min != null ? ` min="${f.min}"` : ''}${f.max != null ? ` max="${f.max}"` : ''} style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px">`}
+        ${f.hint ? `<div style="font-size:13.5px;color:var(--txt3);margin-top:4px">${f.hint}</div>` : ''}
+      </div>`).join('');
+    const m = modal(`<div class="mh">${title} <button class="btn btn-o btn-sm" data-ask="x">✕</button></div>
+      <div class="mb">${body}</div>
+      <div class="mf"><button class="btn btn-o" data-ask="x">取消</button>
+        <button class="btn btn-p" data-ask="ok">${okText || '確定'}</button></div>`);
+    let done = false;
+    const vals = () => fields.map((f, i) => { const el = m.querySelector('#ask-' + i); return el ? el.value : ''; });
+    const fin = x => { if (done) return; done = true; try { m.remove(); } catch (e) {} resolve(x); };
+    m.addEventListener('click', e => {
+      const b = e.target.closest && e.target.closest('[data-ask]');
+      if (b) { e.preventDefault(); e.stopPropagation(); fin(b.dataset.ask === 'ok' ? vals() : null); return; }
+      if (e.target === m) fin(null);
+    });
+    m.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); fin(vals()); }
+      if (e.key === 'Escape') fin(null);
+    });
+    setTimeout(() => { const el = m.querySelector('#ask-0'); if (el) { el.focus(); try { el.select(); } catch (e) {} } }, 60);
+  });
+}
 
 /* ───── 照片解析度：依場景取適當大小（卡片 1000 / modal 2000 / 原圖 2400）───── */
 const thumb = (u, w) => { u = String(u || ''); return u.indexOf('data:') === 0 ? u : u.replace(/sz=w\d+/, 'sz=w' + w); };
@@ -2865,7 +2899,7 @@ function openApptDetailFromObj(a, dateStr) {
       <button class="btn btn-a btn-sm" data-act="cd-mark" data-op="bno">✗ 未抽血</button>` : ''}
       <button class="btn btn-p btn-sm" data-act="cd-mark" data-op="notified">☎ 已通知</button></div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">關閉</button>
-      <button class="btn btn-a" data-act="c-resch">改約</button>
+      <button class="btn btn-a" data-act="c-resch">取消重約</button>
       <button class="btn btn-r" data-act="c-cancel">取消</button>
       <button class="btn btn-g" data-act="c-checkin">報到</button></div>`);
   m.dataset.appt = JSON.stringify({ apptId:a.apptId||a.id||a['預約編號']||'', clinic:S.cClinic, date:a.date||dateStr,
@@ -2873,34 +2907,53 @@ function openApptDetailFromObj(a, dateStr) {
     note:String(a.note||a['備註']||'') });
   window.__cdCurAppt = a;
 }
-async function cAction(m, action) {
+async function cAction(m, action) {   /* ✨ v31.31 包起來：以前出錯會被 promise 吞掉，畫面毫無反應 */
+  try { await cActionGo(m, action); }
+  catch (e) { toast('操作失敗：' + ((e && e.message) || e), 'var(--red)'); }
+}
+async function cActionGo(m, action) {
   const a = JSON.parse(m.dataset.appt);
   if (action === 'checkin') {
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
-      startTime:a.t, doctor:a.doctor, status:'checked_in', by:S.cUser.name, source:'counter' }, true);
+      startTime:a.t, doctor:a.doctor, status:'checked_in',
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
     if (res.ok) { toast('✓ 已報到'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
     else toast('報到失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'cancel') {
-    const weeks = prompt('取消前是否拿藥？輸入週數（0 = 不拿藥）', '0');
-    if (weeks === null) return;
+    const _ans = await ask(`✕ 取消預約｜${esc(a.name || '')} ${esc(a.date)} ${esc(a.t)}`,
+      [{ label: '取消前是否拿藥？（週數）', type: 'number', value: '0', min: 0, max: 12, hint: '0 = 不拿藥' }],
+      '確定取消');
+    if (_ans === null) return;
+    const weeks = _ans[0];
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
       startTime:a.t, doctor:a.doctor, status:'cancelled', medicationWeeks:+weeks||'',
-      note:`櫃台取消${+weeks?`（拿藥${weeks}週）`:''}`, by:S.cUser.name, source:'counter' }, true);
+      /* ✨ v31.31 後端「操作者」讀的是 employeeName，原本只送 by 會留空白，稽核查不到人；
+         備註改為「原備註 · 櫃台取消」，不再整段覆寫掉匯入來源等資訊 */
+      note:`${a.note ? a.note + ' · ' : ''}櫃台取消${+weeks?`（拿藥${weeks}週）`:''}`,
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
     if (res.ok) { toast('✓ 已取消'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
     else toast('取消失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'resch') {
-    const nd = prompt('新日期（YYYY-MM-DD）', a.date); if (!nd) return;
-    const nt = prompt('新時段（HH:MM）', a.t); if (!nt) return;
-    const diffDays = Math.abs(Math.round((new Date(nd) - new Date(a.date)) / 86400000));
-    const sugW = Math.max(1, Math.ceil(diffDays / 7));
-    const weeks = prompt(`拿藥週數？（相距 ${diffDays} 天，建議 ${sugW} 週；0 = 不拿藥）`, String(sugW));
-    if (weeks === null) return;
-    const res = await api.post('rescheduleAppointment', { oldApptId:a.apptId, clinic:a.clinic,
-      date:nd, startTime:nt, endTime:m2t(t2m(nt) + durFor(a.type==='初診'?'initial':'followup', a.doctor, a.clinic)), doctor:a.doctor, name:a.name, phone:a.phone,
-      type:a.type, medicationWeeks:+weeks||'', note:`櫃台改約${+weeks?`（拿藥${weeks}週）`:''}`,
-      employeeName:S.cUser.name, source:'counter' }, true);
-    if (res.ok) { toast('✓ 改約完成'); closeModals(); S.apptCache.clear(); renderCounter(); }
-    else toast('改約失敗：'+(res.message||res.error||''), 'var(--red)');
+    /* ✨ v31.31 「改約」改為「取消重約」：先取消舊的，再跳回看診表點新時段。
+       櫃檯不用打日期，沿用平常點格子掛號的動線。 */
+    const _ans = await ask(`🔁 取消重約｜${esc(a.name || '')}（原 ${esc(a.date)} ${esc(a.t)}）`,
+      [{ label: '取消前是否拿藥？（週數）', type: 'number', value: '0', min: 0, max: 12, hint: '0 = 不拿藥' }],
+      '取消舊預約，去選新時段');
+    if (_ans === null) return;
+    const weeks = _ans[0];
+    const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
+      startTime:a.t, doctor:a.doctor, status:'cancelled', medicationWeeks:+weeks||'',
+      note:`${a.note ? a.note + ' · ' : ''}櫃台取消重約${+weeks?`（拿藥${weeks}週）`:''}`,
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
+    if (!res.ok) { toast('取消失敗：'+(res.message||res.error||''), 'var(--red)'); return; }
+    closeModals();
+    S.apptCache.clear();
+    S.cDate = a.date; S.cView = 'day';
+    renderCounter();
+    toast(`✓ 已取消 ${a.name || ''} ${a.date} ${a.t}　→ 請在看診表點新時段重新預約`);
   }
 }
 /* ── 通知標記工具（寫入備註持久化）── */
@@ -4430,7 +4483,10 @@ document.addEventListener('click', async e => {
       if (!id || !vd) { toast('缺預約編號', 'var(--red)'); break; }
       let newDate = '';
       if (op === 'redate') {
-        newDate = String(prompt('新的抽血日期（YYYY-MM-DD）\n提醒：抽血須在看診日前 3～6 天', '') || '').trim();
+        const _bd = await ask('🩸 改抽血日期',
+          [{ label: '新的抽血日期', type: 'date', value: '', hint: '抽血須在看診日前 3～6 天' }], '確定');
+        if (_bd === null) break;
+        newDate = String(_bd[0] || '').trim();
         if (!newDate) break;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { toast('日期格式要像 2026-09-30', 'var(--amber)'); break; }
       }
