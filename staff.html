@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.26-flow';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.27-cap';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2540,7 +2540,7 @@ async function bkbSave(btn) {
       employeeId: S.cUser.employeeId, employeeName: S.cUser.name, source: 'walk_in'
     }, true);
     btn.disabled = false; btn.textContent = '✓ 建立';
-    if (!r0.ok) { toast('失敗：' + (r0.error || ''), 'var(--red)'); return; }
+    if (!r0.ok) { toast('失敗：' + (r0.message || r0.error || ''), 'var(--red)'); return; }
     const results = (r0.course && r0.course.results || []).map(x => ({ w: x.week, ds: x.date, ok: x.ok, why: x.why || '' }));
     for (let w = 0; w < cWeeks; w++) { const dW = new Date(date + 'T00:00'); dW.setDate(dW.getDate() + w * 7); S.apptCache.delete(clinic + '|' + fmtD(dW)); }
     const okN = results.filter(x => x.ok).length;
@@ -2566,7 +2566,7 @@ async function bkbSave(btn) {
     box.dataset.blood = ''; box.dataset.caseVerified = '';
     toast(!name ? '✓ 已卡位！稍後從提醒補齊資料' : '✓ 掛號完成');
     renderCounter();
-  } else { btn.disabled = false; btn.textContent = '✓ 建立'; toast('失敗：' + (res.error || ''), 'var(--red)'); }
+  } else { btn.disabled = false; btn.textContent = '✓ 建立'; toast('失敗：' + (res.message || res.error || ''), 'var(--red)'); }
 }
 
 async function openQuickBook(date, doctor, time) {
@@ -2699,7 +2699,7 @@ async function qkSave(m, btn) {
     const inc = !name || (!phoneOK(phone) && type === '複診' && !caseNo);
     toast(inc ? '✓ 已卡位！記得稍後補齊資料（頂部提醒）' : '✓ 掛號完成');
     closeModals(); renderCounter();
-  } else { btn.disabled = false; btn.textContent = '✓ 建立掛號'; toast('失敗：' + (res.error || ''), 'var(--red)'); }
+  } else { btn.disabled = false; btn.textContent = '✓ 建立掛號'; toast('失敗：' + (res.message || res.error || ''), 'var(--red)'); }
 }
 /* 補登 modal */
 function fxBloodSel(a) {
@@ -2744,7 +2744,7 @@ async function fxSave(m, btn) {
   const res = await api.post('updateAppointmentFields', { apptId, fields,
     employeeName: S.cUser.name, employeeId: S.cUser.employeeId }, true);
   if (res.ok) { S.apptCache.delete(clinic + '|' + date); toast('✓ 資料已補齊'); closeModals(); renderCounter(); }
-  else { btn.disabled = false; toast('儲存失敗：' + (res.error || ''), 'var(--red)'); }
+  else { btn.disabled = false; toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); }
 }
 /* ✨ v31.11 勾稽共用：modal ＋ 背景掃描（5 分鐘快取，看診表自動提醒） */
 function openAuditModal(list) {
@@ -2875,7 +2875,7 @@ async function cAction(m, action) {
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
       startTime:a.t, doctor:a.doctor, status:'checked_in', by:S.cUser.name, source:'counter' }, true);
     if (res.ok) { toast('✓ 已報到'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
-    else toast('報到失敗：'+(res.error||''), 'var(--red)');
+    else toast('報到失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'cancel') {
     const weeks = prompt('取消前是否拿藥？輸入週數（0 = 不拿藥）', '0');
     if (weeks === null) return;
@@ -2883,7 +2883,7 @@ async function cAction(m, action) {
       startTime:a.t, doctor:a.doctor, status:'cancelled', medicationWeeks:+weeks||'',
       note:`櫃台取消${+weeks?`（拿藥${weeks}週）`:''}`, by:S.cUser.name, source:'counter' }, true);
     if (res.ok) { toast('✓ 已取消'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
-    else toast('取消失敗：'+(res.error||''), 'var(--red)');
+    else toast('取消失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'resch') {
     const nd = prompt('新日期（YYYY-MM-DD）', a.date); if (!nd) return;
     const nt = prompt('新時段（HH:MM）', a.t); if (!nt) return;
@@ -2896,7 +2896,7 @@ async function cAction(m, action) {
       type:a.type, medicationWeeks:+weeks||'', note:`櫃台改約${+weeks?`（拿藥${weeks}週）`:''}`,
       employeeName:S.cUser.name, source:'counter' }, true);
     if (res.ok) { toast('✓ 改約完成'); closeModals(); S.apptCache.clear(); renderCounter(); }
-    else toast('改約失敗：'+(res.error||''), 'var(--red)');
+    else toast('改約失敗：'+(res.message||res.error||''), 'var(--red)');
   }
 }
 /* ── 通知標記工具（寫入備註持久化）── */
@@ -2916,7 +2916,7 @@ async function apptSetNote(a, newNote) {
     employeeName: (S.cUser || {}).name || '', employeeRole: (S.cUser || {}).role || '', employeeId: (S.cUser || {}).employeeId || ''
   }, true);
   if (res.ok) { a.note = newNote; a['備註'] = newNote; S.apptCache.clear(); return true; }
-  toast('更新失敗：' + (res.error || ''), 'var(--red)');
+  toast('更新失敗：' + (res.message || res.error || ''), 'var(--red)');
   return false;
 }
 async function markAppt(a, op) {
@@ -3067,7 +3067,7 @@ async function quickBook() {
     name:$('#q-name').value.trim(), phone, type, note:qNote,
     employeeId:S.cUser.employeeId, employeeName:S.cUser.name, source:'phone_call' }, true);
   if (res.ok) { toast('✓ 預約已建立'); S.apptCache.delete(clinic+'|'+date); }
-  else toast('建立失敗：'+(res.error||''), 'var(--red)');
+  else toast('建立失敗：'+(res.message||res.error||''), 'var(--red)');
 }
 /* ── 🩸 每日抽血名單（補登病歷號＋出生年月日）── */
 function rocToIso(s) {
@@ -3916,6 +3916,7 @@ function htmlATimeCfg() {
       <td><b>${esc(d.shortName)}</b> 醫師<div class="muted" style="font-size:13px">${d.clinics.map(esc).join('・')}</div></td>
       <td><input type="number" class="tc-i" value="${c.initMin}" min="5" max="60" step="5" style="width:76px"> 分</td>
       <td><input type="number" class="tc-f" value="${c.followMin}" min="5" max="60" step="5" style="width:76px"> 分</td>
+      <td><input type="number" class="tc-cap" value="${c.initCap || 0}" min="0" max="20" step="1" style="width:66px" title="0＝不限制"> 位${(c.initCap || 0) ? '' : ' <span class="muted" style="font-size:12.5px">(不限)</span>'}</td>
       <td>${ov ? '<span class="tag tag-b">個別設定</span>' : '<span class="muted">公版</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-p btn-sm" data-act="tc-save" data-d="${esc(d.shortName)}">儲存</button>
@@ -3923,13 +3924,14 @@ function htmlATimeCfg() {
         ${ov ? `<button class="btn btn-o btn-sm" data-act="tc-reset" data-d="${esc(d.shortName)}">回公版</button>` : ''}
         ${d.clinics.length > 1 ? `<button class="btn btn-o btn-sm" data-act="tc-cli-toggle" data-d="${esc(d.shortName)}" style="font-size:13px" title="不同院區用不同時長">🏥 院區別</button>` : ''}
       </td></tr>
-      ${(d.clinics.length < 2 && !d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl])) ? '' : `<tr data-d="${esc(d.shortName)}" class="tcc-row" style="${d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl]) ? '' : 'display:none'}"><td colspan="5" style="background:#f8fafc;padding:7px 12px">
+      ${(d.clinics.length < 2 && !d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl])) ? '' : `<tr data-d="${esc(d.shortName)}" class="tcc-row" style="${d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl]) ? '' : 'display:none'}"><td colspan="6" style="background:#f8fafc;padding:7px 12px">
         <span style="font-size:13px;color:#64748b;margin-right:6px">🏥 院區別（優先於上列設定）：</span>
         ${d.clinics.map(cl => { const k = d.shortName + '|' + cl; const co = (S.timeCfg.clinicOv||{})[k];
-          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
+          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin}${(co.initCap||0)?'・初診上限 '+co.initCap:''} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
         <select class="tcc-cli" style="padding:4px 6px;font-size:13px">${d.clinics.map(cl => `<option>${esc(cl)}</option>`).join('')}</select>
         初 <input type="number" class="tcc-i" value="${c.initMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
         複 <input type="number" class="tcc-f" value="${c.followMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
+        初診上限 <input type="number" class="tcc-cap" value="${c.initCap || 0}" min="0" max="20" step="1" style="width:52px;padding:4px" title="0＝不限制">
         <button class="btn btn-o btn-sm" data-act="tc-save-cli" data-d="${esc(d.shortName)}" style="font-size:13px">＋ 設定此院區</button>
       </td></tr>`}`;
   }).join('');
@@ -3940,8 +3942,8 @@ function htmlATimeCfg() {
       ① <b>已預約的客戶完全不受影響</b>，照原時段看診　② 新預約立即改用新分鐘數切格<br>
       ③ 系統以「時間重疊」自動避開舊預約，<b>絕不重複掛號</b>　④ 空隙塞不下新時長時，客戶端自然顯示額滿，<b>不需再手動按滿診</b><br>
       過渡期（舊預約消化完前，約 2~4 週）可能出現塞不進新客的小空隙，屬正常現象。</div>
-    <p class="muted" style="margin-bottom:12px">個別調整範例：林秉承 → 初診 10 / 複診 10 = 10 分鐘一位不分初複診。改完立即生效（前台＋櫃台同步）。</p>
-    <table class="tbl"><thead><tr><th>醫師</th><th>初診</th><th>複診</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <p class="muted" style="margin-bottom:12px">個別調整範例：林秉承 → 初診 10 / 複診 10 = 10 分鐘一位不分初複診。改完立即生效（前台＋櫃台同步）。<br><b>每診初診上限</b>：同一位醫師在<b>同一個班表時段</b>內最多接幾位初診，超過就不給建立（病人端與櫃檯都擋，複診不受影響）。<b>0 ＝ 不限制</b>。</p>
+    <table class="tbl"><thead><tr><th>醫師</th><th>初診</th><th>複診</th><th title="同一個班表時段內最多幾位初診，0＝不限制">每診初診上限</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ── 班表管理 + Drive sync ── */
@@ -4063,7 +4065,7 @@ document.addEventListener('click', async e => {
       const res = await api.post('addLineBinding', { userId: S.lineUserId, phone: ph, name: $('#bd-name').value.trim() }, false);
       el.disabled = false;
       if (res.ok) { toast('✓ 已綁定'); closeModals(); await loadBindings(); openBindMgr(); }
-      else toast(res.error === 'limit_reached' ? '最多綁定 3 位，請先解除一位' : '綁定失敗：' + (res.error || ''), 'var(--red)');
+      else toast(res.error === 'limit_reached' ? '最多綁定 3 位，請先解除一位' : '綁定失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'bind-del': {
       const b = (S.bindings || [])[+el.dataset.i]; if (!b) break;
@@ -4071,7 +4073,7 @@ document.addEventListener('click', async e => {
       const res = await api.post('removeLineBinding', { userId: S.lineUserId, phone: b.phone }, false);
       el.disabled = false;
       if (res.ok) { toast('✓ 已解除綁定'); closeModals(); await loadBindings(); openBindMgr(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'lk-quick-pick': $('#lk-phone').value = el.dataset.p; doLookup(); break;
     case 'f-fill': { const n = $('#f-name'), p = $('#f-phone'); if (n) n.value = el.dataset.n; if (p) p.value = el.dataset.p; break; }
@@ -4214,7 +4216,7 @@ document.addEventListener('click', async e => {
       const res = await api.post('saveSmsTemplate', { key: k, content, operator: (S.aUser && S.aUser.name) || (S.cUser && S.cUser.name) || 'admin' }, true);
       el.disabled = false;
       if (res.ok) { toast(act === 'as-tpl-reset' ? '✓ 已回復預設' : '✓ 已儲存，立即生效'); loadASms(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'resch-go': reschGo(m, el); break;
     case 'cx-meds': {
@@ -4245,7 +4247,7 @@ document.addEventListener('click', async e => {
       el.disabled = true; el.textContent = '處理中…';
       const res = await api.post('updateMedRequestStatus', { '通知編號': r['通知編號'], to, operator: (S.cUser && S.cUser.name) || 'counter' }, true);
       if (res.ok) { toast(to === '已開單' ? '✓ 已開單給藥局' : '✓ 領藥完成，已結案'); S._medCache = null; loadCMeds(); }
-      else { el.disabled = false; toast('失敗：' + (res.error || ''), 'var(--red)'); }
+      else { el.disabled = false; toast('失敗：' + (res.message || res.error || ''), 'var(--red)'); }
       break; }
     case 'roster-print': rosterPrint(el); break;
     case 'cn-dr': {
@@ -4280,7 +4282,7 @@ document.addEventListener('click', async e => {
             <pre style="background:#f8fafc;border:1.5px solid var(--line);border-radius:8px;padding:10px;white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(raw || '（無資料）')}</pre></details>
           </div>
           <div class="mf"><button class="btn btn-p" style="width:100%" data-act="close-modal">關閉</button></div>`);
-      } else toast('查詢失敗：' + (res.error || ''), 'var(--red)');
+      } else toast('查詢失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'ds-set': {
       const doc = el.dataset.doc, v = el.dataset.v;
@@ -4293,7 +4295,7 @@ document.addEventListener('click', async e => {
         if (v) S.dayStatus.set(key, v); else S.dayStatus.delete(key);
         toast(v ? `✓ ${doc} 醫師 ${S.cDate.replace(/-/g,'/')} 已設為${v}` : '✓ 已恢復正常');
         renderCounter();
-      } else toast('失敗：' + (res.error || ''), 'var(--red)');
+      } else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'stop-notify': {
       const a = (window.__stopIndex || [])[+el.dataset.i]; if (!a) break;
@@ -4312,7 +4314,7 @@ document.addEventListener('click', async e => {
         reason: $('#bl-reason').value.trim() || '櫃檯手動加入', operator: (S.cUser && S.cUser.name) || '' }, true);
       el.disabled = false;
       if (res.ok) { toast('✓ 已加入黑名單'); loadCBlack(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'bl-whitelist': {   // ✨ v31.18 自動封鎖 → 一鍵加白名單
       el.disabled = true; el.textContent = '解除中…';
@@ -4327,7 +4329,7 @@ document.addEventListener('click', async e => {
       const res = await api.post('removeBlacklist', { phone: r['電話'], name: r['姓名'] || '', clinic: r['院區'] || '', operator: (S.cUser && S.cUser.name) || '' }, true);
       el.disabled = false;
       if (res.ok) { toast('✓ 已解除封鎖'); loadCBlack(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'cb-save': {
       const r = (window.__cbIndex || [])[+el.dataset.i]; if (!r) break;
@@ -4343,7 +4345,7 @@ document.addEventListener('click', async e => {
       const res = await api.post('fillBloodRegistration', { apptId: r.apptId, caseNo, birthday: iso, operator: (S.cUser && S.cUser.name) || 'counter' }, true);
       el.disabled = false; el.textContent = '💾 儲存';
       if (res.ok) { toast('✓ 已補登'); S.apptCache.clear(); loadCBlood(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'cn-mark': {
       const a = (window.__cnIndex || [])[+el.dataset.i];
@@ -4562,7 +4564,7 @@ document.addEventListener('click', async e => {
         'Drive資料夾ID': $('#ap-folder').value.trim()
       }, true);
       if (res.ok) { toast('✓ 介紹已更新，前台立即生效'); closeModals(); }
-      else { toast('儲存失敗：' + (res.error || ''), 'var(--red)'); el.disabled = false; }
+      else { toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); el.disabled = false; }
       break; }
     case 'ord-move': {
       const i = +el.dataset.i, d2 = +el.dataset.d, to = i + d2;
@@ -4580,7 +4582,7 @@ document.addEventListener('click', async e => {
       if (!confirm('確定回到預設排序？（總院長優先＋院區順序）')) break;
       const res = await api.post('resetDoctorOrder', {}, true);
       if (res.ok) { S.docOrder = []; S.docTitles = {}; S.ordDraft = null; S.ordTitlesDraft = null; applyDoctorOrder(); toast('✓ 已回到預設排序與職稱'); renderAdmin(); }
-      else toast('重設失敗：' + (res.error || ''), 'var(--red)');
+      else toast('重設失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'tc-uni': {
       const tr = el.closest('tr');
@@ -4606,25 +4608,27 @@ document.addEventListener('click', async e => {
       const tr = el.closest('tr');
       const cli = tr.querySelector('.tcc-cli').value;
       const i2 = +tr.querySelector('.tcc-i').value, f2 = +tr.querySelector('.tcc-f').value;
+      const cap2 = Math.max(0, +(tr.querySelector('.tcc-cap') || {}).value || 0);   /* ✨ v31.27 */
       if (!i2 || !f2) { toast('請填分鐘數', 'var(--amber)'); break; }
       el.disabled = true;
-      const res = await api.post('saveTimeSetting', { doctor: el.dataset.d, clinic: cli, initMin: i2, followMin: f2, by: (S.aUser && S.aUser.name) || 'admin' }, true);
+      const res = await api.post('saveTimeSetting', { doctor: el.dataset.d, clinic: cli, initMin: i2, followMin: f2, initCap: cap2, by: (S.aUser && S.aUser.name) || 'admin' }, true);
       el.disabled = false;
-      if (res.ok) { S.timeCfg.clinicOv[el.dataset.d + '|' + cli] = { initMin: i2, followMin: f2 }; toast(`✓ ${el.dataset.d}／${cli}：初 ${i2} 分・複 ${f2} 分`); renderAdmin(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      if (res.ok) { S.timeCfg.clinicOv[el.dataset.d + '|' + cli] = { initMin: i2, followMin: f2, initCap: cap2 }; toast(`✓ ${el.dataset.d}／${cli}：初 ${i2} 分・複 ${f2} 分`); renderAdmin(); }
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'tc-del-cli': {
       const res = await api.post('deleteTimeSetting', { doctor: el.dataset.d, clinic: el.dataset.c }, true);
       if (res.ok) { delete S.timeCfg.clinicOv[el.dataset.d + '|' + el.dataset.c]; toast('✓ 已移除院區別設定，回到醫師/公版'); renderAdmin(); }
-      else toast('失敗：' + (res.error || ''), 'var(--red)');
+      else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'tc-save': {
       const tr = el.closest('tr');
       const d = el.dataset.d;
       const initMin = +tr.querySelector('.tc-i').value, followMin = +tr.querySelector('.tc-f').value;
+      const initCap = Math.max(0, +(tr.querySelector('.tc-cap') || {}).value || 0);   /* ✨ v31.27 每診初診上限，0＝不限制 */
       if (!(initMin >= 5 && followMin >= 5)) { toast('分鐘數需 ≥ 5', 'var(--amber)'); break; }
-      const res = await api.post('saveTimeSetting', { doctor:d, initMin, followMin, by:S.aUser.name }, true);
-      if (res.ok) { S.timeCfg.overrides[d] = { initMin, followMin }; toast(`✓ ${d}：初診 ${initMin} / 複診 ${followMin} 分`); renderAdmin(); }
+      const res = await api.post('saveTimeSetting', { doctor:d, initMin, followMin, initCap, by:S.aUser.name }, true);
+      if (res.ok) { S.timeCfg.overrides[d] = { initMin, followMin, initCap }; toast(`✓ ${d}：初診 ${initMin} / 複診 ${followMin} 分${initCap?`・每診初診上限 ${initCap} 位`:'・初診不限量'}`); renderAdmin(); }
       else toast('儲存失敗：'+(res.error||'後端未部署 saveTimeSetting'), 'var(--red)');
       break; }
     case 'tc-reset': {
