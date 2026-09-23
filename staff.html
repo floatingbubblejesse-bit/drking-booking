@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.35-noicon';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.36-report';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -3533,14 +3533,63 @@ async function loadCNotify() {
     <th>時段</th><th>病人</th><th>電話</th><th>醫師</th><th>☎ 電話通知</th><th>📨 簡訊/LINE</th><th>備註</th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+/* ✨ v31.36 當日報表重寫。
+   原本讀 d.total／d.checkedIn／d.initial／d.followup／d.cancelled／d.rescheduled，
+   但後端 getDailyReport 回傳的是 { clinic, date, doctors[], subtotal } —— 這些欄位一個都不存在，
+   stat(undefined) 一律顯示 0，所以整頁永遠是 0。
+   （後端另有狀態命名 bug：報到存的是 checked_in，報表卻比對 '已報到'，104 版已修。）
+   改為讀真正的結構，並加上：日期可切換（預設今天）、依醫師分頁、逐筆明細。 */
+function crShift(ds, n){ const d = new Date(ds + 'T00:00'); d.setDate(d.getDate() + n); return fmtD(d); }
 async function loadCReport() {
-  const res = await api.post('getDailyReport', { clinic:S.cClinic, date:S.cDate }, true);
-  const d = (res.ok && res.data) || null;
   const el = $('#cr-box'); if (!el) return;
-  if (!d) { el.innerHTML = '<p class="muted">尚無報表資料</p>'; return; }
-  const stat = (v,l) => `<div class="stat"><div class="sv">${v??0}</div><div class="sl">${l}</div></div>`;
-  el.innerHTML = `<div class="stat-grid">${stat(d.total,'總預約')}${stat(d.checkedIn??d.checked_in,'已報到')}
-    ${stat(d.initial,'初診')}${stat(d.followup,'複診')}${stat(d.cancelled,'取消')}${stat(d.rescheduled,'改約')}</div>`;
+  if (!S.crDate) S.crDate = S.cDate || fmtD(new Date());
+  const date = S.crDate, clinic = S.cClinic;
+  el.innerHTML = '<p class="muted" style="padding:10px">載入中…</p>';
+  const res = await api.post('getDailyReport', { clinic: clinic, date: date }, true);
+  if (!$('#cr-box') || S.crDate !== date || S.cClinic !== clinic) return;
+  if (!res.ok || !res.data) { el.innerHTML = '<p class="muted">讀取失敗：' + esc(res.error || '') + '</p>'; return; }
+  window.__crData = res.data;
+  renderCReport();
+}
+function renderCReport() {
+  const el = $('#cr-box'); const d = window.__crData; if (!el || !d) return;
+  const docs = Array.isArray(d.doctors) ? d.doctors : [];
+  if (!S.crDoc || (S.crDoc !== '__all' && !docs.some(x => x.doctor === S.crDoc))) S.crDoc = '__all';
+  const today = fmtD(new Date());
+  const bar = `<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:11px">
+      <button class="btn btn-o btn-sm" data-act="cr-day" data-d="-1">← 前一天</button>
+      <input type="date" id="cr-date" value="${esc(S.crDate)}" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">
+      <button class="btn btn-o btn-sm" data-act="cr-day" data-d="1">後一天 →</button>
+      <button class="btn ${S.crDate === today ? 'btn-p' : 'btn-o'} btn-sm" data-act="cr-today">今天</button>
+      <span class="muted" style="margin-left:4px">${esc(d.clinic || '')}</span></div>`;
+  const pick = (S.crDoc === '__all') ? d.subtotal : (docs.find(x => x.doctor === S.crDoc) || d.subtotal);
+  const t = pick.total || {}, c = pick.checked || {}, rs = pick.reschedule || {};
+  const 總 = (t.initial||0) + (t.followup||0), 到 = (c.initial||0) + (c.followup||0);
+  const stat = (val, label, color) => `<div class="stat"><div class="sv"${color?' style="color:'+color+'"':''}>${val ?? 0}</div><div class="sl">${label}</div></div>`;
+  const tabs = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">${
+      [{k:'__all',n:'全部',c:(d.subtotal.total.initial||0)+(d.subtotal.total.followup||0)}]
+      .concat(docs.map(x => ({k:x.doctor,n:x.doctor,c:(x.total.initial||0)+(x.total.followup||0)})))
+      .map(x => `<button class="btn btn-sm ${S.crDoc===x.k?'btn-p':'btn-o'}" data-act="cr-doc" data-n="${esc(x.k)}">${esc(x.n)} ${x.c}</button>`).join('')}</div>`;
+  const list = (S.crDoc === '__all')
+    ? docs.reduce((a, x) => a.concat((x.details||[]).map(y => Object.assign({_doc:x.doctor}, y))), [])
+    : ((docs.find(x => x.doctor === S.crDoc) || {}).details || []).map(y => Object.assign({_doc:S.crDoc}, y));
+  list.sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  const badge = st => st==='已報到' ? '<span class="tag tag-g">已報到</span>'
+    : st==='已取消' ? '<span class="tag tag-r">已取消</span>'
+    : st==='已改約' ? '<span class="tag tag-a">已改約</span>'
+    : st==='未到診' ? '<span class="tag tag-r">未到診</span>'
+    : '<span class="tag tag-b">' + esc(st || '已預約') + '</span>';
+  const table = !list.length ? '<p class="muted" style="padding:10px">這一天沒有預約</p>'
+    : '<div style="overflow:auto"><table class="tbl"><thead><tr><th>時段</th><th>醫師</th><th>姓名</th><th>電話</th><th>初/複</th><th>狀態</th><th>拿藥</th><th>改約後</th></tr></thead><tbody>'
+      + list.map(x => `<tr><td>${esc(x.time||'')}</td><td>${esc(x._doc||'')}</td><td>${esc(x.name||'(未填)')}</td>
+          <td>${x.phone ? '<a href="tel:'+esc(x.phone)+'" style="color:var(--blue);font-weight:700">'+esc(x.phone)+'</a>' : '—'}</td>
+          <td>${esc(x.type||'')}</td><td>${badge(x.status)}</td><td>${x.meds ? esc(x.meds)+' 週' : '—'}</td>
+          <td>${x.newDate ? esc(String(x.newDate).slice(5).replace('-','/'))+' '+esc(x.newTime||'') : '—'}</td></tr>`).join('')
+      + '</tbody></table></div>';
+  el.innerHTML = bar + tabs
+    + `<div class="stat-grid">${stat(總,'總預約')}${stat(到,'已報到','var(--green)')}${stat(t.initial,'初診')}${stat(t.followup,'複診')}${stat((rs.changedWithMeds||0)+(rs.changedNoMeds||0),'改約')}${stat(rs.nothing||0,'取消/未到')}</div>`
+    + `<div class="muted" style="margin:9px 0 7px">到診率 ${總 ? Math.round(到/總*100) : 0}%（${到}／${總}）· 共 ${list.length} 筆${S.crDoc === '__all' ? '' : '　·　目前只看 <b>' + esc(S.crDoc) + '</b>'}</div>`
+    + table;
 }
 </script>
 <script>
@@ -4578,6 +4627,10 @@ document.addEventListener('click', async e => {
       if (el.dataset.d) S.cDate = el.dataset.d;
       S.cView = el.dataset.v; S.apptCache.clear(); renderCounter(); break; }
     case 'cd-refresh': S.apptCache.clear(); renderCounter(); break;
+    /* ✨ v31.36 當日報表：換日期、切醫師 */
+    case 'cr-day': { S.crDate = crShift(S.crDate || S.cDate || fmtD(new Date()), +el.dataset.d || 0); loadCReport(); break; }
+    case 'cr-today': { S.crDate = fmtD(new Date()); loadCReport(); break; }
+    case 'cr-doc': { S.crDoc = el.dataset.n || '__all'; renderCReport(); break; }
     case 'cd-mode': S.cMode = el.dataset.m; renderCounter(); break;
     case 'cd-pill': openMiniCal(); break;
     case 'mc-nav': {
@@ -4816,6 +4869,8 @@ document.addEventListener('input', e => {
   }
 });
 document.addEventListener('change', e => {
+  /* ✨ v31.36 當日報表的日期欄 */
+  if (e.target.id === 'cr-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.crDate = e.target.value; loadCReport(); return; }
   if (e.target.id === 'cd-clinic') { S.cClinic = e.target.value; renderCounter(); }
   /* ✨ v31.24 日期直接輸入：跨月不用翻日曆 */
   if (e.target.id === 'cd-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.cDate = e.target.value; S.apptCache.clear(); renderCounter(); }
