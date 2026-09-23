@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.25-fix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.26-flow';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1941,45 +1941,73 @@ async function loadCDaily() {
   const clinic = S.cClinic;
   const today = fmtD(new Date());
   const tomo = dcShift(today, 1), yest = dcShift(today, -1);
+  /* ✨ v31.26 提醒簡訊目前是傍晚才發，14:30 看明天的會是空的。
+     早上（12 點前）預設看「今天」＝開診前補看昨晚發出去的結果；下午預設看「明天」。 */
+  if (!S.dcDay) S.dcDay = (new Date().getHours() < 12) ? 'today' : 'tomo';
+  const callD = (S.dcDay === 'today') ? today : tomo;
   const box0 = $('#dc-box');
   if (!box0) return;
-  box0.innerHTML = '<div id="dc-12"></div><div id="dc-34"><p class="muted" style="padding:10px">檢查中…</p></div>';
+  box0.innerHTML = '<div id="dc-12"></div><div id="dc-345"><p class="muted" style="padding:10px">檢查中…</p></div>';
   const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
   const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
-  const cnt = { need:null, unsent:null, fails:0, bl:0 };
+  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0 };
   const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
-  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'明日待電話') + pill(cnt.bl,'抽血未補登'); };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登'); };
   paintSum();
 
-  /* ── 階段一：快的四支（約 3 秒）→ 先把 ③④ 畫出來 ── */
-  const [tmAppts, rsRes, bY, bT] = await Promise.all([
-    getAppts(clinic, tomo).catch(function(){ return []; }),
-    api.post('getReminderStatus', { date: tomo, clinic: clinic }, true),
+  const [cAppts, rsRes, bY, bT] = await Promise.all([
+    getAppts(clinic, callD).catch(function(){ return []; }),
+    api.post('getReminderStatus', { date: callD, clinic: clinic }, true),
     api.post('getBloodList', { clinic: clinic, date: yest }, true),
     api.post('getBloodList', { clinic: clinic, date: today }, true)
   ]);
-  if (!$('#dc-34') || S.cClinic !== clinic) return;
+  if (!$('#dc-345') || S.cClinic !== clinic) return;
+
+  /* ③ 該日通知失敗，要人工聯繫 */
   const rsMap = (rsRes.ok && rsRes.data) || {};
-  const fails = (tmAppts || []).filter(function(a){
-    if (isDead(a)) return false;
+  const alive = (cAppts || []).filter(function(a){ return !isDead(a); });
+  const fails = alive.filter(function(a){
     const rec = (rsMap[String(a.apptId || a.id || a['預約編號'] || '')] || {}).reminder;
     return rec && !rec.ok;
   });
+  const noRem = alive.filter(function(a){ return !(rsMap[String(a.apptId || a.id || a['預約編號'] || '')] || {}).reminder; });
   const t3 = !fails.length ? '' : '<table class="tbl"><thead><tr><th>時段</th><th>姓名</th><th>電話</th><th>醫師</th><th>類型</th><th>已聯繫？</th></tr></thead><tbody>'
     + fails.map(function(a){ const note = String(a.note || a['備註'] || ''); const done = /☎已通知/.test(note), noans = /☎未接聽/.test(note);
       return '<tr><td>' + esc(apptTime(a)) + '</td><td>' + esc(a.name||a['病人姓名']||'(未填)') + '</td><td>' + tel(String(a.phone||a['電話']||'')) + '</td><td>' + esc(normDoc(a.doctor||a['醫師']||'')) + '</td><td>' + esc(a.type||a['類型']||'') + '</td><td>' + (done ? '<span class="tag tag-g">✓ 已通知</span>' : noans ? '<span class="tag tag-a">✗ 未接聽</span>' : '<span style="color:var(--red);font-weight:700">尚未</span>') + '</td></tr>'; }).join('') + '</tbody></table>';
+  const dayBtn = '<span style="margin-right:6px">'
+    + '<button class="btn btn-sm ' + (S.dcDay==='today'?'btn-p':'btn-o') + '" data-act="dc-day" data-v="today">今天 ' + md(today) + '</button> '
+    + '<button class="btn btn-sm ' + (S.dcDay==='tomo'?'btn-p':'btn-o') + '" data-act="dc-day" data-v="tomo">明天 ' + md(tomo) + '</button></span>';
+  const remHint = (S.dcDay === 'tomo' && !fails.length && noRem.length)
+    ? '<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:9px;padding:10px 13px;margin-bottom:9px;font-size:14px;color:#92400e">ℹ️ 明天有 <b>' + noRem.length + '</b> 筆還沒有提醒紀錄。<b>提醒目前是傍晚才自動發</b>，下午看到空白是正常的；請隔天開診前切到「今天」補看結果。</div>'
+    : '';
+
+  /* ⑤ 該日初診的抽血報告 */
+  const rptPending = alive.filter(function(a){
+    if ((a.type || a['類型']) !== '初診') return false;
+    const n = String(a.note || a['備註'] || '');
+    return !/🩸院內報告OK|🩸外院報告|🩸報告OK/.test(n);
+  });
+  const t5 = !rptPending.length ? '' : '<table class="tbl"><thead><tr><th>時段</th><th>姓名</th><th>電話</th><th>醫師</th><th>抽血安排</th></tr></thead><tbody>'
+    + rptPending.map(function(a){ const n = String(a.note || a['備註'] || '');
+      const bd = (n.match(/🩸抽血日:([0-9-]+)/)||[])[1];
+      const arr = bd ? ('已排 ' + md(bd)) : (/🩸初診當日抽血/.test(n) ? '初診當日抽' : (/🩸未抽血已提醒/.test(n) ? '未抽血·已提醒' : '<span style="color:var(--red);font-weight:700">未安排</span>'));
+      return '<tr><td>' + esc(apptTime(a)) + '</td><td>' + esc(a.name||a['病人姓名']||'(未填)') + '</td><td>' + tel(String(a.phone||a['電話']||'')) + '</td><td>' + esc(normDoc(a.doctor||a['醫師']||'')) + '</td><td>' + arr + '</td></tr>'; }).join('') + '</tbody></table>';
+
+  /* ④ 抽血日到了卻沒補登病歷號／生日 */
   const bYd = (bY.ok && bY.data) || [], bTd = (bT.ok && bT.data) || [];
   const bl = [].concat(bYd, bTd).map(function(x, i){ return Object.assign({ _bd: i < bYd.length ? yest : today }, x); })
     .filter(function(x){ return !String(x.caseNo || '').trim() || !String(x.birthday || '').trim(); });
   const t4 = !bl.length ? '' : '<table class="tbl"><thead><tr><th>抽血日</th><th>姓名</th><th>電話</th><th>看診日</th><th>缺什麼</th></tr></thead><tbody>'
     + bl.map(function(x){ const miss = []; if (!String(x.caseNo||'').trim()) miss.push('病歷號'); if (!String(x.birthday||'').trim()) miss.push('出生年月日');
       return '<tr><td>' + esc(md(x._bd)) + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(md(x.visitDate)) + ' ' + esc(x.time||'') + '</td><td style="color:var(--red);font-weight:700">' + miss.join('、') + '</td></tr>'; }).join('') + '</tbody></table>';
-  cnt.fails = fails.length; cnt.bl = bl.length; paintSum();
-  $('#dc-34').innerHTML =
-      dcCard(fails.length, '☎', '明日需電話通知（' + md(tomo) + '）', '系統每天中午 12:00 自動發提醒，這些是發送失敗的，要人工打電話或 LINE。', t3, 'call', '前往明日通知', tomo)
-    + dcCard(bl.length, '🩸', '抽血未補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。看診日前一天要找得到報告，請先聯繫確認。', t4, 'blood', '前往抽血名單');
 
-  /* ── 階段二：慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒）── */
+  cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; paintSum();
+  $('#dc-345').innerHTML =
+      dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
+    + dcCard(rptPending.length, '🩸', md(callD) + ' 初診的抽血報告', '這些初診病人還沒標記「院內報告OK／外院報告」。看診前要把報告調出來夾進病歷；到通知頁可直接按標記。', t5, 'call', '前往標記報告', callD)
+    + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。看診日前一天要找得到報告，請先聯繫確認。', t4, 'blood', '前往抽血名單');
+
+  /* ①② 慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒） */
   const paint12 = function(list){
     if (!$('#dc-12') || S.cClinic !== clinic) return;
     const audit = (list || []).filter(function(x){ return String(x.clinic || '') === clinic; });
@@ -1993,12 +2021,12 @@ async function loadCDaily() {
       + (sendable.length > 1 ? '<div style="margin-top:9px"><button class="btn btn-g btn-sm" data-act="resend-all" data-ids="' + esc(sendable.join(',')) + '">📨 全部補發（' + sendable.length + ' 筆）</button></div>' : '');
     cnt.need = need.length; cnt.unsent = unsent.length; paintSum();
     $('#dc-12').innerHTML =
-        dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去。點右上角到看診表用 ✏️ 補登。', t1, 'day', '前往補登')
-      + dcCard(unsent.length, '📵', '簡訊未發送成功', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '');
+        dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去，而且提醒也不會發（系統只提醒「預約成功簡訊已成功」的人），所以這塊要最先處理。', t1, 'day', '前往補登')
+      + dcCard(unsent.length, '📵', '預約成功簡訊未送達', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '');
   };
   const c = window.__auditCache;
   if (c && Date.now() - c.at < 300e3) { paint12(c.list || []); return; }
-  $('#dc-12').innerHTML = '<div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:15px;margin-bottom:13px;font-size:15px;color:#475569">⏳ <b>正在檢查「待補登」與「簡訊未送達」…</b><br><span style="font-size:14px">這兩項要掃全部通知紀錄，約需 40 秒。<b>下面兩項已經可以先處理</b>，結果出來會自動補上。</span></div>';
+  $('#dc-12').innerHTML = '<div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:12px;padding:15px;margin-bottom:13px;font-size:15px;color:#475569">⏳ <b>正在檢查「待補登」與「簡訊未送達」…</b><br><span style="font-size:14px">這兩項要掃全部通知紀錄，約需 40 秒。<b>下面三項已經可以先處理</b>，結果出來會自動補上。</span></div>';
   api.post('auditUnsentBookings', {}, true).then(function(r){
     if (r.ok) window.__auditCache = { at: Date.now(), list: r.data || [] };
     if (!$('#dc-12') || S.cClinic !== clinic) return;
@@ -4386,6 +4414,7 @@ document.addEventListener('click', async e => {
       } else toast('同步失敗：' + (r.error || ''), 'var(--red)');
       break; }
     case 'dc-reload': S.apptCache.clear(); window.__auditCache = null; loadCDaily(); break;
+    case 'dc-day': S.dcDay = el.dataset.v; loadCDaily(); break;   /* ✨ v31.26 通知那塊切換今天／明天 */
     case 'dc-goto': {   /* ✨ v31.22 從每日必查跳到對應的完整功能頁 */
       if (el.dataset.d) S.cDate = el.dataset.d;
       S.cView = el.dataset.v; S.apptCache.clear(); renderCounter(); break; }
