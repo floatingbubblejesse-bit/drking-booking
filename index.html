@@ -414,12 +414,18 @@ function applyPilotLock(){if(!pilotLocked())return false;const id=APP.data.clini
 function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',on);
  if(staff){el.innerHTML='<strong>全院區測試模式</strong><span>後台已登入，可以測試所有院區。病人從 LINE 進來看到的是試點版。</span>';return;}
  if(!on){el.innerHTML='';return;}const p=APP.data.pilot,name=APP.data.clinics[0].name;el.innerHTML=(expired?'<span class="pilot-warn">後台登入已過期，目前是病人看到的版本。請回後台重新登入。</span>':'')+'<strong>手機預約目前僅開放'+esc(name)+'</strong><span>'+'其他院區請<a href="'+esc(p.otherUrl||PILOT_LINE_ADD_FRIEND)+'" rel="noopener">使用原本的 LINE 預約</a>'+'</span>';}
-/* 院區醫師排序覆寫（2026-09-19）：head 依序排最前、tail 依序排最後、其餘依後端 rank。三樹院區：張慧馨、闕壯理、黃允玫 ｜（其他）｜ 蕭捷健、蕭捷存、黃錦崧。其他院區與「選醫師不選院區」不受影響 */
-const CLINIC_DOCTOR_ORDER={c1:{head:['doc_f63d073785','doc_899a7d80e0','doc_8112d4e1f2'],tail:['hsiao_chieh_chien','hsiao_chieh_tsuen','huang_chin_sung']}};
+/* 2026-09-23：原本這裡針對三樹院區寫死了醫師順序（head：張慧馨、闕壯理、黃允玫；
+   tail：蕭捷健、蕭捷存、黃錦崧），會蓋掉後台「系統管理 → 醫師排序」拖曳存的結果，
+   所以後台怎麼調，病人看到的順序都不會變 —— 而且方向正好與老闆要的相反
+   （老闆要闕壯理擺在蕭捷健旁邊）。
+   後端 103 版起，v2Bootstrap 已依後台排序給 rank，這裡改為完全照 rank，不再覆寫。
+   保留空物件，rankSort／clinicOrderKey 的結構不動，日後若真要針對單一院區微調可再填回來。 */
+const CLINIC_DOCTOR_ORDER={};
 function clinicOrderKey(id,clinicId){const o=CLINIC_DOCTOR_ORDER[clinicId||STATE.clinic];if(!o)return [1,0];let i=o.head.indexOf(id);if(i>=0)return [0,i];i=o.tail.indexOf(id);if(i>=0)return [2,i];return [1,0];}
 function rankSort(a,b,clinicId){const ka=clinicOrderKey(a.id,clinicId),kb=clinicOrderKey(b.id,clinicId);if(ka[0]!==kb[0])return ka[0]-kb[0];if(ka[0]!==1)return ka[1]-kb[1];return (Number.isFinite(a.rank)?a.rank:100000)-(Number.isFinite(b.rank)?b.rank:100000)||String(a.id).localeCompare(String(b.id));}
-/* 「選醫師不選院區」醫師列表前四位固定順序（2026-09-19）：蕭捷健、闕壯理、張慧馨、黃允玫；其餘依後端 rank */
-const DOCTOR_MODE_HEAD=['hsiao_chieh_chien','doc_899a7d80e0','doc_f63d073785','doc_8112d4e1f2'];
+/* 2026-09-23：原本「選醫師不選院區」的前四位也是寫死的，同樣蓋掉後台排序。
+   改為完全照後端 rank（＝後台拖曳的順序）。保留空陣列，doctorModeSort 結構不動。 */
+const DOCTOR_MODE_HEAD=[];
 function doctorModeSort(a,b){const ha=DOCTOR_MODE_HEAD.indexOf(a.id),hb=DOCTOR_MODE_HEAD.indexOf(b.id);if(ha!==hb){if(ha<0)return 1;if(hb<0)return -1;return ha-hb;}return rankSort(a,b,'-');}
 function listedDoctors(){return doctorMode()?APP.data.doctors.slice().sort(doctorModeSort):clinicDoctors();}
 function doctorMatches(d){const q=STATE.doctorQuery.replace(/\s+/g,'').toLowerCase();return !q||String(d.name||'').replace(/\s+/g,'').toLowerCase().includes(q);}
