@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.31-noprompt';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.32-nosms';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1984,9 +1984,9 @@ async function loadCDaily() {
   box0.innerHTML = '<div id="dc-12"></div><div id="dc-345"><p class="muted" style="padding:10px">檢查中…</p></div>';
   const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
   const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
-  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0 };
+  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0 };
   const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
-  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登'); };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登'); };
   paintSum();
 
   const [cAppts, rsRes, bY, bT] = await Promise.all([
@@ -2005,6 +2005,36 @@ async function loadCDaily() {
     return rec && !rec.ok;
   });
   const noRem = alive.filter(function(a){ return !(rsMap[String(a.apptId || a.id || a['預約編號'] || '')] || {}).reminder; });
+
+  /* ✨ v31.32 系統「根本不會去發」的名單。
+     這些人不會出現在上面的「通知失敗」裡 —— 因為後端 dailyReminder 檢查電話時
+     就直接跳過了，連發都沒發，自然沒有失敗紀錄。若不另外列出來，櫃檯永遠不會發現。
+     判斷條件與後端 dailyReminder 的 _remindOk 保持一致。 */
+  const smsBad = function (a) {
+    const nm = String(a.name || a['病人姓名'] || '').trim();
+    if (!nm || nm.indexOf('未填') >= 0) return '姓名未填';
+    const ph = String(a.phone || a['電話'] || '').replace(/[^0-9]/g, '');
+    if (!ph) return '沒有電話';
+    if (ph.length < 9) return '電話不完整';
+    if (/^09000000\d{2}$/.test(ph)) return '匯入佔位號碼';
+    if (/^(\d)\1+$/.test(ph)) return '號碼無效';
+    if (ph.indexOf('0912345678') === 0) return '測試號碼';
+    return '';
+  };
+  const nosms = alive.map(function (a) { return { a: a, why: smsBad(a) }; })
+                     .filter(function (x) { return x.why; });
+  const t0 = !nosms.length ? '' : '<table class="tbl"><thead><tr><th>時段</th><th>姓名</th><th>病歷號</th><th>電話</th><th>醫師</th><th>類型</th><th>原因</th><th>已聯繫？</th></tr></thead><tbody>'
+    + nosms.map(function (x) {
+        const a = x.a, note = String(a.note || a['備註'] || '');
+        const done = /☎已通知/.test(note), noans = /☎未接聽/.test(note);
+        const ph = String(a.phone || a['電話'] || '');
+        return '<tr><td>' + esc(apptTime(a)) + '</td><td>' + esc(a.name || a['病人姓名'] || '(未填)') + '</td>'
+          + '<td>' + esc(a.caseNo || a['病例號'] || a['病歷號'] || '—') + '</td>'
+          + '<td>' + (x.why === '沒有電話' ? '<span style="color:var(--red);font-weight:700">缺電話</span>' : '<span style="color:var(--txt3)">' + esc(ph) + '</span>') + '</td>'
+          + '<td>' + esc(normDoc(a.doctor || a['醫師'] || '')) + '</td><td>' + esc(a.type || a['類型'] || '') + '</td>'
+          + '<td style="color:var(--red);font-weight:700">' + esc(x.why) + '</td>'
+          + '<td>' + (done ? '<span class="tag tag-g">✓ 已通知</span>' : noans ? '<span class="tag tag-a">✗ 未接聽</span>' : '<span style="color:var(--red);font-weight:700">尚未</span>') + '</td></tr>';
+      }).join('') + '</tbody></table>';
   const t3 = !fails.length ? '' : '<table class="tbl"><thead><tr><th>時段</th><th>姓名</th><th>電話</th><th>醫師</th><th>類型</th><th>已聯繫？</th></tr></thead><tbody>'
     + fails.map(function(a){ const note = String(a.note || a['備註'] || ''); const done = /☎已通知/.test(note), noans = /☎未接聽/.test(note);
       return '<tr><td>' + esc(apptTime(a)) + '</td><td>' + esc(a.name||a['病人姓名']||'(未填)') + '</td><td>' + tel(String(a.phone||a['電話']||'')) + '</td><td>' + esc(normDoc(a.doctor||a['醫師']||'')) + '</td><td>' + esc(a.type||a['類型']||'') + '</td><td>' + (done ? '<span class="tag tag-g">✓ 已通知</span>' : noans ? '<span class="tag tag-a">✗ 未接聽</span>' : '<span style="color:var(--red);font-weight:700">尚未</span>') + '</td></tr>'; }).join('') + '</tbody></table>';
@@ -2039,9 +2069,13 @@ async function loadCDaily() {
         + '<button class="btn btn-o btn-sm" ' + _bt + ' data-op="redate" title="重新安排抽血日期">📅 改日期</button> '
         + '<button class="btn btn-g btn-sm" ' + _bt + ' data-op="sameday" title="改成初診當天提早 30 分鐘抽血，不用另外跑一趟">🏥 改當日抽</button></td></tr>'; }).join('') + '</tbody></table>';
 
-  cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; paintSum();
+  cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; cnt.nosms = nosms.length; paintSum();
   $('#dc-345').innerHTML =
-      dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
+      dcCard(nosms.length, '📵', dayBtn + '系統發不出簡訊，要打電話',
+        '這些人的電話缺漏或不是有效號碼（例如搜博匯入時用的 0900000000 佔位號），<b>系統不會發、也不會列在下面的「通知失敗」裡</b>，因為根本沒試著發。'
+        + '請直接打電話或用 LINE 通知，並到看診表把正確電話補上，下次才會自動發。',
+        t0, 'call', '前往通知頁', callD)
+    + dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
     + dcCard(rptPending.length, '🩸', md(callD) + ' 初診的抽血報告', '這些初診病人還沒標記「院內報告OK／外院報告」。看診前要把報告調出來夾進病歷；到通知頁可直接按標記。', t5, 'call', '前往標記報告', callD)
     + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。<b>看診預約不要取消</b>，先電話或 LINE 聯繫：能來就「改日期」或「改當日抽」，不來抽血的就按「未報到」並提醒<b>看診當天帶 14 天內外院報告</b>。', t4, 'blood', '前往抽血名單');
 
