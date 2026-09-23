@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.23-fast';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.24-visual';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2030,7 +2030,7 @@ function htmlCDay() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       ${modeToggle()}
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="sv-open">📋 門診表</button>
@@ -2055,7 +2055,7 @@ function htmlCWeek() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-7">← 上週</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">本週</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="7">下週 →</button>
-      <button class="dpill" data-act="cd-pill">📅 ${fmtD(ws).replace(/-/g,'/')} — ${fmtD(we).replace(/-/g,'/')}<span class="pe">✏️</span></button>
+      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${fmtD(ws).replace(/-/g,'/')} — ${fmtD(we).replace(/-/g,'/')}<span class="pe">✏️</span></button>
       ${modeToggle()}
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="sv-open">📋 門診表</button>
@@ -2186,7 +2186,16 @@ async function loadCDayGrid() {
       h += `<td class="${on?'':'off'}" ${on ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map(a => {
         const st = a.status || a['狀態'] || '';
         const cls = st==='checked_in'||st==='已報到' ? 'done' : st==='rescheduled'||st==='已改約' ? 're' : (a.type==='初診'||a['類型']==='初診') ? 'i' : '';
-        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}">${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}</div>`;
+        /* ✨ v31.24 格子上直接看出狀態，不用點開 */
+        const _nt = String(a.note || a['備註'] || '');
+        const _nm = String(a.name || a['病人姓名'] || '').trim();
+        const _ph = String(a.phone || a['電話'] || '').replace(/[^0-9]/g, '');
+        const _miss = (!_nm || /未填/.test(_nm) || _ph.length < 9) ? '⚠️' : '';
+        const _ic = (/🩸/.test(_nt) && !/🩸院內報告OK|🩸外院報告/.test(_nt) ? '🩸' : '')
+                  + (/💊.{0,12}第\d+\/\d+週/.test(_nt) ? '💊' : '')
+                  + (/📝/.test(_nt) ? '📝' : '')
+                  + (/☎已通知/.test(_nt) ? '☎' : '');
+        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
       }).join('') + (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : '') + `</td>`;
     });
     h += `</tr>`;
@@ -2763,6 +2772,21 @@ function courseInfo(note) {
   return null;
 }
 
+/* ✨ v31.24 把備註拆成彩色標籤，一眼掃完不用讀長字串 */
+function noteTags(note) {
+  let rest = String(note || '');
+  const out = [];
+  const grab = function(re, bg, fg) { const m = rest.match(re); if (m) m.forEach(function(x){ if (x.trim()) out.push([x.trim(), bg, fg]); rest = rest.replace(x, ''); }); };
+  grab(/💊[^·]*?第\d+\/\d+週\)/g, '#f3e8ff', '#6b21a8');
+  grab(/📝[^·]*/g,                '#fef9c3', '#854d0e');
+  grab(/🩸[^·]*?(?=\s|$|·)/g,     '#fee2e2', '#991b1b');
+  grab(/🔁[^·]*/g,                '#dbeafe', '#1e40af');
+  grab(/☎[^·\s]*/g,               '#dcfce7', '#166534');
+  rest = rest.replace(/·/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (rest) out.push([rest, '#f1f5f9', '#475569']);
+  return out.map(function(t){ return '<span style="display:inline-block;background:' + t[1] + ';color:' + t[2] + ';border-radius:6px;padding:3px 9px;font-size:13.5px;font-weight:700;margin:2px 5px 2px 0;line-height:1.55">' + esc(t[0]) + '</span>'; }).join('');
+}
+
 /* 預約詳情 modal */
 function openApptDetail(key) {
   const list = (window.__cdApptIndex || {})[key] || [];
@@ -2785,7 +2809,7 @@ function openApptDetailFromObj(a, dateStr) {
     ${row('狀態', st ? `<span class="tag tag-g">${esc(st)}</span>` : '未報到')}
     ${src ? row('預約來源', esc(src)) : ''}
     ${(a.medicationWeeks||a['拿藥週數']) ? row('拿藥週數', esc(a.medicationWeeks||a['拿藥週數'])+' 週') : ''}
-    ${(a.note||a['備註']) ? row('備註', `<span id="cd-note-cur" style="font-weight:600;line-height:1.5">${esc(a.note||a['備註'])}</span>`) : `<span id="cd-note-cur" style="display:none"></span>`}
+    ${(a.note||a['備註']) ? row('備註', `<span id="cd-note-cur">${noteTags(a.note||a['備註'])}</span>`) : `<span id="cd-note-cur" style="display:none"></span>`}
     <div style="padding:12px 0 2px;margin-top:4px;border-top:2px dashed var(--line)">
       <div style="font-size:15px;color:var(--txt3);font-weight:700;margin-bottom:6px">📝 櫃檯備註<span style="font-weight:400">（附加在備註最後，不會蓋掉原本內容）</span></div>
       <textarea id="cd-note-in" rows="2" placeholder="例：客人說會晚到 10 分鐘／已電話確認會來／想加自費療程" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;line-height:1.5;resize:vertical"></textarea>
@@ -2883,7 +2907,7 @@ function htmlCCall() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cc-tomorrow">明日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-sm ${S.ccInitOnly?'btn-p':'btn-o'}" data-act="cc-initonly">只看初診</button>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
@@ -3034,7 +3058,7 @@ function htmlCBlood() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
     </div>
@@ -3237,7 +3261,7 @@ function htmlCNotify() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
       <button class="btn btn-p btn-sm" data-act="audit-unsent" title="掃描所有未來預約，列出「預約成功簡訊沒真正送出」的名單並一鍵補發">🩹 勾稽補發</button>
@@ -4464,7 +4488,7 @@ document.addEventListener('click', async e => {
       if (_ok) {
         if (msg) msg.innerHTML = '<span style="color:var(--green);font-weight:800">✓ 已儲存</span>';
         const cur = m.querySelector('#cd-note-cur');
-        if (cur) { cur.textContent = a.note; cur.style.display = ''; }
+        if (cur) { cur.innerHTML = noteTags(a.note); cur.style.display = ''; }
         box.value = '';
         toast('✓ 備註已儲存');
         setTimeout(() => { closeModals(); renderCounter(); }, 700);
@@ -4592,6 +4616,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'cd-clinic') { S.cClinic = e.target.value; renderCounter(); }
+  /* ✨ v31.24 日期直接輸入：跨月不用翻日曆 */
+  if (e.target.id === 'cd-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.cDate = e.target.value; S.apptCache.clear(); renderCounter(); }
   if (e.target.id === 'ad-clinic') { S.adClinic = e.target.value; S.adDoctor = ''; loadADash(); }
   if (e.target.id === 'ad-doctor') { S.adDoctor = e.target.value; loadADash(); }
   if (e.target.classList && e.target.classList.contains('ord-title')) {
