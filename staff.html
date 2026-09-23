@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.33-slowq';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.34-offgrid';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2270,16 +2270,42 @@ async function loadCDayGrid() {
   const rowsPerHour = Math.round(60 / gridStep);
   const byDocT = {};
   const docCnt = {};   /* ✨ v31.25 每診初診／複診人數 */
+  /* ✨ v31.34 時段不在格線上的預約會整筆從畫面上消失。
+     表格是照「格線時間」一列一列畫的，每畫一列去查 byDocT[醫師|該格時間]。
+     但匯入的紙本／搜博資料時間是照實際情況填的（09:50、19:10…），
+     不一定落在格線上（格線＝當日各醫師複診分鐘的最大公因數，例如 15 分）。
+     原本用真實時間當鍵 → 19:10 這種永遠查不到 → 資料在、索引也在，就是畫不出來，
+     櫃檯看著看診表叫號會直接漏掉這個病人（2026-09-24 廖子閑 19:10 就是這樣）。
+     改為：往前對齊到最近的格線當鍵，真實時間另外記在 __offT 上標示出來。 */
+  const offGrid = [];
   appts.forEach(a => {
     const dn = normDoc(a.doctor || a['醫師'] || '');
     const t = apptTime(a); if (!t) return;
-    (byDocT[dn+'|'+t] = byDocT[dn+'|'+t] || []).push(a);
+    a.__offT = '';
+    let key = t;
+    const tm = t2m(t);
+    if (Number.isFinite(tm) && gridStep > 0 && tm >= minM && tm < maxM) {
+      const snapped = minM + Math.floor((tm - minM) / gridStep) * gridStep;
+      if (snapped !== tm) {
+        key = m2t(snapped);
+        a.__offT = t;
+        offGrid.push({ real: t, slot: key, doc: dn, name: String(a.name || a['病人姓名'] || '(未填)') });
+      }
+    }
+    (byDocT[dn+'|'+key] = byDocT[dn+'|'+key] || []).push(a);
     const _c = docCnt[dn] = docCnt[dn] || { i: 0, f: 0 };
     if ((a.type || a['類型']) === '初診') _c.i++; else _c.f++;
   });
+  offGrid.sort((x, y) => x.real < y.real ? -1 : 1);
+  const offNote = !offGrid.length ? '' :
+    `<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:10px;padding:10px 13px;margin-bottom:9px;font-size:14.5px;color:#92400e;line-height:1.8">
+       ⏰ <b>有 ${offGrid.length} 筆預約的時間不在格線上</b>（多為紙本／搜博匯入）。
+       已放進前一個格子並標出真實時間，<b>請依 ⏰ 標示的時間叫號</b>：<br>
+       ${offGrid.map(x => `<b>${esc(x.real)}</b> ${esc(x.name)}（${esc(x.doc)} 醫師，顯示於 ${esc(x.slot)} 格）`).join('　·　')}
+     </div>`;
   const docRanges = {};
   docs.forEach(dn => { docRanges[dn] = dayScheds.filter(s => s.doctor === dn).map(s => [t2m(s.start), t2m(s.end)]); });
-  let h = `<div style="overflow:auto;max-height:calc(100vh - 300px);min-height:320px"><table class="grid-tbl"><thead><tr><th class="tm">時間</th>`;
+  let h = offNote + `<div style="overflow:auto;max-height:calc(100vh - 300px);min-height:320px"><table class="grid-tbl"><thead><tr><th class="tm">時間</th>`;
   docs.forEach(dn => {
     const rs = dayScheds.filter(s => s.doctor === dn).map(s => `${s.start}–${s.end}`).join('、');
     const dst = dayStat(S.cClinic, S.cDate, dn);
@@ -2307,7 +2333,9 @@ async function loadCDayGrid() {
                   + (/💊.{0,12}第\d+\/\d+週/.test(_nt) ? '💊' : '')
                   + (/📝/.test(_nt) ? '📝' : '')
                   + (/☎已通知/.test(_nt) ? '☎' : '');
-        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
+        /* ✨ v31.34 時段不在格線上的，標出真實時間，避免櫃檯照格子時間叫錯人 */
+        const _offMark = a.__offT ? ` <span style="background:#fcd34d;color:#78350f;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800">⏰${esc(a.__offT)}</span>` : '';
+        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_offMark}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
       }).join('') + (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : '') + `</td>`;
     });
     h += `</tr>`;
