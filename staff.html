@@ -2915,7 +2915,9 @@ async function cActionGo(m, action) {
   const a = JSON.parse(m.dataset.appt);
   if (action === 'checkin') {
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
-      startTime:a.t, doctor:a.doctor, status:'checked_in', by:S.cUser.name, source:'counter' }, true);
+      startTime:a.t, doctor:a.doctor, status:'checked_in',
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
     if (res.ok) { toast('✓ 已報到'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
     else toast('報到失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'cancel') {
@@ -2926,7 +2928,11 @@ async function cActionGo(m, action) {
     const weeks = _ans[0];
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
       startTime:a.t, doctor:a.doctor, status:'cancelled', medicationWeeks:+weeks||'',
-      note:`櫃台取消${+weeks?`（拿藥${weeks}週）`:''}`, by:S.cUser.name, source:'counter' }, true);
+      /* ✨ v31.31 後端「操作者」讀的是 employeeName，原本只送 by 會留空白，稽核查不到人；
+         備註改為「原備註 · 櫃台取消」，不再整段覆寫掉匯入來源等資訊 */
+      note:`${a.note ? a.note + ' · ' : ''}櫃台取消${+weeks?`（拿藥${weeks}週）`:''}`,
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
     if (res.ok) { toast('✓ 已取消'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
     else toast('取消失敗：'+(res.message||res.error||''), 'var(--red)');
   } else if (action === 'resch') {
@@ -2939,7 +2945,9 @@ async function cActionGo(m, action) {
     const weeks = _ans[0];
     const res = await api.post('updateAppointmentStatus', { apptId:a.apptId, clinic:a.clinic, date:a.date,
       startTime:a.t, doctor:a.doctor, status:'cancelled', medicationWeeks:+weeks||'',
-      note:`櫃台取消重約${+weeks?`（拿藥${weeks}週）`:''}`, by:S.cUser.name, source:'counter' }, true);
+      note:`${a.note ? a.note + ' · ' : ''}櫃台取消重約${+weeks?`（拿藥${weeks}週）`:''}`,
+      by:S.cUser.name, employeeName:S.cUser.name, employeeId:S.cUser.employeeId || '', employeeRole:S.cUser.role || 'counter',
+      source:'counter' }, true);
     if (!res.ok) { toast('取消失敗：'+(res.message||res.error||''), 'var(--red)'); return; }
     closeModals();
     S.apptCache.clear();
