@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.29-opendays';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.30-blood';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1997,15 +1997,19 @@ async function loadCDaily() {
   const bYd = (bY.ok && bY.data) || [], bTd = (bT.ok && bT.data) || [];
   const bl = [].concat(bYd, bTd).map(function(x, i){ return Object.assign({ _bd: i < bYd.length ? yest : today }, x); })
     .filter(function(x){ return !String(x.caseNo || '').trim() || !String(x.birthday || '').trim(); });
-  const t4 = !bl.length ? '' : '<table class="tbl"><thead><tr><th>抽血日</th><th>姓名</th><th>電話</th><th>看診日</th><th>缺什麼</th></tr></thead><tbody>'
+  const t4 = !bl.length ? '' : '<table class="tbl"><thead><tr><th>抽血日</th><th>姓名</th><th>電話</th><th>看診日</th><th>缺什麼</th><th>處理</th></tr></thead><tbody>'
     + bl.map(function(x){ const miss = []; if (!String(x.caseNo||'').trim()) miss.push('病歷號'); if (!String(x.birthday||'').trim()) miss.push('出生年月日');
-      return '<tr><td>' + esc(md(x._bd)) + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(md(x.visitDate)) + ' ' + esc(x.time||'') + '</td><td style="color:var(--red);font-weight:700">' + miss.join('、') + '</td></tr>'; }).join('') + '</tbody></table>';
+      const _bt = 'data-act="dc-blood" data-id="' + esc(x.apptId||'') + '" data-vd="' + esc(x.visitDate||'') + '"';
+      return '<tr><td>' + esc(md(x._bd)) + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(md(x.visitDate)) + ' ' + esc(x.time||'') + '</td><td style="color:var(--red);font-weight:700">' + miss.join('、') + '</td>'
+        + '<td style="white-space:nowrap"><button class="btn btn-a btn-sm" ' + _bt + ' data-op="noshow" title="標記未來抽血、已提醒帶外院報告；看診預約保留">✗ 未報到</button> '
+        + '<button class="btn btn-o btn-sm" ' + _bt + ' data-op="redate" title="重新安排抽血日期">📅 改日期</button> '
+        + '<button class="btn btn-g btn-sm" ' + _bt + ' data-op="sameday" title="改成初診當天提早 30 分鐘抽血，不用另外跑一趟">🏥 改當日抽</button></td></tr>'; }).join('') + '</tbody></table>';
 
   cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; paintSum();
   $('#dc-345').innerHTML =
       dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
     + dcCard(rptPending.length, '🩸', md(callD) + ' 初診的抽血報告', '這些初診病人還沒標記「院內報告OK／外院報告」。看診前要把報告調出來夾進病歷；到通知頁可直接按標記。', t5, 'call', '前往標記報告', callD)
-    + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。看診日前一天要找得到報告，請先聯繫確認。', t4, 'blood', '前往抽血名單');
+    + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。<b>看診預約不要取消</b>，先電話或 LINE 聯繫：能來就「改日期」或「改當日抽」，不來抽血的就按「未報到」並提醒<b>看診當天帶 14 天內外院報告</b>。', t4, 'blood', '前往抽血名單');
 
   /* ①② 慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒） */
   const paint12 = function(list){
@@ -4421,6 +4425,28 @@ document.addEventListener('click', async e => {
       break; }
     case 'dc-reload': S.apptCache.clear(); window.__auditCache = null; loadCDaily(); break;
     case 'dc-day': S.dcDay = el.dataset.v; loadCDaily(); break;   /* ✨ v31.26 通知那塊切換今天／明天 */
+    case 'dc-blood': {   /* ✨ v31.30 抽血沒來的三種處理，看診預約一律保留 */
+      const op = el.dataset.op, id = el.dataset.id, vd = el.dataset.vd;
+      if (!id || !vd) { toast('缺預約編號', 'var(--red)'); break; }
+      let newDate = '';
+      if (op === 'redate') {
+        newDate = String(prompt('新的抽血日期（YYYY-MM-DD）\n提醒：抽血須在看診日前 3～6 天', '') || '').trim();
+        if (!newDate) break;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { toast('日期格式要像 2026-09-30', 'var(--amber)'); break; }
+      }
+      el.disabled = true;
+      const list = await getAppts(S.cClinic, vd);
+      const a = (list || []).find(x => String(x.apptId || x.id || x['預約編號'] || '') === id);
+      if (!a) { el.disabled = false; toast('找不到這筆預約（可能已改約）', 'var(--red)'); break; }
+      const note = String(a.note || a['備註'] || '');
+      const CLR = [/🩸抽血日:\d{4}-\d{2}-\d{2}/g, /🩸初診當日抽血/g, /🩸未抽血已提醒/g];
+      let newNote, msg;
+      if (op === 'noshow') { newNote = tagNote(note, '🩸未抽血已提醒', [/🩸未抽血已提醒/g]); msg = '✓ 已標記未報到・已提醒帶外院報告（看診預約保留）'; }
+      else if (op === 'sameday') { newNote = tagNote(note, '🩸初診當日抽血', CLR); msg = '✓ 已改為初診當日抽血'; }
+      else { newNote = tagNote(note, '🩸抽血日:' + newDate, CLR); msg = '✓ 抽血日改為 ' + newDate.slice(5).replace('-', '/'); }
+      const ok = await apptSetNote(a, newNote);
+      if (ok) { toast(msg); S.apptCache.clear(); loadCDaily(); } else el.disabled = false;
+      break; }
     case 'dc-goto': {   /* ✨ v31.22 從每日必查跳到對應的完整功能頁 */
       if (el.dataset.d) S.cDate = el.dataset.d;
       S.cView = el.dataset.v; S.apptCache.clear(); renderCounter(); break; }
