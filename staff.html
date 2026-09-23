@@ -362,18 +362,18 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <button class="btn btn-o btn-sm" data-act="c-logout" style="margin-bottom:12px">登出</button>
       <div class="muted" style="font-size:13px;margin-bottom:8px" id="c-ver"></div>
       <div class="mgrp">每天必做</div>
-      <div class="mi" data-act="c-menu" data-v="daily">📋 每日必查</div>
-      <div class="mi on" data-act="c-menu" data-v="day">📅 今日看診表</div>
+      <div class="mi" data-act="c-menu" data-v="daily">每日必查</div>
+      <div class="mi on" data-act="c-menu" data-v="day">今日看診表</div>
       <div class="mgrp">當下處理</div>
-      <div class="mi" data-act="c-menu" data-v="blood">🩸 抽血名單</div>
-      <div class="mi" data-act="c-menu" data-v="quick">📞 電話預約登錄</div>
+      <div class="mi" data-act="c-menu" data-v="blood">抽血名單</div>
+      <div class="mi" data-act="c-menu" data-v="quick">電話預約登錄</div>
       <details class="mfold" id="m-more"><summary>遇到再查</summary>
-        <div class="mi" data-act="c-menu" data-v="call">📞 明日通知</div>
-        <div class="mi" data-act="c-menu" data-v="notify">📨 通知紀錄</div>
-        <div class="mi" data-act="c-menu" data-v="meds">💊 拿藥需求</div>
-        <div class="mi" data-act="c-menu" data-v="black">⛔ 黑名單</div>
-        <div class="mi" data-act="c-menu" data-v="find">🔎 病人查詢</div>
-        <div class="mi" data-act="c-menu" data-v="report">📊 當日報表</div>
+        <div class="mi" data-act="c-menu" data-v="call">明日通知</div>
+        <div class="mi" data-act="c-menu" data-v="notify">通知紀錄</div>
+        <div class="mi" data-act="c-menu" data-v="meds">拿藥需求</div>
+        <div class="mi" data-act="c-menu" data-v="black">黑名單</div>
+        <div class="mi" data-act="c-menu" data-v="find">病人查詢</div>
+        <div class="mi" data-act="c-menu" data-v="report">當日報表</div>
       </details>
     </div>
     <div id="c-content"></div>
@@ -403,7 +403,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="profile">📝 醫師介紹編輯</div>
       <div class="mi" data-act="a-menu" data-v="sms">✉️ 簡訊內容</div>
       <div class="mi" data-act="a-menu" data-v="emp">👥 使用者權限</div>
-      <div class="mi" data-act="a-menu" data-v="report">📊 區間報表</div>
+      <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.34-offgrid';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.35-noicon';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
