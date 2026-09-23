@@ -25,11 +25,13 @@ if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SES
   const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   /* 2026-09-21 v87：後端隨班表附上滿診／停診的日子；只收合法欄位，沒有就不加（舊後端） */
   const closed=Array.isArray(c.closed)?c.closed.filter(x=>x&&typeof x.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&typeof x.clinicId==='string'&&typeof x.doctorId==='string'&&(x.status==='滿診'||x.status==='停診')).slice(0,5000).map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,status:x.status})):null;
+  /* 2026-09-23：初診已額滿的診次（複診不受影響）。舊後端沒給就是 null＝不限制 */
+  const initFull=Array.isArray(c.initFull)?c.initFull.filter(x=>x&&typeof x.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&typeof x.clinicId==='string'&&typeof x.doctorId==='string'&&typeof x.start==='string'&&typeof x.end==='string').slice(0,5000).map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end})):null;
   /* 2026-09-21 v88：各醫師已約時段 [日期, 醫師ID, 開始分, 結束分]；收到時由前端蓋時間戳，不存進 localStorage */
   const busy=Array.isArray(d.busy)&&Number.isFinite(d.busyAt)?d.busy.filter(x=>Array.isArray(x)&&typeof x[0]==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x[0])&&typeof x[1]==='string'&&Number.isInteger(x[2])&&Number.isInteger(x[3])&&x[2]>=0&&x[3]>x[2]&&x[3]<=1440).slice(0,20000).map(x=>[x[0],x[1],x[2],x[3]]):null;
-  const config=x=>({initMin:x.initMin,followMin:x.followMin});
+  const config=x=>({initMin:x.initMin,followMin:x.followMin,openDays:x.openDays});   /* 2026-09-23：依醫師的網路預約天數 */
   const configs=x=>Object.fromEntries(Object.entries(x||{}).map(([k,v])=>[k,config(v)]));
-  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,publicVersion:typeof d.publicVersion==='string'?d.publicVersion:'',clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays,...(closed?{closed}:{})},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,pilot:pilotOf(d.pilot),staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at},...(busy?{busy,busyAt:d.busyAt}:{})}};
+  return {ok:true,data:{backend:d.backend,protocol:d.protocol,version:d.version,publicVersion:typeof d.publicVersion==='string'?d.publicVersion:'',clinics,doctors,slots:[],lazySlots:true,publicCatalog:{schema:c.schema,at:c.at,expiresAt:c.expiresAt,from:c.from,to:c.to,clinics,doctors,sessions,blocks,times:{defaults:config(c.times.defaults),overrides:configs(c.times.overrides),clinicOverrides:configs(c.times.clinicOverrides)},sourceHash:c.sourceHash,openDays:c.openDays,...(closed?{closed}:{}),...(initFull?{initFull}:{})},today:d.today,mode:d.mode,notificationMode:d.notificationMode,canStaff:false,lineEnabled:d.lineEnabled,pilot:pilotOf(d.pilot),staffUrl:d.staffUrl,writesReady:d.writesReady,message:'',scheduleState:{source:'EXTERNAL',verifiedAt:c.at},...(busy?{busy,busyAt:d.busyAt}:{})}};
  }
 
  let latest=null,inflight=null;
@@ -324,6 +326,11 @@ if(window.PUBLIC_BOOTSTRAP_UPDATE)Promise.resolve(window.PUBLIC_BOOTSTRAP_UPDATE
 function busyFresh(){const d=APP.data;return !!(d&&Array.isArray(d.busy)&&Number.isFinite(d.busyAt)&&Date.now()-d.busyAt<BUSY_TTL);}
 function busyMap(){const b=APP.data.busy;if(BUSY_INDEX.ref!==b){BUSY_INDEX.ref=b;BUSY_INDEX.map=new Map();(b||[]).forEach(x=>{const k=x[1]+'|'+x[0];if(!BUSY_INDEX.map.has(k))BUSY_INDEX.map.set(k,[]);BUSY_INDEX.map.get(k).push(x);});}return BUSY_INDEX.map;}
 function slotBusy(s){if(!s||!busyFresh())return false;const list=busyMap().get(s.doctorId+'|'+s.date);if(!list)return false;const t=legacyMinutes_(s.time),e=t+Number(s.durationMinutes||0);return list.some(x=>t<x[3]&&x[2]<e);/* 與後端 bridgeOpen_ 相同：同醫師同一天、不分院區 */}
+/* ✨ 2026-09-23 初診已額滿：只在病人選「初診」時套用，複診完全不受影響。
+   後端沒給 initFull（或讀取失敗）時 map 為 null＝不限制，時段照常顯示，退回「按了才擋」。 */
+const CAT_INITFULL={ref:undefined,map:null};
+function catalogInitFull(){const c=APP.data&&APP.data.publicCatalog;if(c!==CAT_INITFULL.ref){CAT_INITFULL.ref=c;let m=null;if(c&&Array.isArray(c.initFull)&&c.initFull.length){m=new Map();c.initFull.forEach(x=>{const k=x.clinicId+'|'+x.date+'|'+x.doctorId;if(!m.has(k))m.set(k,[]);m.get(k).push([x.start,x.end]);});}CAT_INITFULL.map=m;}return CAT_INITFULL.map;}
+function slotInitFull(s){if(!s||STATE.visitType!=='INITIAL')return false;const m=catalogInitFull();if(!m)return false;const segs=m.get(s.clinicId+'|'+s.date+'|'+s.doctorId);if(!segs)return false;const t=s.time;for(let i=0;i<segs.length;i++){if(t>=segs[i][0]&&t<segs[i][1])return true;}return false;}
 const CAT_CLOSED={ref:undefined,set:null};
 function catalogClosed(){const c=APP.data&&APP.data.publicCatalog;if(c!==CAT_CLOSED.ref){CAT_CLOSED.ref=c;CAT_CLOSED.set=c&&Array.isArray(c.closed)?new Set(c.closed.map(x=>x.clinicId+'|'+x.date+'|'+x.doctorId)):null;DAY_CLOSED_SLOT.clear();}return CAT_CLOSED.set;}
 function slotClosed(s){if(!s)return false;const k=s.clinicId+'|'+s.date+'|'+s.doctorId,cat=catalogClosed();if(cat&&cat.has(k))return true;/* v87 後端已隨班表給 */if(!DAY_CLOSED.size)return false;if(DAY_CLOSED_SLOT.has(k))return DAY_CLOSED_SLOT.get(k);const c=APP.data.clinics.find(x=>x.id===s.clinicId),d=APP.data.doctors.find(x=>x.id===s.doctorId),v=!!(c&&d&&DAY_CLOSED.has(dayClosedKey(c.name,s.date,d.name)));DAY_CLOSED_SLOT.set(k,v);return v;}
@@ -419,8 +426,11 @@ function doctorMatches(d){const q=STATE.doctorQuery.replace(/\s+/g,'').toLowerCa
 function clinicNames(ids){return (Array.isArray(ids)?ids:[]).map(id=>{const c=APP.data.clinics.find(x=>x.id===id);return c?c.name:'';}).filter(Boolean);}
 const INITIAL_LEAD_DAYS=3;
 /* 初診須提前 3 天（2026-09-19 v62 起，原為 4 天）：抽血須在看診前 3～6 天，最晚的抽血日＝看診日−3，也就是今天仍可抽；看診日 < 今天+3 的時段不列出、不可選（複診不受限；與後端 getAvailableSlots 規則一致） */
-function slotLeadOk(s){if(STATE.visitType!=='INITIAL'||!APP.today)return true;const d=parseDate(s.date);return !!d&&Math.round((d-APP.today)/86400000)>=INITIAL_LEAD_DAYS;}
-function scopedSlots(openOnly=true){return APP.data.slots.filter(s=>s.clinicId===STATE.clinic&&(!STATE.doctor||STATE.doctor==='any'||s.doctorId===STATE.doctor)&&(!openOnly||Number(s.remaining)>0&&!slotClosed(s)&&!(s.availabilityVerified!==true&&slotBusy(s)))&&slotLeadOk(s));}
+/* ✨ 2026-09-23 依醫師的「網路預約天數」上限（0／沒設＝用公版），初複診都適用。
+   櫃檯代約走後台，不受此限制。 */
+function doctorOpenDays(s){try{const c=APP.data&&APP.data.publicCatalog;if(!c||!c.times)return 0;const d=APP.data.doctors.find(x=>x.id===s.doctorId),cl=APP.data.clinics.find(x=>x.id===s.clinicId);if(!d)return 0;const co=c.times.clinicOverrides||{},ov=c.times.overrides||{};const cfg=(cl&&co[d.name+'|'+cl.name])||ov[d.name]||null;const n=cfg&&parseInt(cfg.openDays,10);return Number.isFinite(n)&&n>0?n:0;}catch(_){return 0;}}
+function slotLeadOk(s){const od=doctorOpenDays(s);if(od&&APP.today){const d2=parseDate(s.date);if(d2&&Math.round((d2-APP.today)/86400000)>od)return false;}if(STATE.visitType!=='INITIAL'||!APP.today)return true;const d=parseDate(s.date);return !!d&&Math.round((d-APP.today)/86400000)>=INITIAL_LEAD_DAYS;}
+function scopedSlots(openOnly=true){return APP.data.slots.filter(s=>s.clinicId===STATE.clinic&&(!STATE.doctor||STATE.doctor==='any'||s.doctorId===STATE.doctor)&&(!openOnly||Number(s.remaining)>0&&!slotClosed(s)&&!slotInitFull(s)&&!(s.availabilityVerified!==true&&slotBusy(s)))&&slotLeadOk(s));}
 function dateSlots(date){return scopedSlots().filter(s=>s.date===date).sort((a,b)=>a.time.localeCompare(b.time)||a.doctorId.localeCompare(b.doctorId));}
 function selectedSlot(){return dateSlots(STATE.date).find(s=>String(s.id)===STATE.slotId&&s.time===STATE.time);}
 function canSelectDate(s){return APP.ready&&!!STATE.doctor&&!!parseDate(s)&&dateSlots(s).length>0;}
