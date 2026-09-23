@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.24-visual';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.25-fix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2160,10 +2160,13 @@ async function loadCDayGrid() {
   const gridStep = docs.map(dn => cfgFor(dn, clinic).followMin).reduce((g, v) => gcd2(g, v), 60) || 15;
   const rowsPerHour = Math.round(60 / gridStep);
   const byDocT = {};
+  const docCnt = {};   /* ✨ v31.25 每診初診／複診人數 */
   appts.forEach(a => {
     const dn = normDoc(a.doctor || a['醫師'] || '');
     const t = apptTime(a); if (!t) return;
     (byDocT[dn+'|'+t] = byDocT[dn+'|'+t] || []).push(a);
+    const _c = docCnt[dn] = docCnt[dn] || { i: 0, f: 0 };
+    if ((a.type || a['類型']) === '初診') _c.i++; else _c.f++;
   });
   const docRanges = {};
   docs.forEach(dn => { docRanges[dn] = dayScheds.filter(s => s.doctor === dn).map(s => [t2m(s.start), t2m(s.end)]); });
@@ -2171,7 +2174,7 @@ async function loadCDayGrid() {
   docs.forEach(dn => {
     const rs = dayScheds.filter(s => s.doctor === dn).map(s => `${s.start}–${s.end}`).join('、');
     const dst = dayStat(S.cClinic, S.cDate, dn);
-    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}</div>
+    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-top:3px">
         ${['','滿診','停診'].map(v => `<button data-act="ds-set" data-doc="${esc(dn)}" data-v="${v}" style="font-size:13px;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid ${dst===v?'#1e40af':'#cbd5e1'};background:${dst===v?'#1e40af':'#fff'};color:${dst===v?'#fff':'#64748b'}">${v||'正常'}</button>`).join('')}
       </div></th>`;
@@ -2183,7 +2186,7 @@ async function loadCDayGrid() {
     docs.forEach(dn => {
       const on = docRanges[dn].some(([s,e]) => t >= s && t < e);
       const cell = byDocT[dn+'|'+tt] || [];
-      h += `<td class="${on?'':'off'}" ${on ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map(a => {
+      h += `<td class="${on?'':'off'}" ${on ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map((a, _ii) => {
         const st = a.status || a['狀態'] || '';
         const cls = st==='checked_in'||st==='已報到' ? 'done' : st==='rescheduled'||st==='已改約' ? 're' : (a.type==='初診'||a['類型']==='初診') ? 'i' : '';
         /* ✨ v31.24 格子上直接看出狀態，不用點開 */
@@ -2195,7 +2198,7 @@ async function loadCDayGrid() {
                   + (/💊.{0,12}第\d+\/\d+週/.test(_nt) ? '💊' : '')
                   + (/📝/.test(_nt) ? '📝' : '')
                   + (/☎已通知/.test(_nt) ? '☎' : '');
-        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
+        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
       }).join('') + (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : '') + `</td>`;
     });
     h += `</tr>`;
@@ -2788,10 +2791,14 @@ function noteTags(note) {
 }
 
 /* 預約詳情 modal */
-function openApptDetail(key) {
+/* ✨ v31.25 修正：同一位醫師同一時段有多位病人時，原本 data-k 只有「醫師|時段」，
+   四個人的 key 一模一樣，點誰都開第一筆，導致第 2 筆以後按不到報到／改約／取消。
+   改為連同格內索引一起帶進來。 */
+function openApptDetail(key, idx) {
   const list = (window.__cdApptIndex || {})[key] || [];
   if (!list.length) return;
-  openApptDetailFromObj(list[0], S.cDate);
+  const i = Math.max(0, Math.min(Number(idx) || 0, list.length - 1));
+  openApptDetailFromObj(list[i], S.cDate);
 }
 function openApptDetailFromObj(a, dateStr) {
   const t = apptTime(a);
@@ -4396,7 +4403,7 @@ document.addEventListener('click', async e => {
       const a = (window.__cwIndex || {})[el.dataset.k];
       if (a) openApptDetailFromObj(a, el.dataset.k.split('|')[0]);
       break; }
-    case 'appt-detail': openApptDetail(el.dataset.k); break;
+    case 'appt-detail': openApptDetail(el.dataset.k, +el.dataset.i || 0); break;
     case 'cd-slot': bkbSet(el.dataset.doc, el.dataset.t); break;
     case 'sv-open': openSchedViewer(); break;
     case 'sv-mode': {
