@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.46-cfgdur';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.47-busy';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -3197,6 +3197,7 @@ function htmlCCall() {
 }
 async function loadCCall() {
   const clinic = S.cClinic, date = S.cDate;
+  busyBox('#cc-box', '查詢通知狀態中…');
   S.apptCache.delete(clinic + '|' + date);
   // ✨ v26.4 同步抓自動通知（LINE/簡訊）送達狀態
   const [applist, rsRes] = await Promise.all([
@@ -3346,6 +3347,7 @@ function htmlCBlood() {
 }
 async function loadCBlood() {
   const box = $('#cb-box'); if (!box) return;
+  busyBox(box, '查詢抽血名單中…');
   const res = await api.post('getBloodList', { clinic: S.cClinic, date: S.cDate }, true);
   if (!document.querySelector('#cb-box')) return;
   if (!res.ok) { box.textContent = '載入失敗：' + (res.error || '請確認後端已更新 v13.0'); return; }
@@ -3411,6 +3413,7 @@ function medPickDate(r) {
 }
 async function loadCMeds() {
   const box = document.querySelector('#cm-box'); if (!box) return;
+  busyBox(box, '查詢拿藥需求中…');
   const all = await fetchMedReqs(true);
   if (!document.querySelector('#cm-box')) return;
   const stRank = s => s === '待處理' ? 0 : 1;
@@ -3599,8 +3602,29 @@ function renderSentLog(res) {
     window.__cnPoll = null;   // 全部有結果 → 停止輪詢
   }
 }
-async function loadCNotify() {
+async /* ✨ v31.47 後端查詢期間畫面完全沒反應，使用者會以為按鈕壞掉。
+   多數頁面的 load 函式在 await 之前就會先寫「載入中…」，但有 6 支沒有：
+   loadCNotify／loadCCall／loadCMeds／loadCBlood／loadASms／loadAEmp。
+   這些查詢要 3～5 秒（Apps Script 平台本身就 1.5 秒起跳），全程無聲，
+   櫃檯按了「看全部」沒看到任何變化，會重複按或以為功能失效。
+   統一補上轉圈＋文字。純顯示，不動任何查詢邏輯。 */
+function busyBox(sel, msg) {
+  const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
+  if (!el) return;
+  if (!document.getElementById('busy-css')) {
+    const s = document.createElement('style'); s.id = 'busy-css';
+    s.textContent = '@keyframes busyspin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(s);
+  }
+  el.classList.remove('muted');
+  el.style.textAlign = '';
+  el.innerHTML = '<div style="padding:14px;display:flex;align-items:center;gap:10px;color:var(--txt3);font-size:15px">'
+    + '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:busyspin .7s linear infinite;flex:none"></span>'
+    + (msg || '查詢中…') + '</div>';
+}
+function loadCNotify() {
   const clinic = S.cClinic, date = S.cDate;
+  busyBox('#cn-box', '查詢通知紀錄中…');
   S.apptCache.delete(clinic + '|' + date);
   const [appts, logRes, sentRes] = await Promise.all([
     getAppts(clinic, date),
@@ -4141,6 +4165,7 @@ async function runCutoutAll(btn) {
 /* ── ✉️ 簡訊內容設定 ── */
 async function loadASms() {
   const box = $('#as-box'); if (!box) return;
+  busyBox(box, '載入簡訊範本中…');
   const res = await api.post('getSmsTemplates', {}, true);
   if (!document.querySelector('#as-box')) return;
   if (!res.ok) { box.textContent = '載入失敗：' + (res.error || '請確認後端已更新 v12.1'); return; }
@@ -4394,6 +4419,7 @@ async function aSync(btn) {
 }
 /* ── 使用者權限 ── */
 async function loadAEmp() {
+  busyBox('#ae-box', '載入員工資料中…');
   const res = await api.post('getEmployees', {}, true);
   const rows = (res.ok && res.data) || [];
   const el = $('#ae-box'); if (!el) return;
