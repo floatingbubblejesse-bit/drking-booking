@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.45-obslot';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.46-cfgdur';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -675,11 +675,16 @@ function cfgFor(doc, cli) {
     || S.timeCfg.overrides[n] || S.timeCfg.defaults;
 }
 const durFor = (type, doc, cli) => type === 'initial' ? cfgFor(doc, cli).initMin : cfgFor(doc, cli).followMin;
+/* ✨ v31.46 以系統設定的時長為準，不再採用資料表寫的結束時間。
+   原本只要 a['結束時段'] 比設定長就直接回傳它。搜博／紙本匯入的預約普遍多寫 5 分鐘
+   （複診設定 15 分卻寫 15:00–15:20），於是 15:15 這種明明沒人的格子被算成已佔用，
+   櫃檯和病人都約不進去（2026-10-01 闕壯理 15:15、16:15）。
+   決策（2026-09-24 chi）：設定才是規則，匯入資料的時長是錯的。
+   後端 bridgeOpen_／bridgeBusy_ 已同步改為相同規則（109 版），兩邊必須一致，
+   否則會出現「前端說空、後端說滿」。
+   這個函式只用來算「被佔用區間」，不用於任何畫面顯示，所以不會改到看診表上的時間。 */
 function apptEndMin(a, docN) {
-  const eT = a.endTime || a.end || a['結束時段'] || '';
-  const em = t2m(fmtT(eT));
   const st = t2m(apptTime(a));
-  if (!isNaN(em) && em > st) return em;
   const type = String(a.type || a['類型'] || '') === '初診' ? 'initial' : 'followup';
   return st + durFor(type, docN, a.clinic || a['院區'] || '');
 }
