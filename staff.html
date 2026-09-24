@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.48-busyfix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.49-lastend';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -453,6 +453,9 @@ const CLINICS = [
 const WDS = ['日','一','二','三','四','五','六'];
 
 /* ───── API 層 ───── */
+/* ✨ v31.49 全院最晚收診時間，必須與後端 LAST_END_MIN 一致（後端 110 版）。
+   後端才是真正把關的地方；這裡只是讓櫃檯在選單上先看得出來，不要選了才被退。 */
+const LAST_END_MIN = 21 * 60;
 const API_TIMEOUT = 30000;   // ✨ v19.1 逾時保護：請求不再無限卡住
 /* ✨ v31.33 少數「要掃整張表」的唯讀查詢放寬逾時。
    auditUnsentBookings 實測 41.9 秒（會隨通知紀錄成長而變慢），
@@ -2602,7 +2605,10 @@ function bkbRefresh(preferT) {
   const free = [], over = [];
   sched.slotsFor(doc, clinic, wd).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
-      if (!blocks.some(([bs, be]) => t < be && bs < t + dur)) free.push(m2t(t));
+      /* ✨ v31.49 超過 21:00 收診時間的，跟「已被預約」一樣歸到需超約那組。
+         沒開超約的醫師就整個不列出來 —— 反正後端也會擋。 */
+      const late = t + dur > LAST_END_MIN;
+      if (!late && !blocks.some(([bs, be]) => t < be && bs < t + dur)) free.push(m2t(t));
       else if (cfg.overbook) over.push(m2t(t));
     }
   });
@@ -2610,10 +2616,14 @@ function bkbRefresh(preferT) {
   const prevVal = preferT || sel.value;
   /* 注意：bkbSave 是用 textContent.split('～')[0] 取開始時間，
      所以標記一定要加在結束時間「後面」，不能動到前面那段。 */
-  const _opt = (t, ob) => `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${ob ? '　⚠️ 已有人・可超約' : ''}</option>`;
+  const _opt = (t, ob) => {
+    const late = t2m(t) + dur > LAST_END_MIN;
+    const tag = !ob ? '' : late ? '　⚠️ 超過 ' + m2t(LAST_END_MIN) + ' 收診' : '　⚠️ 已有人・可超約';
+    return `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${tag}</option>`;
+  };
   sel.innerHTML = (free.length + over.length)
     ? free.map(t => _opt(t, false)).join('')
-      + (free.length && over.length ? '<option disabled>──── 以下時段已有人，選了會問你要不要超約 ────</option>' : '')
+      + (free.length && over.length ? '<option disabled>──── 以下時段需要確認才能排（已有人／超過收診時間）────</option>' : '')
       + over.map(t => _opt(t, true)).join('')
     : '<option value="">（無可約時段）</option>';
   bkb.querySelector('[data-act="bkb-save"]').disabled = !(free.length + over.length);
@@ -2727,10 +2737,16 @@ async function bkbSave(btn) {
   /* ✨ v31.37 過渡期超約：後端回 slot_taken_can_overbook 代表「這個醫師院區有開放超約，
      但要櫃檯明確確認」。只有「該時段已被預約」會走到這裡；沒門診／請假／停診仍直接失敗。 */
   if (!res.ok && res.error === 'slot_taken_can_overbook') {
-    const go = await ask('⚠️ 此時段已有預約',
-      [{ label: '確定要超約嗎？', type: 'select', value: 'no',
-         options: [{ v:'no', t:'不要，我改選其他時段' }, { v:'yes', t:'確定超約，建立這筆預約' }],
-         hint: esc(doc) + ' 醫師 ' + esc(date) + ' ' + esc(t) + ' 已經有人預約。超約後兩位病人會排在同一個時段，且會在備註標記。' }],
+    /* ✨ v31.49 原本標題與說明寫死「此時段已有預約」，但超約閘門現在也會因為
+       「超過 21:00 收診時間」而走到這裡，寫死的文字會讓櫃檯誤以為是撞號。改用後端回的原因。 */
+    const _why = String(res.message || '此時段已有預約');
+    const _late = _why.indexOf('收診時間') >= 0;
+    const go = await ask('⚠️ ' + _why,
+      [{ label: '確定要排入嗎？', type: 'select', value: 'no',
+         options: [{ v:'no', t:'不要，我改選其他時段' }, { v:'yes', t:'確定排入，建立這筆預約' }],
+         hint: esc(doc) + ' 醫師 ' + esc(date) + ' ' + esc(t) + '：' + esc(_why) + '。'
+               + (_late ? '醫師這個時間已經收診，排進去可能看不完。' : '排進去後兩位病人會在同一個時段。')
+               + '建立後會在備註標記。' }],
       '送出');
     if (go === null || go[0] !== 'yes') { btn.disabled = false; btn.textContent = '✓ 建立'; return; }
     btn.textContent = '⚠️ 超約建立中…';
