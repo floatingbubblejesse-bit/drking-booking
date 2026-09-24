@@ -420,7 +420,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.51-cust';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.52-span';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2313,8 +2313,25 @@ async function loadCDayGrid() {
       }
     }
     (byDocT[dn+'|'+key] = byDocT[dn+'|'+key] || []).push(a);
+    a.__key = key;   /* ✨ v31.52 卡片實際被放進哪一格，算覆蓋範圍要用 */
     const _c = docCnt[dn] = docCnt[dn] || { i: 0, f: 0 };
     if ((a.type || a['類型']) === '初診') _c.i++; else _c.f++;
+  });
+  /* ✨ v31.52 看診時間比一格長的預約（例：初診 30 分，格線 15 分）只畫在起始那一格，
+     後面被它蓋住的格子仍然顯示「＋ 預約」，看起來是空的 ——
+     櫃檯點下去才發現約不進去，而且會以為系統壞掉
+     （2026-10-08 黃錦崧 19:45：被 19:30 的蒲秀慧初診 19:30–20:00 蓋住）。
+     這裡把「被蓋住但自己沒有預約」的格子標成延續，不再顯示可預約。
+     自己有預約的格子維持原樣照畫，不會蓋掉任何一位病人。 */
+  const coverBy = {};
+  appts.forEach(a => {
+    const dn = normDoc(a.doctor || a['醫師'] || '');
+    const ks = t2m(a.__key); if (!Number.isFinite(ks)) return;
+    const end = apptEndMin(a, dn);
+    for (let g = ks + gridStep; g < end && g < maxM; g += gridStep) {
+      const gk = dn + '|' + m2t(g);
+      if (!coverBy[gk]) coverBy[gk] = a;
+    }
   });
   offGrid.sort((x, y) => x.real < y.real ? -1 : 1);
   const offNote = !offGrid.length ? '' :
@@ -2353,7 +2370,10 @@ async function loadCDayGrid() {
     docs.forEach(dn => {
       const on = docRanges[dn].some(([s,e]) => t >= s && t < e);
       const cell = byDocT[dn+'|'+tt] || [];
-      h += `<td class="${on?'':'off'}" ${on ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map((a, _ii) => {
+      /* ✨ v31.52 這格自己沒預約，但被上面比較長的診次蓋住 → 不是空位 */
+      const _cov = (!cell.length && on) ? (coverBy[dn+'|'+tt] || null) : null;
+      const _clickable = on && !_cov;
+      h += `<td class="${on?'':'off'}" ${_clickable ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map((a, _ii) => {
         const st = a.status || a['狀態'] || '';
         const cls = st==='checked_in'||st==='已報到' ? 'done' : st==='rescheduled'||st==='已改約' ? 're' : (a.type==='初診'||a['類型']==='初診') ? 'i' : '';
         /* ✨ v31.24 格子上直接看出狀態，不用點開 */
@@ -2376,7 +2396,11 @@ async function loadCDayGrid() {
           ? ` <span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800" title="這個時段目前有 ${cell.length} 位病人">同時段 ${cell.length}</span>`
           : '';
         return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_offMark}${_dup}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
-      }).join('') + (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : '') + `</td>`;
+      }).join('')
+        + (_cov ? `<div class="apt cont" title="${esc(String(_cov.name || _cov['病人姓名'] || ''))} 的診還沒結束（${esc(_cov.__offT || _cov.__key || '')}－${esc(m2t(apptEndMin(_cov, dn)))}）"
+             style="opacity:.62;border-style:dashed;cursor:not-allowed;font-size:12.5px">↑ ${esc(_cov.name || _cov['病人姓名'] || '(未填)')} 看診中</div>`
+           : (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : ''))
+        + `</td>`;
     });
     h += `</tr>`;
   }
