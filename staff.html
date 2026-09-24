@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.38-retime';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.39-dupmark';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2335,7 +2335,15 @@ async function loadCDayGrid() {
                   + (/☎已通知/.test(_nt) ? '☎' : '');
         /* ✨ v31.34 時段不在格線上的，標出真實時間，避免櫃檯照格子時間叫錯人 */
         const _offMark = a.__offT ? ` <span style="background:#fcd34d;color:#78350f;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800">⏰${esc(a.__offT)}</span>` : '';
-        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_offMark}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
+        /* ✨ v31.39 超約警示改為「看當下」而不是看備註。
+           備註裡的 ⚠️超約 記錄的是「當初怎麼建立的」，不會因為旁邊那筆取消而消失，
+           於是同時段只剩一位病人時，畫面卻還掛著超約標記，櫃檯會以為還有重複。
+           改成：這一格真的還有 2 筆以上有效預約才顯示，數字直接標出來。
+           備註的紀錄保留不動（稽核用），只是畫面不再照它顯示。 */
+        const _dup = cell.length > 1
+          ? ` <span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800" title="這個時段目前有 ${cell.length} 位病人">同時段 ${cell.length}</span>`
+          : '';
+        return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_offMark}${_dup}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
       }).join('') + (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : '') + `</td>`;
     });
     h += `</tr>`;
@@ -2965,6 +2973,10 @@ function openApptDetailFromObj(a, dateStr) {
         `<span style="color:#6d28d9;font-weight:800;font-size:17px">💊 ${esc(c.name)}　第 ${c.cur}${c.total ? ' ／ 共 ' + c.total : ''} 次</span>`) : ''; })()}
     ${row('看診時間', `${esc(a.date||dateStr)} ${esc(t)}`)}
     ${row('狀態', st ? `<span class="tag tag-g">${esc(st)}</span>` : '未報到')}
+    ${(() => { /* ✨ v31.39 同時段還有幾位：看當下，不看備註 */
+        const _k = normDoc(a.doctor || a['醫師'] || '') + '|' + t;
+        const _n = ((window.__cdApptIndex || {})[_k] || []).length;
+        return _n > 1 ? row('同時段', `<span class="tag tag-r">這個時段目前有 ${_n} 位病人</span>`) : ''; })()}
     ${src ? row('預約來源', esc(src)) : ''}
     ${(a.medicationWeeks||a['拿藥週數']) ? row('拿藥週數', esc(a.medicationWeeks||a['拿藥週數'])+' 週') : ''}
     ${(a.note||a['備註']) ? row('備註', `<span id="cd-note-cur">${noteTags(a.note||a['備註'])}</span>`) : `<span id="cd-note-cur" style="display:none"></span>`}
