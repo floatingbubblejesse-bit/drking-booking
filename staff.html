@@ -301,11 +301,13 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 <body>
 <div id="splash"><div class="logo">🏥</div><div style="font-size:23px;font-weight:700">金鶯診所</div><div class="spin"></div><div class="msg" id="splash-msg">載入最新班表中…</div></div>
 <nav>
-  <div class="brand">🏥 金鶯診所｜減重診預約系統</div>
+  <div class="brand">金鶯診所｜減重診預約系統</div>
   <div class="tabs">
-    <button data-act="portal" data-p="portal" class="on">🧑 減重預約</button>
-    <button data-act="portal" data-p="counter" class="staff-only" style="display:none">💼 櫃台管理</button>
-    <button data-act="portal" data-p="admin" class="staff-only" style="display:none">⚙️ 系統管理</button>
+    <button data-act="portal" data-p="portal" class="on">減重預約</button>
+    <button data-act="portal" data-p="counter" class="staff-only" style="display:none">櫃台管理</button>
+    <!-- ✨ v31.50 系統管理只有 chi 會用，收成一個齒輪就好，不佔導覽列寬度 -->
+    <button data-act="portal" data-p="admin" class="staff-only" title="系統管理" aria-label="系統管理"
+            style="display:none;font-size:19px;padding-left:13px;padding-right:13px">⚙</button>
   </div>
 </nav>
 <div id="toast"></div>
@@ -418,7 +420,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.49-lastend';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.50-offtidy';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2316,10 +2318,22 @@ async function loadCDayGrid() {
   });
   offGrid.sort((x, y) => x.real < y.real ? -1 : 1);
   const offNote = !offGrid.length ? '' :
-    `<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:10px;padding:10px 13px;margin-bottom:9px;font-size:14.5px;color:#92400e;line-height:1.8">
-       ⏰ <b>有 ${offGrid.length} 筆預約的時間不在格線上</b>（多為紙本／搜博匯入）。
-       已放進前一個格子並標出真實時間，<b>請依 ⏰ 標示的時間叫號</b>：<br>
-       ${offGrid.map(x => `<b>${esc(x.real)}</b> ${esc(x.name)}（${esc(x.doc)} 醫師，顯示於 ${esc(x.slot)} 格）`).join('　·　')}
+    `<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:10px;padding:11px 14px;margin-bottom:9px;font-size:14.5px;color:#92400e">
+       <div style="font-weight:800;margin-bottom:8px;line-height:1.6">有 ${offGrid.length} 筆預約的時間不在格線上（多為紙本／搜博匯入），請依「實際時間」叫號</div>
+       <table style="border-collapse:collapse;font-size:14px;color:#92400e">
+         <thead><tr>
+           <th style="text-align:left;font-weight:700;padding:3px 18px 5px 0;white-space:nowrap">實際時間</th>
+           <th style="text-align:left;font-weight:700;padding:3px 18px 5px 0;white-space:nowrap">病人</th>
+           <th style="text-align:left;font-weight:700;padding:3px 18px 5px 0;white-space:nowrap">醫師</th>
+           <th style="text-align:left;font-weight:700;padding:3px 0 5px 0;white-space:nowrap">顯示於</th>
+         </tr></thead>
+         <tbody>${offGrid.map(x => `<tr>
+           <td style="padding:4px 18px 4px 0;font-weight:800;white-space:nowrap;border-top:1px solid #fcd34d">${esc(x.real)}</td>
+           <td style="padding:4px 18px 4px 0;white-space:nowrap;border-top:1px solid #fcd34d">${esc(x.name)}</td>
+           <td style="padding:4px 18px 4px 0;white-space:nowrap;border-top:1px solid #fcd34d">${esc(x.doc)} 醫師</td>
+           <td style="padding:4px 0;white-space:nowrap;border-top:1px solid #fcd34d">${esc(x.slot)} 格</td>
+         </tr>`).join('')}</tbody>
+       </table>
      </div>`;
   const docRanges = {};
   docs.forEach(dn => { docRanges[dn] = dayScheds.filter(s => s.doctor === dn).map(s => [t2m(s.start), t2m(s.end)]); });
@@ -2352,7 +2366,7 @@ async function loadCDayGrid() {
                   + (/📝/.test(_nt) ? '📝' : '')
                   + (/☎已通知/.test(_nt) ? '☎' : '');
         /* ✨ v31.34 時段不在格線上的，標出真實時間，避免櫃檯照格子時間叫錯人 */
-        const _offMark = a.__offT ? ` <span style="background:#fcd34d;color:#78350f;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800">⏰${esc(a.__offT)}</span>` : '';
+        const _offMark = a.__offT ? ` <span style="background:#fcd34d;color:#78350f;border-radius:4px;padding:0 4px;font-size:11.5px;font-weight:800">${esc(a.__offT)}</span>` : '';
         /* ✨ v31.39 超約警示改為「看當下」而不是看備註。
            備註裡的 ⚠️超約 記錄的是「當初怎麼建立的」，不會因為旁邊那筆取消而消失，
            於是同時段只剩一位病人時，畫面卻還掛著超約標記，櫃檯會以為還有重複。
