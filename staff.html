@@ -417,7 +417,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.37-overbook';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.38-retime';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2984,6 +2984,7 @@ function openApptDetailFromObj(a, dateStr) {
       <button class="btn btn-a btn-sm" data-act="cd-mark" data-op="bno">✗ 未抽血</button>` : ''}
       <button class="btn btn-p btn-sm" data-act="cd-mark" data-op="notified">☎ 已通知</button></div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">關閉</button>
+      <button class="btn btn-o" data-act="c-retime">調整時段</button>
       <button class="btn btn-a" data-act="c-resch">取消重約</button>
       <button class="btn btn-r" data-act="c-cancel">取消</button>
       <button class="btn btn-g" data-act="c-checkin">報到</button></div>`);
@@ -3020,6 +3021,38 @@ async function cActionGo(m, action) {
       source:'counter' }, true);
     if (res.ok) { toast('✓ 已取消'); closeModals(); S.apptCache.delete(a.clinic+'|'+a.date); renderCounter(); }
     else toast('取消失敗：'+(res.message||res.error||''), 'var(--red)');
+  } else if (action === 'retime') {
+    /* ✨ v31.38 調整時段：只改這一筆的時間，不取消重掛，預約編號與通知紀錄都保留。
+       匯入的紙本／搜博資料時間常常不在班表格線上（09:50、19:10…），
+       後端 _apptCompleteness 會判成「時段不在醫師排班內」，於是一直掛在「待補登」，
+       但櫃檯完全沒有對應的修正按鈕，只能看著它跳 —— 這裡補上。
+       時段選項直接由該醫師當天的班表產生，不會再選到班表外的時間。 */
+    const _cfg = cfgFor(a.doctor, a.clinic);
+    const _dur = (a.type === '初診') ? _cfg.initMin : _cfg.followMin;
+    const _wd = isoWd(a.date);
+    const _segs = sched.byClinic(a.clinic).filter(s => s.weekday === _wd && s.enabled && normDoc(s.doctor) === normDoc(a.doctor));
+    const _opts = [];
+    _segs.forEach(s => { for (let t = t2m(s.start); t + _dur <= t2m(s.end); t += _cfg.followMin) { const v2 = m2t(t); if (!_opts.some(o => o.v === v2)) _opts.push({ v: v2, t: v2 }); } });
+    if (!_opts.length) { toast('這位醫師當天沒有班表時段，請用「取消重約」', 'var(--amber)'); return; }
+    _opts.sort((x, y) => t2m(x.v) - t2m(y.v));
+    const _near = _opts.reduce((best, o) => Math.abs(t2m(o.v) - t2m(a.t)) < Math.abs(t2m(best.v) - t2m(a.t)) ? o : best, _opts[0]);
+    const _ans = await ask(`🕐 調整時段｜${esc(a.name || '')}（原 ${esc(a.t)}）`,
+      [{ label: '改到哪一個時段', type: 'select', value: _near.v, options: _opts,
+         hint: '只改這一筆的時間，<b>不會取消重掛</b>，預約編號與已發過的通知都保留。'
+             + (_segs.length ? '<br>' + esc(normDoc(a.doctor)) + ' 當天班表：' + _segs.map(s => esc(s.start + '–' + s.end)).join('、') : '') }],
+      '確定調整');
+    if (_ans === null) return;
+    const _nt = String(_ans[0] || '');
+    if (_nt === a.t) { toast('時段沒有變更'); return; }
+    const _res = await api.post('updateAppointmentFields', {
+      apptId: a.apptId,
+      fields: { '開始時段': _nt, '結束時段': m2t(t2m(_nt) + _dur),
+                '備註': (a.note ? a.note + ' ' : '') + '[調整時段 ' + a.t + '→' + _nt + ']' },
+      by: S.cUser.name, employeeName: S.cUser.name, employeeId: S.cUser.employeeId || '', employeeRole: S.cUser.role || 'counter'
+    }, true);
+    if (_res.ok) { toast('✓ 時段已改為 ' + _nt + '（病人若已收到舊時間的簡訊，請記得告知）', 'var(--amber)');
+      closeModals(); S.apptCache.delete(a.clinic + '|' + a.date); renderCounter(); }
+    else toast('調整失敗：' + (_res.message || _res.error || ''), 'var(--red)');
   } else if (action === 'resch') {
     /* ✨ v31.31 「改約」改為「取消重約」：先取消舊的，再跳回看診表點新時段。
        櫃檯不用打日期，沿用平常點格子掛號的動線。 */
@@ -4772,6 +4805,7 @@ document.addEventListener('click', async e => {
     case 'c-checkin': cAction(m, 'checkin'); break;
     case 'c-cancel': cAction(m, 'cancel'); break;
     case 'c-resch': cAction(m, 'resch'); break;
+    case 'c-retime': cAction(m, 'retime'); break;
     case 'q-book': quickBook(); break;
     case 'cf-go': counterFind(); break;
     /* admin */
