@@ -374,7 +374,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
         <div class="mi" data-act="c-menu" data-v="notify">通知紀錄</div>
         <div class="mi" data-act="c-menu" data-v="meds">拿藥需求</div>
         <div class="mi" data-act="c-menu" data-v="black">黑名單</div>
-        <div class="mi" data-act="c-menu" data-v="find">病人查詢</div>
+        <div class="mi" data-act="c-menu" data-v="find">客戶查詢</div>
         <div class="mi" data-act="c-menu" data-v="report">當日報表</div>
       </details>
     </div>
@@ -398,13 +398,13 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="who">系統管理</div><div class="whon" id="a-who">—</div>
       <div class="muted" style="font-size:13px" id="a-ver"></div>
       <button class="btn btn-o btn-sm" data-act="a-logout" style="margin-bottom:12px">登出</button>
-      <div class="mi on" data-act="a-menu" data-v="dash">📈 營運儀表板</div>
-      <div class="mi" data-act="a-menu" data-v="sched">📅 班表管理</div>
-      <div class="mi" data-act="a-menu" data-v="timecfg">⏱ 預約時間設定</div>
-      <div class="mi" data-act="a-menu" data-v="order">↕ 前台醫師排序</div>
-      <div class="mi" data-act="a-menu" data-v="profile">📝 醫師介紹編輯</div>
-      <div class="mi" data-act="a-menu" data-v="sms">✉️ 簡訊內容</div>
-      <div class="mi" data-act="a-menu" data-v="emp">👥 使用者權限</div>
+      <div class="mi on" data-act="a-menu" data-v="dash">營運儀表板</div>
+      <div class="mi" data-act="a-menu" data-v="sched">班表管理</div>
+      <div class="mi" data-act="a-menu" data-v="timecfg">預約時間設定</div>
+      <div class="mi" data-act="a-menu" data-v="order">前台醫師排序</div>
+      <div class="mi" data-act="a-menu" data-v="profile">醫師介紹編輯</div>
+      <div class="mi" data-act="a-menu" data-v="sms">簡訊內容</div>
+      <div class="mi" data-act="a-menu" data-v="emp">使用者權限</div>
       <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
       <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
     </div>
@@ -420,7 +420,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.50-offtidy';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.51-cust';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -1080,7 +1080,7 @@ function htmlStep1() {
         ${c.tel ? `<a href="tel:${esc(String(c.tel).replace(/[^0-9+]/g, ''))}" onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:9px;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:9px;padding:9px 12px;text-decoration:none">
             <span style="white-space:nowrap;font-size:15.5px;font-weight:800;color:#065f46;letter-spacing:.3px">📞 ${esc(c.tel)}</span>
             <span style="white-space:nowrap;font-weight:700;font-size:12.5px;color:#059669;background:#d1fae5;border-radius:6px;padding:3px 7px">撥打</span></a>` : ''}
-        ${c.addr ? `<button data-act="nav-map" data-q="${esc('金鶯診所 ' + c.addr)}" style="position:absolute;top:10px;right:10px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700;color:#1e40af;cursor:pointer">🗺 導航</button>` : ''}</div>`;
+        ${c.addr ? `<button data-act="nav-map" data-q="${esc('金鶯診所 ' + c.addr)}" style="position:absolute;top:10px;right:10px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700;color:#1e40af;cursor:pointer">導航</button>` : ''}</div>`;
     }).join('') + `</div>`;
   }
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
@@ -1423,7 +1423,7 @@ function htmlBloodSection() {
     <div style="font-size:14.5px;color:var(--txt2);margin-bottom:10px">初診需先完成抽血，讓醫師於看診時一併評估身體狀況。</div>
     <div class="vt" style="margin-bottom:10px">
       <button type="button" class="${mode!=='external'?'on':''}" data-act="blood-mode" data-v="${noneAvail?'sameday':'date'}">🏥 到院抽血</button>
-      <button type="button" class="${mode==='external'?'on':''}" data-act="blood-mode" data-v="external">📄 外院 14 天內報告</button>
+      <button type="button" class="${mode==='external'?'on':''}" data-act="blood-mode" data-v="external">外院 14 天內報告</button>
     </div>
     ${inner}</div></div>`;
 }
@@ -1955,7 +1955,7 @@ function renderCounter() {
   else if (S.cView === 'quick') c.innerHTML = htmlCQuick();
   else if (S.cView === 'find') c.innerHTML = htmlCFind();
   else if (S.cView === 'notify') { c.innerHTML = htmlCNotify(); loadCNotify(); }
-  else if (S.cView === 'report') { c.innerHTML = `<div class="card"><h3>📊 當日報表</h3><div id="cr-box" class="muted" style="padding:14px">載入中…</div></div>`; loadCReport(); }
+  else if (S.cView === 'report') { c.innerHTML = `<div class="card"><h3>當日報表</h3><div id="cr-box" class="muted" style="padding:14px">載入中…</div></div>`; loadCReport(); }
 }
 /* ══════════════ 📋 每日必查（v31.22）══════════════
    把櫃檯每天下午要確認的四件事收在同一頁，不用在四個頁籤之間跑。
@@ -2109,7 +2109,7 @@ async function loadCDaily() {
       + need.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(normDoc(x.doctor||'')) + '</td><td>' + esc(x.name||'(未填)') + '</td><td style="color:var(--red);font-weight:700">' + esc(String(x.why).replace('資料不齊：','')) + '</td></tr>'; }).join('') + '</tbody></table>';
     const sendable = unsent.filter(function(x){ return x.canSend; }).map(function(x){ return x.apptId; });
     const t2 = !unsent.length ? '' : '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>姓名</th><th>電話</th><th>原因</th><th>補發</th></tr></thead><tbody>'
-      + unsent.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(x.why||'') + '</td><td>' + (x.canSend ? '<button class="btn btn-p btn-sm" data-act="resend-one" data-id="' + esc(x.apptId) + '">📨 補發</button>' : '<span class="muted">需先補資料</span>') + '</td></tr>'; }).join('') + '</tbody></table>'
+      + unsent.map(function(x){ return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time||'') + '</td><td>' + esc(x.name||'(未填)') + '</td><td>' + tel(x.phone) + '</td><td>' + esc(x.why||'') + '</td><td>' + (x.canSend ? '<button class="btn btn-p btn-sm" data-act="resend-one" data-id="' + esc(x.apptId) + '">補發</button>' : '<span class="muted">需先補資料</span>') + '</td></tr>'; }).join('') + '</tbody></table>'
       + (sendable.length > 1 ? '<div style="margin-top:9px"><button class="btn btn-g btn-sm" data-act="resend-all" data-ids="' + esc(sendable.join(',')) + '">📨 全部補發（' + sendable.length + ' 筆）</button></div>' : '');
     cnt.need = need.length; cnt.unsent = unsent.length; paintSum();
     $('#dc-12').innerHTML =
@@ -2154,7 +2154,7 @@ function htmlCDay() {
       ${modeToggle()}
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="sv-open">📋 門診表</button>
-      <button class="btn btn-o btn-sm" data-act="roster-print">🖨 看診名單</button>
+      <button class="btn btn-o btn-sm" data-act="roster-print">看診名單</button>
       ${['all','早診','午診','晚診'].map(s =>
         `<button class="btn btn-sm ${S.cSession===s?'btn-p':'btn-o'}" data-act="cd-sess" data-s="${s}">${s==='all'?'全日':s}</button>`).join('')}
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
@@ -2557,7 +2557,7 @@ function renderBkb(selDoc, selT) {
   box.dataset.type = type;
   box.innerHTML = `<div class="bkb">
     <div class="bkb-r1">
-      <span class="bkb-t">🖊 掛號</span>
+      <span class="bkb-t">掛號</span>
       <div class="vt2">
         <button class="${type==='複診'?'on':''}" data-act="bkb-type" data-v="複診">複診</button>
         <button class="${type==='初診'?'on':''}" data-act="bkb-type" data-v="初診">初診</button></div>
@@ -2579,10 +2579,10 @@ function renderBkb(selDoc, selT) {
       <select id="bkb-course-start" title="從第幾週開始（例：客人已打過 2 針，選第 3 週）" style="display:none"></select>` : ''}
       <input id="bkb-note" class="grow" placeholder="備註" value="${esc(keep('#bkb-note'))}">
       ${type === '複診' ? `<label style="display:flex;align-items:center;gap:5px;font-size:13.5px;color:#7f1d1d;white-space:nowrap;cursor:pointer">
-        <input type="checkbox" id="bkb-rpt" ${prev && prev.querySelector('#bkb-rpt')?.checked ? 'checked' : ''}>🩸 下次需看抽血報告</label>` : ''}
+        <input type="checkbox" id="bkb-rpt" ${prev && prev.querySelector('#bkb-rpt')?.checked ? 'checked' : ''}>下次需看抽血報告</label>` : ''}
       <label style="display:flex;align-items:center;gap:5px;font-size:13.5px;color:#92400e;white-space:nowrap;cursor:pointer"
              title="勾選代表這筆是把紙本/舊系統的預約補登進來，病人早就知道了，不會再發一次「預約成功」簡訊">
-        <input type="checkbox" id="bkb-paper" ${prev && prev.querySelector('#bkb-paper')?.checked ? 'checked' : ''}>📋 紙本補登（不發簡訊）</label>
+        <input type="checkbox" id="bkb-paper" ${prev && prev.querySelector('#bkb-paper')?.checked ? 'checked' : ''}>紙本補登（不發簡訊）</label>
       <button class="btn btn-g" data-act="bkb-save">✓ 建立</button>
     </div>
     <div class="bkb-blood" style="display:none"></div>
@@ -2647,7 +2647,7 @@ function bkbRefresh(preferT) {
   bEl.style.display = isInit ? '' : 'none';
   if (isInit) {
     let selB = null; try { selB = JSON.parse(box.dataset.blood || 'null'); } catch(_){}
-    bEl.innerHTML = `<span style="font-size:14px;font-weight:700;color:#7f1d1d">🩸 抽血安排：</span>` + bloodPickHtml(date, clinic, selB, 'bkb-blood');
+    bEl.innerHTML = `<span style="font-size:14px;font-weight:700;color:#7f1d1d">抽血安排：</span>` + bloodPickHtml(date, clinic, selB, 'bkb-blood');
   }
 }
 function bkbSet(doc, t) {
@@ -2958,7 +2958,7 @@ function openAuditModal(list) {
   const rowsH = list.map((x) => `<tr style="${x.canSend ? '' : 'background:#fef2f2'}">
     <td>${esc(x.date.slice(5))} ${esc(x.time)}</td><td><b>${esc(x.name || '(未填)')}</b><br><span class="muted">${esc(x.phone || '—')}</span></td>
     <td>${esc(x.clinic)}<br>${esc(normDoc(x.doctor))}</td><td style="color:${x.canSend ? '#9a3412' : 'var(--red)'};font-weight:700">${esc(x.why)}</td>
-    <td>${x.canSend ? `<button class="btn btn-p btn-sm" data-act="resend-one" data-id="${esc(x.apptId)}">📨 補發</button>` : '<span class="muted">先補資料</span>'}</td></tr>`).join('');
+    <td>${x.canSend ? `<button class="btn btn-p btn-sm" data-act="resend-one" data-id="${esc(x.apptId)}">補發</button>` : '<span class="muted">先補資料</span>'}</td></tr>`).join('');
   const sendable = list.filter(x => x.canSend).map(x => x.apptId);
   modal(`<div class="mh">🩹 簡訊勾稽（未來預約）<button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>
     <div class="mb">
@@ -3071,7 +3071,7 @@ function openApptDetailFromObj(a, dateStr) {
       <div style="font-size:15px;color:var(--txt3);font-weight:700;margin-bottom:6px">📝 櫃檯備註<span style="font-weight:400">（附加在備註最後，不會蓋掉原本內容）</span></div>
       <textarea id="cd-note-in" rows="2" placeholder="例：客人說會晚到 10 分鐘／已電話確認會來／想加自費療程" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;line-height:1.5;resize:vertical"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-        <button class="btn btn-p btn-sm" data-act="cd-note-save">💾 儲存備註</button>
+        <button class="btn btn-p btn-sm" data-act="cd-note-save">儲存備註</button>
         <span id="cd-note-msg" style="font-size:14px;font-weight:700"></span>
       </div>
     </div>
@@ -3081,7 +3081,7 @@ function openApptDetailFromObj(a, dateStr) {
       <button class="btn btn-g btn-sm" data-act="cd-mark" data-op="bin">✓ 已有</button>
       <button class="btn btn-o btn-sm" data-act="cd-mark" data-op="bext">📄 外院</button>
       <button class="btn btn-a btn-sm" data-act="cd-mark" data-op="bno">✗ 未抽血</button>` : ''}
-      <button class="btn btn-p btn-sm" data-act="cd-mark" data-op="notified">☎ 已通知</button></div>
+      <button class="btn btn-p btn-sm" data-act="cd-mark" data-op="notified">已通知</button></div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">關閉</button>
       <button class="btn btn-o" data-act="c-retime">調整時段</button>
       <button class="btn btn-a" data-act="c-resch">取消重約</button>
@@ -3286,7 +3286,7 @@ async function loadCCall() {
         ${bloodField}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn ${done ? 'btn-o' : 'btn-p'}" data-act="cc-mark" data-op="notified" data-i="${i}" style="white-space:nowrap">☎ 已通知</button>
+        <button class="btn ${done ? 'btn-o' : 'btn-p'}" data-act="cc-mark" data-op="notified" data-i="${i}" style="white-space:nowrap">已通知</button>
         <button class="btn ${/☎未接聽/.test(note) ? 'btn-a' : 'btn-o'} btn-sm" data-act="cc-mark" data-op="noans" data-i="${i}" style="white-space:nowrap">✗ 未接聽</button>
       </div>
       </div>`;
@@ -3385,15 +3385,27 @@ async function loadCBlood() {
   if (!rows.length) { box.innerHTML = `<div class="muted" style="padding:10px">${esc(S.cClinic)} ${esc(S.cDate.replace(/-/g,'/'))} 沒有預約到院抽血的初診 ✓</div>`; return; }
   window.__cbIndex = rows;
   box.classList.remove('muted'); box.style.padding = '0'; box.style.textAlign = 'left';
-  box.innerHTML = `<table class="tbl"><thead><tr><th>看診日</th><th>醫師</th><th>姓名</th><th>電話</th><th>病歷號</th><th>出生年月日（民國）</th><th>操作</th></tr></thead><tbody>
+  /* ✨ v31.51 這份清單列的是「當天所有要抽血的人」，不是「還沒補登的人」，
+     所以存檔後那一列本來就還在 —— 櫃檯會以為沒存到（2026-09-24 chi 回報）。
+     原本只有兩欄都填齊才亮一個小綠勾，太隱晦。改成明確標出還缺什麼，未完成的排最前面。 */
+  const _st = r => !r.caseNo && !r.birthday ? { t:'待補登', c:'#b91c1c', b:'#fef2f2', o:0 }
+                 : !r.caseNo ? { t:'待補病歷號', c:'#b45309', b:'#fffbeb', o:1 }
+                 : !r.birthday ? { t:'待補生日', c:'#b45309', b:'#fffbeb', o:1 }
+                 : { t:'已完成', c:'#15803d', b:'#f0fdf4', o:2 };
+  rows.sort((a, b) => _st(a).o - _st(b).o || String(a.visitDate).localeCompare(String(b.visitDate)));
+  const _todo = rows.filter(r => _st(r).o < 2).length;
+  box.innerHTML = `<div style="padding:10px 12px;font-size:15px;font-weight:700;color:${_todo ? '#b45309' : '#15803d'}">${_todo ? '還有 ' + _todo + ' 筆要補資料（存檔後該列不會消失，看「狀態」欄確認）' : '全部都補齊了'}</div>
+  <table class="tbl"><thead><tr><th>狀態</th><th>看診日</th><th>醫師</th><th>姓名</th><th>電話</th><th>病歷號</th><th>出生年月日（民國）</th><th>操作</th></tr></thead><tbody>
     ${rows.map((r, i) => {
       const done = r.caseNo && r.birthday;
-      return `<tr style="${done ? 'background:#f0fdf4' : ''}">
+      const s = _st(r);
+      return `<tr style="background:${s.b}">
+      <td><span style="color:${s.c};font-weight:800;white-space:nowrap">${s.t}</span></td>
       <td>${esc(String(r.visitDate).replace(/-/g,'/'))} ${esc(r.time || '')}</td><td>${esc(normDoc(r.doctor))}</td>
       <td><b>${esc(r.name)}</b></td><td>${esc(r.phone)}</td>
       <td><input id="cb-c-${i}" value="${esc(r.caseNo || '')}" placeholder="掛號後填" style="width:110px;padding:6px"></td>
       <td><input id="cb-b-${i}" value="${esc(r.birthday ? isoToRoc(r.birthday) : '')}" placeholder="例 79/05/01" style="width:130px;padding:6px"></td>
-      <td>${done ? '<span style="color:var(--green);font-weight:700">✓</span> ' : ''}<button class="btn btn-p btn-sm" data-act="cb-save" data-i="${i}">💾 儲存</button></td></tr>`;
+      <td><button class="btn btn-p btn-sm" data-act="cb-save" data-i="${i}">儲存</button></td></tr>`;
     }).join('')}</tbody></table>`;
 }
 /* ── ⛔ 黑名單 ── */
@@ -3493,7 +3505,7 @@ async function rosterPrint(btn) {
   w.document.write('<p style="font-family:sans-serif;padding:24px">📋 名單產生中…</p>');
   if (btn) { btn.disabled = true; btn.textContent = '🖨 產生中…'; }
   const res = await api.post('getDailyRoster', { clinic: S.cClinic, date: S.cDate }, true);
-  if (btn) { btn.disabled = false; btn.textContent = '🖨 看診名單'; }
+  if (btn) { btn.disabled = false; btn.textContent = '看診名單'; }
   if (!res.ok) { w.close(); toast('名單產生失敗：' + (res.error || '請確認後端已更新 v11.7'), 'var(--red)'); return; }
   const rows = res.data || [];
   const blood = nt => { nt = String(nt||'');
@@ -3517,7 +3529,7 @@ async function rosterPrint(btn) {
   </style></head><body>
     <h2>當日看診名單 · ${esc(S.cClinic)}</h2>
     <div class="sub">${esc(S.cDate)}（共 ${rows.length} 位）· 產生於 ${new Date().toLocaleString('zh-TW')}</div>
-    <button onclick="print()" style="margin-bottom:12px;padding:8px 20px;cursor:pointer;font-size:14px">🖨 列印</button>
+    <button onclick="print()" style="margin-bottom:12px;padding:8px 20px;cursor:pointer;font-size:14px">列印</button>
     <table><thead><tr><th>時段</th><th>醫師</th><th>初/複診</th><th>姓名</th><th>病歷號</th><th>出生年月日</th><th>院內抽血報告</th><th>手機號碼</th><th style="width:230px">備註</th></tr></thead><tbody>
     ${rows.map(r => `<tr><td>${esc(r.time||'')}</td><td>${esc(r.doctor||'')}</td>
       <td class="${r.type==='初診'?'init':''}">${esc(r.type||'')}${(() => { const c = courseInfo(r.note); return c ? `<br><span style="color:#6d28d9;font-weight:700;font-size:12px">💊${esc(c.name)} ${c.cur}${c.total?'/'+c.total:''}</span>` : ''; })()}</td><td>${esc(r.name||'')}</td>
@@ -3530,7 +3542,7 @@ async function rosterPrint(btn) {
 }
 /* ── 病人查詢 ── */
 function htmlCFind() {
-  return `<div class="card"><h3>🔎 病人查詢</h3>
+  return `<div class="card"><h3>客戶查詢</h3>
     <div style="display:flex;gap:8px;margin:12px 0"><input id="cf-kw" placeholder="姓名 / 電話 / 病歷號" style="flex:1">
     <button class="btn btn-p" data-act="cf-go">查詢</button></div>
     <div id="cf-out"></div></div>`;
@@ -3577,7 +3589,7 @@ function htmlCNotify() {
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
       <button class="btn btn-p btn-sm" data-act="audit-unsent" title="掃描所有未來預約，列出「預約成功簡訊沒真正送出」的名單並一鍵補發">🩹 勾稽補發</button>
-      <button class="btn btn-o btn-sm" data-act="repair-zeros" title="一次性修復：把舊資料中被試算表吃掉開頭 0 的電話/病歷號整批補回">🧰 資料修復(補0)</button>
+      <button class="btn btn-o btn-sm" data-act="repair-zeros" title="一次性修復：把舊資料中被試算表吃掉開頭 0 的電話/病歷號整批補回">資料修復(補0)</button>
     </div>
     <p class="muted" style="margin-bottom:10px">📨 上半：本日「看診」預約的通知狀態 ｜ 下半：本日「實際發出」的簡訊/LINE 紀錄（含幫未來預約發的）</p>
     <div id="cn-box" class="muted" style="padding:14px;text-align:center">載入中…</div>
@@ -3614,7 +3626,7 @@ function renderSentLog(res) {
       <td>${esc(r.target)}</td>
       <td class="muted" style="max-width:300px;font-size:13px">${esc(r.content)}…</td>
       <td>${badge(r.status)}</td>
-      <td>${(() => { const m = String(r.status||'').match(/transID=(\d+)/); return m ? `<button class="btn btn-o btn-sm" data-act="cn-dr" data-tid="${m[1]}" title="查看送達詳情">📡 詳情</button>` : ''; })()}</td></tr>`).join('') + `</tbody></table></div>`;
+      <td>${(() => { const m = String(r.status||'').match(/transID=(\d+)/); return m ? `<button class="btn btn-o btn-sm" data-act="cn-dr" data-tid="${m[1]}" title="查看送達詳情">詳情</button>` : ''; })()}</td></tr>`).join('') + `</tbody></table></div>`;
   // ✨ v29.2 有未回報的 → 自動輪詢補查（最多 6 輪，約 2 分鐘），查到自動更新
   const pending = rows.some(r => String(r.channel) === 'moding' && /成功 transID=/.test(r.status) && !/▸/.test(r.status));
   if (pending) {
@@ -3841,13 +3853,13 @@ function aShow() {
 function renderAdmin() {
   document.querySelectorAll('#a-main .mi').forEach(el => el.classList.toggle('on', el.dataset.v === S.aView));
   const c = $('#a-content');
-  if (S.aView === 'dash') { c.innerHTML = `<div class="card"><h3>📈 營運儀表板</h3><div id="ad-box" class="muted" style="padding:14px">載入中…</div></div>`; loadADash(); }
+  if (S.aView === 'dash') { c.innerHTML = `<div class="card"><h3>營運儀表板</h3><div id="ad-box" class="muted" style="padding:14px">載入中…</div></div>`; loadADash(); }
   else if (S.aView === 'sched') { c.innerHTML = htmlASched(); loadASyncStatus(); }
   else if (S.aView === 'timecfg') c.innerHTML = htmlATimeCfg();
   else if (S.aView === 'order') { c.innerHTML = htmlAOrder(); bindOrderDrag(); }
   else if (S.aView === 'profile') c.innerHTML = htmlAProfile();
-  else if (S.aView === 'sms') { c.innerHTML = `<div class="card"><h3>✉️ 簡訊內容設定</h3><div id="as-box" class="muted" style="padding:14px">載入中…</div></div>`; loadASms(); }
-  else if (S.aView === 'emp') { c.innerHTML = `<div class="card"><h3>👥 使用者權限</h3><div id="ae-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAEmp(); }
+  else if (S.aView === 'sms') { c.innerHTML = `<div class="card"><h3>簡訊內容設定</h3><div id="as-box" class="muted" style="padding:14px">載入中…</div></div>`; loadASms(); }
+  else if (S.aView === 'emp') { c.innerHTML = `<div class="card"><h3>使用者權限</h3><div id="ae-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAEmp(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
 }
@@ -3861,7 +3873,7 @@ function srcMonthStart() { const d = new Date(); return fmtD(new Date(d.getFullY
 function htmlASource() {
   if (!S.srcFrom) S.srcFrom = srcMonthStart();
   if (!S.srcTo) S.srcTo = fmtD(new Date());
-  return `<div class="card"><h3>👥 顧客來源</h3>
+  return `<div class="card"><h3>顧客來源</h3>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0 4px">
       <input type="date" id="src-from" value="${esc(S.srcFrom)}" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">
       <span class="muted">到</span>
@@ -4192,7 +4204,7 @@ async function runCutoutAll(btn) {
     </div>
     <div class="mf"><button class="btn btn-p" style="width:100%" data-act="close-modal">完成</button></div>`);
 }
-/* ── ✉️ 簡訊內容設定 ── */
+/* ── 簡訊內容設定 ── */
 async function loadASms() {
   const box = $('#as-box'); if (!box) return;
   busyBox(box, '載入簡訊範本中…');
@@ -4249,12 +4261,12 @@ async function loadADash() {
     ${(!S.adClinic && !S.adDoctor) ? `<div class="stat-grid" style="margin-top:10px">${stat(S.schedules.length,'班表總筆數')}${stat(S.doctors.length,'醫師數')}</div>` : ''}
     <p class="muted" style="margin-top:10px">今日快照，切換院區／醫師即時重算；未選院區時數字為跨院加總，上表為院區拆分。歷史趨勢請至「📊 區間報表」。</p>`;
 }
-/* ── 📝 醫師介紹編輯 ── */
+/* ── 醫師介紹編輯 ── */
 function htmlAProfile() {
   const rows = S.doctors.map(d => `<tr>
     <td><b>${esc(d.shortName)}</b> 醫師${titleTag(d.shortName, 12)}<div class="muted" style="font-size:13px">${d.clinics.map(esc).join('・')}</div></td>
     <td style="text-align:right"><button class="btn btn-p btn-sm" data-act="ap-edit" data-d="${esc(d.shortName)}">✏️ 編輯介紹</button></td></tr>`).join('');
-  return `<div class="card"><h3>📝 醫師介紹編輯</h3>
+  return `<div class="card"><h3>醫師介紹編輯</h3>
     <p class="muted" style="margin:8px 0 12px">編輯前台醫師字卡的「一句話」與「介紹文字」；BA 作品集資料夾 ID 可選填（Drive 資料夾）。</p>
     <table class="tbl"><tbody>${rows}</tbody></table></div>`;
 }
@@ -4276,7 +4288,7 @@ async function openProfileEdit(shortName) {
   if (folEl) { folEl.disabled = false; folEl.placeholder = '1AbCd…（Drive 資料夾網址最後那串）'; folEl.value = d.folderId || d['Drive資料夾ID'] || ''; }
 }
 
-/* ── ↕ 前台醫師排序 ── */
+/* ── 前台醫師排序 ── */
 function htmlAOrder() {
   if (!S.ordDraft) S.ordDraft = (S.docOrder && S.docOrder.length) ? [...S.docOrder] : defaultDoctorOrder();
   // 補上新醫師（班表新增但草稿沒有的）
@@ -4312,7 +4324,7 @@ function htmlAOrder() {
           <input type="checkbox" class="ord-div" data-n="${esc(n)}" ${(S.ordDivDraft || {})[n] ? 'checked' : ''}> 🔥分流</label>
       </div></div>`;
   }).join('');
-  return `<div class="card"><h3>↕ 前台醫師排序
+  return `<div class="card"><h3>前台醫師排序
     <button class="btn btn-o btn-sm" data-act="cutout-run" style="margin-left:10px" title="用 AI 把醫師照片去背，前台立即換上設計版卡片">🪄 醫師照片一鍵去背</button><button class="btn btn-o btn-sm" data-act="cutout-restore" style="margin-left:6px" title="去背效果不滿意？一鍵換回 Drive 原始照片">↩ 還原原始照片</button><button class="btn btn-o btn-sm" data-act="photo-sync" style="margin-left:6px" title="立刻重新從 Drive 挑選照片（不用等每日自動同步）">🔄 重新同步照片</button><button class="btn btn-o btn-sm" data-act="unify-bg" style="margin-left:6px" title="AI 把每張醫師照換成統一背景色（取自基準醫師照片）並統一人物比例">🎨 統一照片背景</button></h3>
     <p class="muted" style="margin:8px 0 4px">用滑鼠<b>按住醫師卡上下拖曳</b>（或按 ▲▼）調整前台「指定預約醫師」的顯示順序。</p>
     <p class="muted" style="margin-bottom:12px">預設四層：<b>醫學會理事長</b>（蕭捷健）→ <b>總院長</b>（蕭捷存→黃錦崧）→ <b>各院區院長</b>（依院區序）→ <b>其餘醫師</b>（依院區序）。每位醫師的職稱可用右側下拉直接改，改完按「儲存排序」一起存。</p>
@@ -4359,7 +4371,7 @@ function bindOrderDrag() {
   });
 }
 
-/* ── ⏱ 預約時間設定 ── */
+/* ── 預約時間設定 ── */
 function htmlATimeCfg() {
   const d0 = S.timeCfg.defaults;
   const rows = S.doctors.map(d => {
@@ -4394,7 +4406,7 @@ function htmlATimeCfg() {
         <button class="btn btn-o btn-sm" data-act="tc-save-cli" data-d="${esc(d.shortName)}" style="font-size:13px">＋ 設定此院區</button>
       </td></tr>`}`;
   }).join('');
-  return `<div class="card"><h3>⏱ 預約時間設定</h3>
+  return `<div class="card"><h3>預約時間設定</h3>
     <p class="muted" style="margin:8px 0 4px">公版：初診 <b>${d0.initMin}</b> 分鐘 / 複診 <b>${d0.followMin}</b> 分鐘。時段以「複診分鐘」為間隔切格；初診會佔滿整段時長，重疊時段自動反黑不可約。</p>
     <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:9px 13px;margin:6px 0 10px;font-size:13px;line-height:1.7">
       <b>📌 調整用時會發生什麼？</b><br>
@@ -4415,7 +4427,7 @@ function htmlASched() {
     <button class="btn btn-g btn-sm" data-act="ls-sync">🔄 立即從請假系統同步</button></div>
     <div class="syncbar"><div style="font-size:15.5px;color:#1e3a8a"><b>📡 Drive 班表同步（舊備援）</b> · <span id="as-info">檢查中…</span></div>
     <button class="btn btn-o btn-sm" data-act="a-sync">🔄 舊來源同步</button></div>
-    <h3>📅 班表管理（目前 ${S.schedules.length} 筆）</h3>
+    <h3>班表管理（目前 ${S.schedules.length} 筆）</h3>
     <div style="margin:10px 0">${chips}</div>
     <div style="display:flex;gap:8px;margin:10px 0">
       <select id="as-clinic"><option value="">全部院區</option>${CLINICS.map(c=>`<option>${c.name}</option>`).join('')}</select>
@@ -4803,8 +4815,8 @@ document.addEventListener('click', async e => {
       if (!caseNo && !iso) { toast('請至少填病歷號或出生年月日', 'var(--amber)'); break; }
       el.disabled = true; el.textContent = '儲存中…';
       const res = await api.post('fillBloodRegistration', { apptId: r.apptId, caseNo, birthday: iso, operator: (S.cUser && S.cUser.name) || 'counter' }, true);
-      el.disabled = false; el.textContent = '💾 儲存';
-      if (res.ok) { toast('✓ 已補登'); S.apptCache.clear(); loadCBlood(); }
+      el.disabled = false; el.textContent = '儲存';
+      if (res.ok) { toast(caseNo && iso ? '已補登完成' : '已存檔，但資料還沒齊（看「狀態」欄）'); S.apptCache.clear(); loadCBlood(); }
       else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'cn-mark': {
@@ -4828,7 +4840,7 @@ document.addEventListener('click', async e => {
       if (!confirm('將掃描「預約」與「病人」資料表，把被吃掉開頭 0 的電話/病歷號補回（一次性，約 1 分鐘）。開始？')) break;
       el.disabled = true; el.textContent = '🧰 修復中…';
       const rz = await api.post('repairLeadingZeros', {}, true);
-      el.disabled = false; el.textContent = '🧰 資料修復(補0)';
+      el.disabled = false; el.textContent = '資料修復(補0)';
       if (rz.ok) toast(`✓ 修復完成：預約表 ${rz.fixed['預約'] ?? 0} 格、病人表 ${rz.fixed['病人'] ?? 0} 格`);
       else toast('修復失敗：' + (rz.error || ''), 'var(--red)');
       break; }
@@ -4850,7 +4862,7 @@ document.addEventListener('click', async e => {
       else { el.disabled = false; toast('補發失敗：' + ((r1.data && r1.data[0] && r1.data[0].why) || r1.error || ''), 'var(--red)'); }
       break; }
     case 'resend-all': {
-      el.disabled = true; el.textContent = '📨 補發中…';
+      el.disabled = true; el.textContent = '補發中…';
       const ids = el.dataset.ids.split(',').filter(Boolean);
       const r2 = await api.post('resendBookingSms', { apptIds: ids }, true);
       if (r2.ok) {
