@@ -404,6 +404,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="sms">✉️ 簡訊內容</div>
       <div class="mi" data-act="a-menu" data-v="emp">👥 使用者權限</div>
       <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
+      <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -417,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.39-dupmark';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.41-source';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2540,6 +2541,9 @@ function renderBkb(selDoc, selT) {
       <input id="bkb-note" class="grow" placeholder="備註" value="${esc(keep('#bkb-note'))}">
       ${type === '複診' ? `<label style="display:flex;align-items:center;gap:5px;font-size:13.5px;color:#7f1d1d;white-space:nowrap;cursor:pointer">
         <input type="checkbox" id="bkb-rpt" ${prev && prev.querySelector('#bkb-rpt')?.checked ? 'checked' : ''}>🩸 下次需看抽血報告</label>` : ''}
+      <label style="display:flex;align-items:center;gap:5px;font-size:13.5px;color:#92400e;white-space:nowrap;cursor:pointer"
+             title="勾選代表這筆是把紙本/舊系統的預約補登進來，病人早就知道了，不會再發一次「預約成功」簡訊">
+        <input type="checkbox" id="bkb-paper" ${prev && prev.querySelector('#bkb-paper')?.checked ? 'checked' : ''}>📋 紙本補登（不發簡訊）</label>
       <button class="btn btn-g" data-act="bkb-save">✓ 建立</button>
     </div>
     <div class="bkb-blood" style="display:none"></div>
@@ -2673,10 +2677,16 @@ async function bkbSave(btn) {
     renderCounter();
     return;
   }
+  /* ✨ v31.40 紙本補登：這筆預約是把紙本／舊系統的資料補進來，病人當初已經約過了，
+     再發一次「預約成功簡訊」會讓病人以為被重複掛號。notify:'none' 讓後端跳過成功簡訊；
+     前一日提醒不受影響（後端 dailyReminder 對補登資料會強制發提醒）。 */
+  const _paper = !!bkb.querySelector('#bkb-paper')?.checked;
   const _payload = {
     clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
     name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
-    employeeId: S.cUser.employeeId, employeeName: S.cUser.name, source: 'walk_in'
+    employeeId: S.cUser.employeeId, employeeName: S.cUser.name,
+    source: _paper ? '紙本補登' : 'walk_in',
+    ...(_paper ? { notify: 'none' } : {})
   };
   let res = await api.post('createCounterBooking', _payload, true);
   /* ✨ v31.37 過渡期超約：後端回 slot_taken_can_overbook 代表「這個醫師院區有開放超約，
@@ -3559,18 +3569,48 @@ async function loadCNotify() {
   window.__cnIndex = list.map(x => x.a);
   if (!list.length) { el.innerHTML = '<p class="muted">本日無預約</p>'; return; }
   let phoneDone = 0, smsSent = 0;
-  const rows = list.map(({ a, t }, i) => {
+  /* ✨ v31.41 明日電話通知：只有「系統發不出簡訊」的才需要櫃檯打電話。
+     判斷順序（越前面越確定）：
+       1. 已送達        → 不用打
+       2. 發送失敗      → 要打
+       3. 電話不是 09 開頭十碼 / 沒填 → 一定發不出去，要打
+       4. 佔位假號碼（後八碼同一個數字）→ 要打，而且要問到真號碼
+       5. 通知方式 none → 不會發，要打
+       6. 這批提醒已經跑過（同一天有別人收到了），這筆卻沒有任何紀錄 → 漏發了，要打
+     第 6 點是關鍵：如果 12:00 那批還沒跑，全部都是 pending，這時候不該把所有人都當異常。 */
+  const anySent = list.some(({ a }) => (smsMap[a.apptId || a.id || a['預約編號'] || ''] || {}).smsStatus === 'sent');
+  function cnBadWhy(a, s) {
+    if (s.smsStatus === 'sent') return '';
+    if (s.smsStatus === 'failed') return '簡訊發送失敗';
+    const ph = String(a.phone || a['電話'] || '').trim();
+    if (!ph) return '沒有電話號碼';
+    if (!/^09\d{8}$/.test(ph)) return '電話格式不對（' + ph + '）';
+    if (/^09(\d)\1{7}$/.test(ph)) return '假號碼（' + ph + '）要問到真的手機';
+    if (String(a.notify || a['通知方式'] || '') === 'none') return '此筆設定不發簡訊';
+    if (anySent) return '提醒已發出但這筆沒有紀錄';
+    return '';
+  }
+  const marked = list.map(x => { const s = smsMap[x.a.apptId || x.a.id || x.a['預約編號'] || ''] || {}; return Object.assign({}, x, { s: s, why: cnBadWhy(x.a, s) }); });
+  const badCount = marked.filter(x => x.why).length;
+  /* 統計一律算全名單，不受「只看異常」影響——否則過濾後畫面會顯示「簡訊送達 0」，
+     跟這次修掉的後端 bug 是同一種誤導。 */
+  smsSent = marked.filter(x => x.s.smsStatus === 'sent').length;
+  phoneDone = marked.filter(x => /☎已通知/.test(String(x.a.note || x.a['備註'] || ''))).length;
+  if (S.cnAll === undefined) S.cnAll = false;   /* 預設只看異常 */
+  const shown = S.cnAll ? marked : marked.filter(x => x.why);
+  const rows = shown.map(({ a, t, why }) => {
+    const i = window.__cnIndex.indexOf(a);
     const note = String(a.note || a['備註'] || '');
     const id = a.apptId || a.id || a['預約編號'] || '';
     // 電話狀態
     let phoneTag;
-    if (/☎已通知/.test(note)) { phoneDone++; phoneTag = `<span class="tag tag-g">✓ ${esc((note.match(/☎已通知[0-9\/]*/)||['已通知'])[0].replace('☎',''))}</span>`; }
+    if (/☎已通知/.test(note)) { phoneTag = `<span class="tag tag-g">✓ ${esc((note.match(/☎已通知[0-9\/]*/)||['已通知'])[0].replace('☎',''))}</span>`; }
     else if (/☎未接聽/.test(note)) phoneTag = `<span class="tag tag-a">✗ ${esc((note.match(/☎未接聽[0-9\/]*/)||['未接聽'])[0].replace('☎',''))}</span>`;
     else phoneTag = '<span class="tag tag-r">未通知</span>';
     // 簡訊/LINE 狀態
     const s = smsMap[id] || {};
     let smsTag;
-    if (s.smsStatus === 'sent') { smsSent++; smsTag = `<span class="tag tag-g">✓ 已送達${s.smsSentAt ? ' ' + esc(String(s.smsSentAt).slice(5, 16).replace('T', ' ')) : ''}</span>`; }
+    if (s.smsStatus === 'sent') { smsTag = `<span class="tag tag-g">✓ 已送達${s.smsSentAt ? ' ' + esc(String(s.smsSentAt).slice(5, 16).replace('T', ' ')) : ''}</span>`; }
     else if (s.smsStatus === 'failed') smsTag = '<span class="tag tag-r">✗ 發送失敗</span>';
     else smsTag = '<span class="muted">—</span>';
     const lineTag = s.lineStatus === 'sent' ? '<span class="tag tag-g">✓ LINE</span>' : s.lineStatus === 'failed' ? '<span class="tag tag-r">✗ LINE</span>' : '';
@@ -3583,11 +3623,15 @@ async function loadCNotify() {
         <button class="btn btn-p btn-sm" data-act="cn-mark" data-op="notified" data-i="${i}">已通知</button>
         <button class="btn btn-o btn-sm" data-act="cn-mark" data-op="noans" data-i="${i}">未接聽</button></div></td>
       <td>${smsTag} ${lineTag}</td>
-      <td class="muted" style="max-width:180px;font-size:13px">${esc(note.replace(/[☎🩸][^ ]*/g, '').trim())}</td>
+      <td class="muted" style="max-width:180px;font-size:13px">${why ? '<b style="color:var(--red)">☎ ' + esc(why) + '</b><br>' : ''}${esc(note.replace(/[☎🩸][^ ]*/g, '').trim())}</td>
     </tr>`;
   }).join('');
   el.style.textAlign = '';
-  el.innerHTML = `<div class="muted" style="margin-bottom:8px">共 ${list.length} 筆 · 電話已通知 ${phoneDone} · 簡訊送達 ${smsSent}</div>
+  el.innerHTML = `<div style="margin-bottom:9px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      <b style="color:${badCount ? 'var(--red)' : 'var(--green)'};font-size:16px">${badCount ? '☎ 要打電話：' + badCount + ' 位' : '✓ 全部都收得到簡訊，不用打電話'}</b>
+      <button class="btn btn-o btn-sm" data-act="cn-all">${S.cnAll ? '只看要打的' : '看全部 ' + list.length + ' 筆'}</button>
+      <span class="muted">簡訊送達 ${smsSent} · 電話已通知 ${phoneDone}</span></div>
+    ${!S.cnAll && !badCount ? '<p class="muted" style="padding:6px 0">系統的提醒簡訊都發出去了，這頁沒有需要處理的。要核對全部名單請按上面「看全部」。</p>' : ''}
     <div style="overflow:auto"><table class="tbl"><thead><tr>
     <th>時段</th><th>病人</th><th>電話</th><th>醫師</th><th>☎ 電話通知</th><th>📨 簡訊/LINE</th><th>備註</th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -3654,7 +3698,7 @@ function renderCReport() {
 <script>
 /* Same-turn staff reads share one backend round trip. Completed results are not
    cached here; every fresh view reads current records. Writes are never batched. */
-const STAFF_READ_ACTIONS = new Set(['getAppointmentsByClinicDate','getNotifyLogByClinicDate','getNotifyLogBySentDate','getDailyReport','getBloodList','getMedicationRequests','getBlacklist','getAutoBlockedList','getReminderStatus']);
+const STAFF_READ_ACTIONS = new Set(['getSourceStats','getAppointmentsByClinicDate','getNotifyLogByClinicDate','getNotifyLogBySentDate','getDailyReport','getBloodList','getMedicationRequests','getBlacklist','getAutoBlockedList','getReminderStatus']);
 const staffRawGet = api.get.bind(api), staffRawPost = api.post.bind(api);
 let staffReadQueue = [], staffReadTimer = null, staffReadEpoch = 0;
 const staffPendingReads = new Map();
@@ -3704,6 +3748,77 @@ function renderAdmin() {
   else if (S.aView === 'sms') { c.innerHTML = `<div class="card"><h3>✉️ 簡訊內容設定</h3><div id="as-box" class="muted" style="padding:14px">載入中…</div></div>`; loadASms(); }
   else if (S.aView === 'emp') { c.innerHTML = `<div class="card"><h3>👥 使用者權限</h3><div id="ae-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAEmp(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
+  else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
+}
+/* ✨ v31.41 顧客來源報表（系統管理）
+   問題：目前分不清楚一筆預約是「病人自己上網/LINE 約的」還是「櫃檯幫忙掛的」，
+   所以不知道自行預約這條路到底有沒有人在走。
+   後端 getSourceStats 依「建立來源」欄位分成 self／counter／auto 三類，各自再拆初診/複診。
+   注意：過渡期的「紙本匯入」「搜博匯入」也算 counter，但那是把舊資料倒進來、
+   不是真的在系統上掛號，所以畫面上會把它們單獨標出來，避免看錯比例。 */
+function srcMonthStart() { const d = new Date(); return fmtD(new Date(d.getFullYear(), d.getMonth(), 1)); }
+function htmlASource() {
+  if (!S.srcFrom) S.srcFrom = srcMonthStart();
+  if (!S.srcTo) S.srcTo = fmtD(new Date());
+  return `<div class="card"><h3>👥 顧客來源</h3>
+    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0 4px">
+      <input type="date" id="src-from" value="${esc(S.srcFrom)}" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">
+      <span class="muted">到</span>
+      <input type="date" id="src-to" value="${esc(S.srcTo)}" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">
+      <button class="btn btn-p btn-sm" data-act="src-go">查詢</button>
+      <button class="btn btn-o btn-sm" data-act="src-month">這個月</button>
+    </div>
+    <div id="src-box" class="muted" style="padding:14px">載入中…</div></div>`;
+}
+async function loadASource() {
+  const el = $('#src-box'); if (!el) return;
+  const from = S.srcFrom, to = S.srcTo;
+  el.innerHTML = '<p class="muted">載入中…（第一次查詢可能要十幾秒）</p>';
+  const res = await api.post('getSourceStats', { from: from, to: to, clinic: '' }, true);
+  if (!$('#src-box') || S.srcFrom !== from || S.srcTo !== to) return;
+  if (!res.ok || !res.data || !res.data.ok) { el.innerHTML = '<p class="muted">讀取失敗：' + esc(res.error || (res.data && res.data.error) || '') + '</p>'; return; }
+  window.__srcData = res.data; renderASource();
+}
+function renderASource() {
+  const el = $('#src-box'), d = window.__srcData; if (!el || !d) return;
+  const n = x => (x && x.initial || 0) + (x && x.followup || 0);
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  function block(title, o) {
+    const tot = o.total || 0;
+    const s = o.self || {}, c = o.counter || {}, au = o.auto || {}, ot = o.other || {}, un = o.unknown || {};
+    const real = n(s) + n(c) + n(au) + n(ot) + n(un);
+    return `<div style="margin-bottom:18px">
+      <div style="font-weight:800;font-size:16px;margin-bottom:6px">${esc(title)}<span class="muted" style="font-weight:400"> · 共 ${tot} 筆</span></div>
+      <div style="overflow:auto"><table class="tbl"><thead><tr>
+        <th>來源</th><th>初診</th><th>複診</th><th>小計</th><th>佔比</th></tr></thead><tbody>
+        <tr><td><b style="color:var(--green)">病人自行預約</b><br><span class="muted" style="font-size:13px">預約網站 / LINE</span></td>
+            <td><b>${s.initial||0}</b></td><td>${s.followup||0}</td><td><b>${n(s)}</b></td><td>${pct(n(s), real)}%</td></tr>
+        <tr><td><b style="color:var(--blue)">櫃檯預約</b><br><span class="muted" style="font-size:13px">現場 / 電話 / 補登匯入</span></td>
+            <td><b>${c.initial||0}</b></td><td>${c.followup||0}</td><td><b>${n(c)}</b></td><td>${pct(n(c), real)}%</td></tr>
+        ${n(au) ? `<tr><td class="muted">系統自動<br><span style="font-size:13px">療程連續排 / 自動回診</span></td>
+            <td>${au.initial||0}</td><td>${au.followup||0}</td><td>${n(au)}</td><td>${pct(n(au), real)}%</td></tr>` : ''}
+        ${n(ot) + n(un) ? `<tr><td class="muted">其他／未填來源</td>
+            <td>${(ot.initial||0)+(un.initial||0)}</td><td>${(ot.followup||0)+(un.followup||0)}</td>
+            <td>${n(ot)+n(un)}</td><td>${pct(n(ot)+n(un), real)}%</td></tr>` : ''}
+      </tbody></table></div></div>`;
+  }
+  const raw = d.rawSources || {};
+  const IMPORT = Object.keys(raw).filter(k => /匯入|補登|legacy|external/i.test(k));
+  const importN = IMPORT.reduce((a, k) => a + (raw[k].count || 0), 0);
+  const rawRows = Object.keys(raw).sort((a, b) => raw[b].count - raw[a].count)
+    .map(k => `<tr><td>${esc(k)}</td><td>${raw[k].count}</td><td class="muted">${esc({self:'病人自行',counter:'櫃檯',auto:'系統自動',other:'其他',unknown:'未填'}[raw[k].bucket] || raw[k].bucket)}</td></tr>`).join('');
+  el.style.padding = '4px 0';
+  el.innerHTML =
+    `<div class="muted" style="margin:0 0 12px">${esc(d.from)} ～ ${esc(d.to)}　·　不含已取消、已改約的預約</div>`
+    + (importN ? `<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:14px;line-height:1.7">
+        ⚠️ 這段期間有 <b>${importN}</b> 筆是<b>紙本／舊系統匯入</b>的（${esc(IMPORT.join('、'))}），它們被算在「櫃檯預約」裡，
+        但其實不是在這個系統上掛的號。過渡期還沒結束前，<b>這個比例不能當成真正的顧客來源結論</b>。</div>` : '')
+    + (d.clinics || []).map(c => block(c.clinic, c)).join('')
+    + ((d.clinics || []).length > 1 ? block('全部院區合計', d.totals || {}) : '')
+    + `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">看原始來源明細（${Object.keys(raw).length} 種）</summary>
+        <div style="overflow:auto;margin-top:8px"><table class="tbl"><thead><tr><th>建立來源</th><th>筆數</th><th>歸類</th></tr></thead>
+        <tbody>${rawRows}</tbody></table></div>
+        <p class="muted" style="font-size:13px;margin-top:6px">如果這裡出現沒看過的來源、或歸類成「其他／未填」，跟我說一聲，那代表有新的預約管道還沒被認出來。</p></details>`;
 }
 /* ── 🪄 醫師照片一鍵去背 v2（管理端瀏覽器跑 AI；成果存回後端，前台全體受益）
    主引擎：ISNet 專業去背模型（@imgly/background-removal，髮絲級邊緣）
@@ -4691,6 +4806,10 @@ document.addEventListener('click', async e => {
     /* ✨ v31.36 當日報表：換日期、切醫師 */
     case 'cr-day': { S.crDate = crShift(S.crDate || S.cDate || fmtD(new Date()), +el.dataset.d || 0); loadCReport(); break; }
     case 'cr-today': { S.crDate = fmtD(new Date()); loadCReport(); break; }
+    case 'cn-all': { S.cnAll = !S.cnAll; loadCNotify(); break; }   /* ✨ v31.41 明日通知：只看異常 ⇄ 看全部 */
+    /* ✨ v31.41 顧客來源報表：換區間 */
+    case 'src-go': { S.srcFrom = $('#src-from').value || S.srcFrom; S.srcTo = $('#src-to').value || S.srcTo; loadASource(); break; }
+    case 'src-month': { S.srcFrom = srcMonthStart(); S.srcTo = fmtD(new Date()); renderAdmin(); break; }
     case 'cr-doc': { S.crDoc = el.dataset.n || '__all'; renderCReport(); break; }
     case 'cd-mode': S.cMode = el.dataset.m; renderCounter(); break;
     case 'cd-pill': openMiniCal(); break;
