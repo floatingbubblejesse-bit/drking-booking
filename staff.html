@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.42-offgrid';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.43-orphdone';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2373,7 +2373,15 @@ async function loadCDayGrid() {
   }).filter(Boolean);
   renderBkb();
   // 待補登
+  /* ✨ v31.43 這個黃框原本只看「醫師有沒有指派、時段在不在班表內」，完全沒有看狀態。
+     所以櫃檯把人報到了、取消了、標未到診了，它還是照跳 —— 因為 09:50 這種時間
+     永遠不會落進 10:00–11:00 的班表區間，條件恆真，警告永遠消不掉
+     （2026-09-24 林玉珍：按了報到，提醒還在）。
+     這個框的用途是「還沒處理、需要櫃檯動手的預約」，狀態一旦結案就不該再出現。 */
+  const _settled = a => /已報到|checked_in|已完成|未到診|no_show|已取消|cancelled|已改約|rescheduled/i
+                        .test(String(a.status || a['狀態'] || '').trim());
   const orph = appts.filter(a => {
+    if (_settled(a)) return false;
     const dn = normDoc(a.doctor || a['醫師'] || '');
     if (!dn || dn === '系統指派') return true;
     if (!docs.includes(dn)) return true;
