@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.43-orphdone';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.44-caseno';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2995,6 +2995,18 @@ function openApptDetailFromObj(a, dateStr) {
     <div class="mb">
     ${row('病人姓名', esc(a.name||a['病人姓名']||'(未填)'))}
     ${row('電話', esc(a.phone||a['電話']||'—'))}
+    ${(() => { /* ✨ v31.44 病例號沒顯示在詳情裡。
+        櫃檯可以只用病例號卡位（姓名電話都空），但這個視窗原本只列姓名、電話、
+        類型、時間、狀態 —— 所以點進來只看到「(未填) / —」，根本不知道這筆是誰，
+        也就無法去調病歷補資料。這里把病例號補上；沒姓名的時候放大顯示，因為那是唯一的線索。 */
+        const _cs = String(a.caseFull || a.caseNo || a['病例號'] || a['病歷號'] || '').trim();
+        const _nm = String(a.name || a['病人姓名'] || '').replace(/[\(（]未填[\)）]/g, '').trim();
+        if (_cs) return row('病例號', _nm
+          ? `<span style="font-size:17px;font-weight:800">${esc(_cs)}</span>`
+          : `<span style="color:var(--blue);font-size:19px;font-weight:800">${esc(_cs)}</span>` +
+            `<div class="muted" style="font-size:13px;font-weight:400;margin-top:2px">用病例號卡位，姓名電話待補</div>`);
+        if (!_nm) return row('病例號', '<span style="color:var(--red);font-weight:700">沒有病例號，也沒有姓名——無法辨識這筆是誰</span>');
+        return ''; })()}
     ${row('預約類型', `<span class="tag tag-b">${esc(a.type||a['類型']||'複診')}</span>`)}
     ${(() => { const c = courseInfo(a.note||a['備註']); return c ? row('療程',
         `<span style="color:#6d28d9;font-weight:800;font-size:17px">💊 ${esc(c.name)}　第 ${c.cur}${c.total ? ' ／ 共 ' + c.total : ''} 次</span>`) : ''; })()}
