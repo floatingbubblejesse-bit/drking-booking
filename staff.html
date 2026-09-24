@@ -420,7 +420,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.52-span';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.53-contcolor';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2397,8 +2397,21 @@ async function loadCDayGrid() {
           : '';
         return `<div class="apt ${cls}" data-act="appt-detail" data-k="${esc(dn)}|${tt}" data-i="${_ii}" title="${esc(_nt)}">${_miss}${esc(a.name||a['病人姓名']||'(未填)')} · ${esc(a.type||a['類型']||'複診')}${_offMark}${_dup}${_ic ? ` <span style="font-size:11.5px">${_ic}</span>` : ''}</div>`;
       }).join('')
-        + (_cov ? `<div class="apt cont" title="${esc(String(_cov.name || _cov['病人姓名'] || ''))} 的診還沒結束（${esc(_cov.__offT || _cov.__key || '')}－${esc(m2t(apptEndMin(_cov, dn)))}）"
-             style="opacity:.62;border-style:dashed;cursor:not-allowed;font-size:12.5px">↑ ${esc(_cov.name || _cov['病人姓名'] || '(未填)')} 看診中</div>`
+        + (_cov ? (() => {
+             /* ✨ v31.53 這個方塊不是「狀態」，是「這一格被上面那筆佔著」。
+                v31.52 寫成「看診中」，櫃檯按了報到看它還在，會以為狀態沒更新
+                （2026-09-25 chi 回報）。報到與否都一樣佔著這格，它本來就不該消失。
+                改成：文字只講「是誰、佔到幾點」，並且跟上面那張卡同色，
+                讓它讀起來是同一筆預約的延續，而不是另一件待處理的事。 */
+             const _st = _cov.status || _cov['狀態'] || '';
+             const _cc = _st === 'checked_in' || _st === '已報到' ? 'done'
+                       : _st === 'rescheduled' || _st === '已改約' ? 're'
+                       : (_cov.type === '初診' || _cov['類型'] === '初診') ? 'i' : '';
+             const _nm = esc(_cov.name || _cov['病人姓名'] || '(未填)');
+             const _to = esc(m2t(apptEndMin(_cov, dn)));
+             return `<div class="apt ${_cc}" title="這一格被上面那筆佔著：${_nm}（看到 ${_to}）。報到與否都一樣佔著，不是待處理狀態。"
+               style="opacity:.55;border-style:dashed;cursor:not-allowed;font-size:12.5px">↑ ${_nm}（到 ${_to}）</div>`;
+           })()
            : (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : ''))
         + `</td>`;
     });
