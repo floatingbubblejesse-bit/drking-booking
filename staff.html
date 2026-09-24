@@ -6,23 +6,29 @@
 <title>金鶯診所｜減重診預約系統 v10</title>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
-:root{--navy:#1e2a3a;--blue:#3b82f6;--purple:#6d28d9;--green:#16a34a;--amber:#f59e0b;--red:#dc2626;
---bg:#f1f5f9;--card:#fff;--txt:#0f172a;--txt2:#475569;--txt3:#94a3b8;--line:#e2e8f0;--r:12px}
+/* v31.56 後台配色改採客戶端那一套（墨綠／薄荷），變數名維持不變，
+   其餘 CSS 不用動就會整體跟著換。對照 index.html 的 :root：
+   --ink #183e40 / --teal #167e82 / --deep #0f696e / --line #dfeae7 / --bg #f5f9f8
+   狀態色（初診紫、已報到綠、警告琥珀、錯誤紅）保留可辨識度，只把彩度壓下來配合主色。 */
+:root{--navy:#183e40;--blue:#167e82;--purple:#6b4fa0;--green:#1f8a5f;--amber:#956422;--red:#c0392b;
+--bg:#f5f9f8;--card:#fff;--txt:#183e40;--txt2:#4a6764;--txt3:#8aa5a2;--line:#dfeae7;--r:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{-webkit-text-size-adjust:100%;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--txt);font-size:17px}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:16px;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue)}
 /* ===== splash ===== */
-#splash{position:fixed;inset:0;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;transition:opacity .3s}
+#splash{position:fixed;inset:0;background:linear-gradient(135deg,#167e82,#0f696e);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;transition:opacity .3s}
 #splash.done{opacity:0;pointer-events:none}
-#splash .logo{font-size:48.5px;margin-bottom:12px}
+#splash .logo{margin-bottom:12px;line-height:0}
+#splash .logo img{width:78px;height:78px;display:block}
 #splash .spin{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;margin-top:18px}
 @keyframes spin{to{transform:rotate(360deg)}}
 #splash .msg{margin-top:14px;font-size:16px;opacity:.85}
 /* ===== nav ===== */
 nav{background:var(--navy);color:#fff;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
-nav .brand{font-weight:700;font-size:18.5px}
+nav .brand{font-weight:700;font-size:18.5px;display:flex;align-items:center;gap:9px}
+.brand img{width:28px;height:28px;border-radius:50%;background:#fff;flex:none}
 nav .tabs{display:flex;gap:8px}
 nav .tabs button{background:transparent;color:#cbd5e1;border:none;padding:8px 14px;border-radius:8px;font-size:16px;font-weight:600}
 nav .tabs button.on{background:var(--blue);color:#fff}
@@ -299,9 +305,9 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 </style>
 </head>
 <body>
-<div id="splash"><div class="logo">🏥</div><div style="font-size:23px;font-weight:700">金鶯診所</div><div class="spin"></div><div class="msg" id="splash-msg">載入最新班表中…</div></div>
+<div id="splash"><div class="logo"><img src="drking-logo.svg" alt="" width="78" height="78"></div><div style="font-size:23px;font-weight:700">金鶯診所</div><div class="spin"></div><div class="msg" id="splash-msg">載入最新班表中…</div></div>
 <nav>
-  <div class="brand">金鶯診所｜減重診預約系統</div>
+  <div class="brand"><img src="drking-logo.svg" alt="">金鶯診所｜減重診預約系統</div>
   <div class="tabs">
     <button data-act="portal" data-p="portal" class="on">減重預約</button>
     <button data-act="portal" data-p="counter" class="staff-only" style="display:none">櫃台管理</button>
@@ -350,7 +356,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 <!-- ═══════════ 櫃台端 ═══════════ -->
 <div id="page-counter" class="page">
   <div id="c-login" class="card login-card">
-    <div style="font-size:46px">💼</div><h2 style="margin:8px 0 4px">櫃台管理登入</h2>
+    <img src="drking-logo.svg" alt="" style="width:64px;height:64px"><h2 style="margin:8px 0 4px">櫃台管理登入</h2>
     <p class="muted" style="margin-bottom:14px">請用「員工入口網」的帳號密碼登入</p>
     <input id="cl-id" placeholder="員工編號" autocomplete="off">
     <input id="cl-pw" type="password" placeholder="密碼">
@@ -385,7 +391,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 <!-- ═══════════ 系統管理 ═══════════ -->
 <div id="page-admin" class="page">
   <div id="a-login" class="card login-card">
-    <div style="font-size:46px">⚙️</div><h2 style="margin:8px 0 4px">系統管理登入</h2>
+    <img src="drking-logo.svg" alt="" style="width:64px;height:64px"><h2 style="margin:8px 0 4px">系統管理登入</h2>
     <p class="muted" style="margin-bottom:14px">限系統管理員</p>
     <input id="al-id" placeholder="員工編號" autocomplete="off">
     <input id="al-pw" type="password" placeholder="密碼">
@@ -420,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.55-batch';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.56-brand';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
