@@ -420,7 +420,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.53-contcolor';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.54-stale';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2004,16 +2004,22 @@ async function loadCDaily() {
   box0.innerHTML = '<div id="dc-12"></div><div id="dc-345"><p class="muted" style="padding:10px">檢查中…</p></div>';
   const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
   const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
-  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0 };
+  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0, stale:0 };
   const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
-  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登'); };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登') + pill(cnt.stale,'未結案'); };
   paintSum();
 
-  const [cAppts, rsRes, bY, bT] = await Promise.all([
+  /* ✨ v31.54 櫃檯忘記按報到是完全靜默的，但後端把「過了看診日還停在已預約」
+     一律當成未到診（getAutoBlockedList：st==='已預約' && 看診日期 < today）。
+     初診累積 2 次未到就自動封鎖那支電話 —— 客人下次上網約不了，而且沒人知道為什麼。
+     這裡回頭掃過去 14 天，把還沒結案的挑出來讓櫃檯補按。一次區間查詢，不逐日打。 */
+  const staleFrom = dcShift(today, -14), staleTo = dcShift(today, -1);
+  const [cAppts, rsRes, bY, bT, staleRes] = await Promise.all([
     getAppts(clinic, callD).catch(function(){ return []; }),
     api.post('getReminderStatus', { date: callD, clinic: clinic }, true),
     api.post('getBloodList', { clinic: clinic, date: yest }, true),
-    api.post('getBloodList', { clinic: clinic, date: today }, true)
+    api.post('getBloodList', { clinic: clinic, date: today }, true),
+    api.post('getReportByRange', { clinic: clinic, from: staleFrom, to: staleTo }, true).catch(function(){ return { ok:false }; })
   ]);
   if (!$('#dc-345') || S.cClinic !== clinic) return;
 
@@ -2089,7 +2095,23 @@ async function loadCDaily() {
         + '<button class="btn btn-o btn-sm" ' + _bt + ' data-op="redate" title="重新安排抽血日期">📅 改日期</button> '
         + '<button class="btn btn-g btn-sm" ' + _bt + ' data-op="sameday" title="改成初診當天提早 30 分鐘抽血，不用另外跑一趟">🏥 改當日抽</button></td></tr>'; }).join('') + '</tbody></table>';
 
-  cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; cnt.nosms = nosms.length; paintSum();
+  /* ✨ v31.54 過去 14 天還停在「已預約」的 —— 系統會當成未到診 */
+  const stale = (function () {
+    const d = (staleRes && staleRes.ok && staleRes.data) || null;
+    if (!d) return [];
+    const ds = Array.isArray(d.doctors) ? d.doctors : Object.keys(d.doctors || {}).map(function (k) { return d.doctors[k]; });
+    const out = [];
+    ds.forEach(function (doc) {
+      (doc.details || []).forEach(function (x) {
+        if (String(x.status || '') !== '已預約') return;
+        out.push({ date: x.date, time: x.time, name: x.name, type: x.type,
+                   phone: x.phone, doctor: doc.doctor, apptId: x.apptId });
+      });
+    });
+    return out.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)); });
+  })();
+  const staleInit = stale.filter(function (x) { return x.type === '初診'; }).length;
+  cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; cnt.nosms = nosms.length; cnt.stale = stale.length; paintSum();
   $('#dc-345').innerHTML =
       dcCard(nosms.length, '📵', dayBtn + '系統發不出簡訊，要打電話',
         '這些人的電話缺漏或不是有效號碼（例如搜博匯入時用的 0900000000 佔位號），<b>系統不會發、也不會列在下面的「通知失敗」裡</b>，因為根本沒試著發。'
@@ -2097,6 +2119,20 @@ async function loadCDaily() {
         t0, 'call', '前往通知頁', callD)
     + dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
     + dcCard(rptPending.length, '🩸', md(callD) + ' 初診的抽血報告', '這些初診病人還沒標記「院內報告OK／外院報告」。看診前要把報告調出來夾進病歷；到通知頁可直接按標記。', t5, 'call', '前往標記報告', callD)
+    + dcCard(stale.length, '', '前幾天還沒結案的預約（過去 14 天）',
+        '這些預約過了看診日還停在「已預約」。<b>系統會一律當成未到診</b>，而且<b>初診累積 2 次未到就會自動封鎖那支電話</b>，客人下次上網就約不了、也不會有人知道原因。'
+        + (staleInit ? '<br><b style="color:#b91c1c">其中 ' + staleInit + ' 筆是初診，風險最高。</b>' : '')
+        + '<br>來了就補按「報到」，沒來就按「未到診」。點右邊「前往」會直接跳到那天的看診表。',
+        (!stale.length ? '' :
+          '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>類型</th><th>電話</th><th>前往</th></tr></thead><tbody>'
+          + stale.map(function (x) {
+              return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time || '') + '</td>'
+                + '<td>' + esc(normDoc(x.doctor || '')) + '</td><td><b>' + esc(x.name || '(未填)') + '</b></td>'
+                + '<td>' + (x.type === '初診' ? '<span class="tag tag-b">初診</span>' : '複診') + '</td>'
+                + '<td>' + tel(x.phone) + '</td>'
+                + '<td><button class="btn btn-o btn-sm" data-act="dc-goto" data-v="day" data-d="' + esc(x.date) + '">前往</button></td></tr>';
+            }).join('') + '</tbody></table>'),
+        '', '')
     + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。<b>看診預約不要取消</b>，先電話或 LINE 聯繫：能來就「改日期」或「改當日抽」，不來抽血的就按「未報到」並提醒<b>看診當天帶 14 天內外院報告</b>。', t4, 'blood', '前往抽血名單');
 
   /* ①② 慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒） */
