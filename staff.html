@@ -418,7 +418,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.44-caseno';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.45-obslot';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2587,18 +2587,31 @@ function bkbRefresh(preferT) {
     const st = t2m(apptTime(a)); if (isNaN(st)) return;
     blocks.push([st, apptEndMin(a, normDoc(doc))]);
   });
-  const free = [];
+  /* ✨ v31.45 開了「櫃檯可超約」的醫師，被佔用的時段也要列出來。
+     原本這裡把所有跟現有預約重疊的時段整個濾掉，櫃檯在掛號視窗根本選不到，
+     於是 v31.37 做的超約確認流程永遠觸發不了 —— 那個流程只在「前端以為空、
+     後端說被佔」時才會跑，但前端從不讓這種情況發生，等於超約在這條路上是死的
+     （2026-10-01 闕壯理 15:15、16:15：詹佳容/李俐葶 各佔 20 分鐘壓過 15 分格線）。
+     改為：可超約的醫師，重疊時段排在可約時段後面並標記，選了才會跳確認框。
+     沒開超約的醫師行為完全不變。 */
+  const free = [], over = [];
   sched.slotsFor(doc, clinic, wd).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
       if (!blocks.some(([bs, be]) => t < be && bs < t + dur)) free.push(m2t(t));
+      else if (cfg.overbook) over.push(m2t(t));
     }
   });
   const sel = bkb.querySelector('#bkb-time');
   const prevVal = preferT || sel.value;
-  sel.innerHTML = free.length
-    ? free.map(t => `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}</option>`).join('')
+  /* 注意：bkbSave 是用 textContent.split('～')[0] 取開始時間，
+     所以標記一定要加在結束時間「後面」，不能動到前面那段。 */
+  const _opt = (t, ob) => `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${ob ? '　⚠️ 已有人・可超約' : ''}</option>`;
+  sel.innerHTML = (free.length + over.length)
+    ? free.map(t => _opt(t, false)).join('')
+      + (free.length && over.length ? '<option disabled>──── 以下時段已有人，選了會問你要不要超約 ────</option>' : '')
+      + over.map(t => _opt(t, true)).join('')
     : '<option value="">（無可約時段）</option>';
-  bkb.querySelector('[data-act="bkb-save"]').disabled = !free.length;
+  bkb.querySelector('[data-act="bkb-save"]').disabled = !(free.length + over.length);
   // 初診 → 抽血列
   const bEl = bkb.querySelector('.bkb-blood');
   const isInit = type === '初診';
