@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.56-brand';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.57-course';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2868,12 +2868,53 @@ async function bkbSave(btn) {
     const [cName, cWeeksS] = courseRaw.split('|');
     const cWeeks = +cWeeksS || 0;
     const cStart = Math.min(Math.max(+(bkb.querySelector('#bkb-course-start')?.value) || 1, 1), cWeeks || 1);   // ✨ v31.19
+    /* ✨ v31.57 療程是一次建立多週，原本只要其中一週撞到就整批失敗，
+       畫面還只丟一句「失敗：該日滿診」—— 櫃檯不知道是哪一週卡住，也沒有放行的機會，
+       更看不到後面幾週其實也有問題（2026-10-01 蕭捷存：第2週滿診、第3週已被預約、第5週根本沒門診）。
+       改為：送出前先跑後端 previewCourse（只看不寫），把每一週的狀態攤開給櫃檯看，
+       需要超約的要明確放行，完全擋住的先講清楚不會建立、要另外處理。 */
+    btn.textContent = '檢查各週…';
+    const _cInfo = { name: cName.replace(/療程$/, ''), weeks: cWeeks, startWeek: cStart };
+    const pv = await api.post('previewCourse', {
+      clinic, doctor: doc, date, startTime: t, course: _cInfo,
+      employeeId: S.cUser.employeeId, createdRole: 'counter', source: 'walk_in'
+    }, true);
+    if (!pv.ok) { btn.disabled = false; btn.textContent = '✓ 建立';
+      toast('療程試算失敗：' + (pv.message || pv.error || ''), 'var(--red)'); return; }
+    let _allowOver = false;
+    if (pv.needOverbook || pv.blocked) {
+      const _ic = { ok: '<span style="color:var(--green);font-weight:700">可約</span>',
+                    overbook: '<span style="color:#b45309;font-weight:800">需超約</span>',
+                    blocked: '<span style="color:var(--red);font-weight:800">建不了</span>' };
+      const _tbl = '<table style="border-collapse:collapse;font-size:14px;margin-top:6px">'
+        + '<thead><tr><th style="text-align:left;padding:2px 14px 4px 0">週次</th>'
+        + '<th style="text-align:left;padding:2px 14px 4px 0">日期</th>'
+        + '<th style="text-align:left;padding:2px 14px 4px 0">狀態</th>'
+        + '<th style="text-align:left;padding:2px 0 4px 0">原因</th></tr></thead><tbody>'
+        + pv.list.map(function (x) {
+            return '<tr><td style="padding:3px 14px 3px 0;white-space:nowrap">第 ' + x.week + ' 週</td>'
+              + '<td style="padding:3px 14px 3px 0;white-space:nowrap">' + esc(String(x.date).replace(/-/g,'/')) + '</td>'
+              + '<td style="padding:3px 14px 3px 0;white-space:nowrap">' + _ic[x.status] + '</td>'
+              + '<td style="padding:3px 0" class="muted">' + esc(x.why || '') + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        + (pv.blocked ? '<div style="color:var(--red);font-weight:700;margin-top:8px">建不了的那 '
+            + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '');
+      const _opts = pv.needOverbook
+        ? [{ v:'no', t:'先不要，我重新安排' }, { v:'yes', t:'放行超約，建立其餘 ' + (pv.times - pv.blocked) + ' 次' }]
+        : [{ v:'no', t:'先不要' }, { v:'yes', t:'知道了，建立可約的 ' + (pv.times - pv.blocked) + ' 次' }];
+      const _ans = await ask('療程逐週檢查｜' + esc(doc) + ' ' + esc(t),
+        [{ label: pv.needOverbook ? '有 ' + pv.needOverbook + ' 週需要超約，確定放行嗎？' : '有幾週建不了，確定繼續嗎？',
+           type: 'select', value: 'no', options: _opts, hint: _tbl }], '送出');
+      if (_ans === null || _ans[0] !== 'yes') { btn.disabled = false; btn.textContent = '✓ 建立'; return; }
+      _allowOver = !!pv.needOverbook;
+    }
     btn.textContent = `💊 建立第 ${cStart}～${cWeeks} 週療程中…`;
     const r0 = await api.post('createCounterBooking', {
       clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
       name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
-      course: { name: cName.replace(/療程$/, ''), weeks: cWeeks, startWeek: cStart },
-      employeeId: S.cUser.employeeId, employeeName: S.cUser.name, source: 'walk_in'
+      course: _cInfo, allowOverbook: _allowOver,
+      employeeId: S.cUser.employeeId, employeeName: S.cUser.name,
+      createdBy: S.cUser.name, createdRole: 'counter', source: 'walk_in'
     }, true);
     btn.disabled = false; btn.textContent = '✓ 建立';
     if (!r0.ok) { toast('失敗：' + (r0.message || r0.error || ''), 'var(--red)'); return; }
