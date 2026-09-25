@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.57-course';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.58-leave';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2375,6 +2375,33 @@ function renderMiniCal(m) {
   }
   m.querySelector('#mc-body').innerHTML = h + `</div></div>`;
 }
+/* ✨ v31.58 醫師請假時，後台看診表還是照「班表」分頁的每週規則畫出那一欄，
+   但預約驗證比對的是來源試算表產生的「診次」逐日資料 —— 請假那天診次會消失。
+   結果櫃檯看到欄位、看到空格、點得下去，送出才被擋
+   （2026-10-22 蕭捷存請假：其餘三位醫師都在，只有他那格沒有診次）。
+   改為：抓逐日診次，班表有、診次沒有的那天直接顯示停診並鎖住格子。
+   ⚠️ 只有在診次資料涵蓋範圍內才判定；超出範圍時不可以誤判成請假。 */
+async function ensureSrcSessions(clinic) {
+  const today = fmtD(new Date());
+  const from = dcShift(today, -31), to = dcShift(today, 210);
+  const c = S.srcSess;
+  if (c && c.clinic === clinic && c.from <= from && c.to >= to) return c;
+  const r = await api.post('getSessionDays', { clinic: clinic, from: from, to: to }, true);
+  if (!r.ok) return null;
+  const map = {};
+  (r.data || []).forEach(function (x) { map[normDoc(x.doctor) + '|' + x.date] = true; });
+  S.srcSess = { clinic: clinic, from: from, to: to, map: map, srcFrom: r.from, srcTo: r.to };
+  return S.srcSess;
+}
+/** 這位醫師這天是不是請假（班表有、診次沒有）。無法判定時回 false，不亂標。 */
+function docOnLeave(dn, date) {
+  const c = S.srcSess;
+  if (!c || !c.map) return false;
+  if (c.srcFrom && date < c.srcFrom) return false;
+  if (c.srcTo && date > c.srcTo) return false;
+  if (date < c.from || date > c.to) return false;
+  return !c.map[normDoc(dn) + '|' + date];
+}
 async function loadCDayGrid() {
   const clinic = S.cClinic, date = S.cDate;
   const wd = isoWd(date);
@@ -2385,7 +2412,8 @@ async function loadCDayGrid() {
   if (!box) return;
   if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} 本日無排班</p>`; $('#cd-orph').innerHTML=''; return; }
   S.apptCache.delete(clinic + '|' + date);
-  const appts = (await getAppts(clinic, date)).filter(a => !isDead(a));
+  const [appts0] = await Promise.all([ getAppts(clinic, date), ensureSrcSessions(clinic) ]);
+  const appts = (appts0 || []).filter(a => !isDead(a));
   if (S.cClinic !== clinic || S.cDate !== date) return;
   // 網格範圍
   let minM = Math.min(...dayScheds.map(s => t2m(s.start))), maxM = Math.max(...dayScheds.map(s => t2m(s.end)));
@@ -2472,12 +2500,18 @@ async function loadCDayGrid() {
        </table>
      </div>`;
   const docRanges = {};
-  docs.forEach(dn => { docRanges[dn] = dayScheds.filter(s => s.doctor === dn).map(s => [t2m(s.start), t2m(s.end)]); });
+  docs.forEach(dn => {
+    /* ✨ v31.58 請假那天把時段區間清空 —— 格子會變成不可點的斜線底，
+       跟「沒有門診」呈現一致，櫃檯不會再點進一個註定失敗的時段。 */
+    docRanges[dn] = docOnLeave(dn, date) ? []
+      : dayScheds.filter(s => s.doctor === dn).map(s => [t2m(s.start), t2m(s.end)]);
+  });
   let h = offNote + `<div style="overflow:auto;max-height:calc(100vh - 300px);min-height:320px"><table class="grid-tbl"><thead><tr><th class="tm">時間</th>`;
   docs.forEach(dn => {
     const rs = dayScheds.filter(s => s.doctor === dn).map(s => `${s.start}–${s.end}`).join('、');
-    const dst = dayStat(S.cClinic, S.cDate, dn);
-    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
+    const _leave = docOnLeave(dn, date);   /* ✨ v31.58 */
+    const dst = _leave ? '停診' : dayStat(S.cClinic, S.cDate, dn);
+    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}${_leave ? '<br><span style="color:#dc2626;font-weight:700">醫師請假，當日無診次</span>' : ''}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-top:3px">
         ${['','滿診','停診'].map(v => `<button data-act="ds-set" data-doc="${esc(dn)}" data-v="${v}" style="font-size:13px;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid ${dst===v?'#1e40af':'#cbd5e1'};background:${dst===v?'#1e40af':'#fff'};color:${dst===v?'#fff':'#64748b'}">${v||'正常'}</button>`).join('')}
       </div></th>`;
@@ -2773,7 +2807,8 @@ function bkbRefresh(preferT) {
      改為：可超約的醫師，重疊時段排在可約時段後面並標記，選了才會跳確認框。
      沒開超約的醫師行為完全不變。 */
   const free = [], over = [];
-  sched.slotsFor(doc, clinic, wd).forEach(r => {
+  /* ✨ v31.58 醫師當天請假就沒有任何時段可選（與看診表一致） */
+  (docOnLeave(doc, date) ? [] : sched.slotsFor(doc, clinic, wd)).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
       /* ✨ v31.49 超過 21:00 收診時間的，跟「已被預約」一樣歸到需超約那組。
          沒開超約的醫師就整個不列出來 —— 反正後端也會擋。 */
@@ -5114,7 +5149,7 @@ document.addEventListener('click', async e => {
     case 'dc-goto': {   /* ✨ v31.22 從每日必查跳到對應的完整功能頁 */
       if (el.dataset.d) S.cDate = el.dataset.d;
       S.cView = el.dataset.v; S.apptCache.clear(); renderCounter(); break; }
-    case 'cd-refresh': S.apptCache.clear(); renderCounter(); break;
+    case 'cd-refresh': S.apptCache.clear(); S.srcSess = null; renderCounter(); break;
     case 'cd-batch': openBatchMark(); break;                                   /* ✨ v31.55 批次報到 */
     case 'bm-all': { const on = el.dataset.on === '1';
       document.querySelectorAll('#bm-list input[type=checkbox]').forEach(c => { c.checked = on; });
