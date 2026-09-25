@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.58-leave';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.59-coursesms';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2933,7 +2933,13 @@ async function bkbSave(btn) {
               + '<td style="padding:3px 0" class="muted">' + esc(x.why || '') + '</td></tr>';
           }).join('') + '</tbody></table>'
         + (pv.blocked ? '<div style="color:var(--red);font-weight:700;margin-top:8px">建不了的那 '
-            + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '');
+            + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '')
+        /* ✨ v31.59 先講清楚會不會發簡訊，免得櫃檯不敢按 */
+        + '<div style="margin-top:8px;color:var(--txt2)">'
+        + (bkb.querySelector('#bkb-paper')?.checked
+            ? '已勾「紙本補登」：<b>完全不發簡訊</b>。'
+            : '簡訊：<b>只發 1 封</b>（第一次的預約成功簡訊），後續週次併入不重複發。前一日提醒照常。')
+        + '</div>';
       const _opts = pv.needOverbook
         ? [{ v:'no', t:'先不要，我重新安排' }, { v:'yes', t:'放行超約，建立其餘 ' + (pv.times - pv.blocked) + ' 次' }]
         : [{ v:'no', t:'先不要' }, { v:'yes', t:'知道了，建立可約的 ' + (pv.times - pv.blocked) + ' 次' }];
@@ -2948,8 +2954,13 @@ async function bkbSave(btn) {
       clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
       name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
       course: _cInfo, allowOverbook: _allowOver,
+      /* ✨ v31.59 療程原本完全沒吃「紙本補登（不發簡訊）」那個勾選框 ——
+         _paper 是在下面的單筆流程才讀取的，療程這條路更早就 return 了，
+         所以櫃檯勾了也沒用，還是會發一封預約成功簡訊。
+         （療程只有第一筆會發，後續週次的通知紀錄寫的是「併入首筆、不重複發送」。） */
+      ...(bkb.querySelector('#bkb-paper')?.checked ? { notify: 'none', source: '紙本補登' } : { source: 'walk_in' }),
       employeeId: S.cUser.employeeId, employeeName: S.cUser.name,
-      createdBy: S.cUser.name, createdRole: 'counter', source: 'walk_in'
+      createdBy: S.cUser.name, createdRole: 'counter'
     }, true);
     btn.disabled = false; btn.textContent = '✓ 建立';
     if (!r0.ok) { toast('失敗：' + (r0.message || r0.error || ''), 'var(--red)'); return; }
