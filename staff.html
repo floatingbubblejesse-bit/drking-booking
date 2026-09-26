@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.60-cancelby';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.61-quicklook';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2934,7 +2934,7 @@ async function bkbSave(btn) {
           }).join('') + '</tbody></table>'
         + (pv.blocked ? '<div style="color:var(--red);font-weight:700;margin-top:8px">建不了的那 '
             + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '')
-        /* ✨ v31.60 先講清楚會不會發簡訊，免得櫃檯不敢按 */
+        /* ✨ v31.61 先講清楚會不會發簡訊，免得櫃檯不敢按 */
         + '<div style="margin-top:8px;color:var(--txt2)">'
         + (bkb.querySelector('#bkb-paper')?.checked
             ? '已勾「紙本補登」：<b>完全不發簡訊</b>。'
@@ -2954,7 +2954,7 @@ async function bkbSave(btn) {
       clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
       name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
       course: _cInfo, allowOverbook: _allowOver,
-      /* ✨ v31.60 療程原本完全沒吃「紙本補登（不發簡訊）」那個勾選框 ——
+      /* ✨ v31.61 療程原本完全沒吃「紙本補登（不發簡訊）」那個勾選框 ——
          _paper 是在下面的單筆流程才讀取的，療程這條路更早就 return 了，
          所以櫃檯勾了也沒用，還是會發一封預約成功簡訊。
          （療程只有第一筆會發，後續週次的通知紀錄寫的是「併入首筆、不重複發送」。） */
@@ -3830,22 +3830,44 @@ async function counterFind() {
     tally.canA ? `系統取消 ${tally.canA}` : '',
     tally.canU ? `取消 ${tally.canU}（來源不明）` : ''
   ].filter(Boolean).join(' · ') || '病人取消 0';
-  const summary = pt ? `<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:11px 14px;margin-bottom:10px">
+  /* ✨ 2026-09-26：這頁是給櫃檯接電話用的——重點是「客人下次什麼時候來」。
+     所以未來預約放大擺最上面，過去紀錄和細部統計收進展開區，平常不擋路。 */
+  const _today0 = new Date(); _today0.setHours(0, 0, 0, 0);
+  const _dObj = r => { const s = fmtD2(r['看診日期']) || r.date || ''; const d = new Date(s + 'T00:00'); return isNaN(d) ? null : d; };
+  const _pending = r => /已預約/.test(String(r['狀態'] || r.status || ''));
+  const future = rows.filter(r => { const d = _dObj(r); return d && d >= _today0 && _pending(r); })
+    .sort((a, b) => (fmtD2(a['看診日期']) + apptTime(a)).localeCompare(fmtD2(b['看診日期']) + apptTime(b)));
+  const past = rows.filter(r => future.indexOf(r) < 0);
+  const _line = r => {
+    const d = _dObj(r), c = courseInfo(r['備註'] || r.note);
+    return `${esc(fmtD2(r['看診日期']))}${d ? '（週' + WDS[d.getDay()] + '）' : ''} ${esc(apptTime(r))}　${esc(normDoc(r.doctor || r['醫師'] || ''))} 醫師 · ${esc(r.clinic || r['院區'] || '')} · ${esc(r.type || r['類型'] || '複診')}`
+      + (c ? ` · <span style="color:#6d28d9;font-weight:700">💊${esc(c.name)} 第 ${c.cur}${c.total ? ' / 共 ' + c.total : ''} 次</span>` : '');
+  };
+  const miniStat = `共 ${tally.total} 次 · 已報到 ${tally.checked} · 未到診 ${tally.noShow} · 病人取消 ${tally.canP}`
+    + (sc !== 'all' ? `（僅 ${esc(sc)}）` : '');
+  const summary = pt ? `<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:10px 14px;margin-bottom:10px">
     <b style="font-size:17px">${esc(pt['姓名'] || '(未填)')}</b>
     <span class="muted" style="margin-left:8px">📱 ${esc(pt['電話'] || '—')}</span>
     ${pt['各院區清單'] ? `<div style="margin-top:6px;font-size:14px"><b style="color:#1e40af">🗂 各院區病歷號：</b>${pt['各院區清單'].split('、').map(x => `<span class="tag tag-b" style="margin-right:5px">${esc(x)}</span>`).join('')}</div>`
       : `<span class="muted" style="margin-left:4px">· 病歷號 ${esc(pt['病例號'] || '—')}</span>`}
-    <div class="muted" style="font-size:13.5px;margin-top:4px">${sc === 'all'
-      ? `共 ${tally.total} 次預約 · 已預約 ${tally.booked} · 已報到 ${tally.checked} · 未到診 ${tally.noShow} · ${canTxt} · 改約 ${tally.resch}`
-      : `🔒 僅顯示 ${esc(sc)} 的紀錄（共 ${tally.total} 筆） · 已報到 ${tally.checked} · 未到診 ${tally.noShow} · ${canTxt}`}</div></div>` : '';
-  const tbl = !rows.length ? '<p class="muted">此病人尚無預約紀錄</p>'
-    : `<table class="tbl"><thead><tr><th>日期</th><th>時段</th><th>病人</th><th>電話</th><th>院區</th><th>醫師</th><th>類型</th><th>狀態</th><th>拿藥</th></tr></thead><tbody>`
-    + rows.slice(0, 100).map(r => `<tr><td>${esc(fmtD2(r['看診日期']) || r.date || '')}</td><td>${esc(apptTime(r))}</td>
+    <div class="muted" style="font-size:12.5px;margin-top:3px">${miniStat}</div></div>` : '';
+  const nextCard = future.length
+    ? `<div style="background:#ecfdf5;border:2px solid #34d399;border-radius:12px;padding:13px 16px;margin-bottom:10px">
+        <div class="muted" style="font-size:13px;margin-bottom:3px">下次預約</div>
+        <div style="font-size:19px;font-weight:800;line-height:1.5">${_line(future[0])}</div>
+        ${future.length > 1 ? `<div style="margin-top:9px;padding-top:9px;border-top:1px dashed #a7f3d0">
+          <div class="muted" style="font-size:13px;margin-bottom:2px">後續還有 ${future.length - 1} 次</div>
+          ${future.slice(1).map(r => `<div style="font-size:14.5px;line-height:1.9">${_line(r)}</div>`).join('')}</div>` : ''}</div>`
+    : `<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:12px;padding:13px 16px;margin-bottom:10px;font-size:17px;font-weight:700">目前沒有未來預約</div>`;
+  const pastTbl = !past.length ? ''
+    : `<details style="margin-top:2px"><summary style="cursor:pointer;color:var(--blue);font-weight:600;padding:6px 0">過去與已取消的紀錄（${past.length} 筆）</summary>`
+    + `<table class="tbl"><thead><tr><th>日期</th><th>時段</th><th>病人</th><th>電話</th><th>院區</th><th>醫師</th><th>類型</th><th>狀態</th><th>拿藥</th></tr></thead><tbody>`
+    + past.slice(0, 100).map(r => `<tr><td>${esc(fmtD2(r['看診日期']) || r.date || '')}</td><td>${esc(apptTime(r))}</td>
       <td>${esc(r.name||r['病人姓名']||'')}</td><td>${esc(r.phone||r['電話']||'')}</td><td>${esc(r.clinic||r['院區']||'')}</td>
       <td>${esc(normDoc(r.doctor||r['醫師']||''))}</td><td>${esc(r.type||r['類型']||'')}</td>
       <td>${esc(r.status||r['狀態']||'')}${_isCan(r) ? `<span class="muted" style="font-size:12px">（${_canLabel[_canBy(r)] || '來源不明'}）</span>` : ''}</td><td>${esc(r.medicationWeeks||r['拿藥週數']||'')}</td></tr>`).join('')
-    + `</tbody></table>`;
-  $('#cf-out').innerHTML = summary + tbl;
+    + `</tbody></table></details>`;
+  $('#cf-out').innerHTML = summary + nextCard + pastTbl;
 }
 /* ── 通知紀錄 / 當日報表 ── */
 function htmlCNotify() {
