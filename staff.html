@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.59-coursesms';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.60-cancelby';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2934,7 +2934,7 @@ async function bkbSave(btn) {
           }).join('') + '</tbody></table>'
         + (pv.blocked ? '<div style="color:var(--red);font-weight:700;margin-top:8px">建不了的那 '
             + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '')
-        /* ✨ v31.59 先講清楚會不會發簡訊，免得櫃檯不敢按 */
+        /* ✨ v31.60 先講清楚會不會發簡訊，免得櫃檯不敢按 */
         + '<div style="margin-top:8px;color:var(--txt2)">'
         + (bkb.querySelector('#bkb-paper')?.checked
             ? '已勾「紙本補登」：<b>完全不發簡訊</b>。'
@@ -2954,7 +2954,7 @@ async function bkbSave(btn) {
       clinic, date, startTime: t, endTime: m2t(t2m(t) + dur), doctor: doc,
       name: name || '(未填)', phone, caseFull: caseNo, type, note: qNote,
       course: _cInfo, allowOverbook: _allowOver,
-      /* ✨ v31.59 療程原本完全沒吃「紙本補登（不發簡訊）」那個勾選框 ——
+      /* ✨ v31.60 療程原本完全沒吃「紙本補登（不發簡訊）」那個勾選框 ——
          _paper 是在下面的單筆流程才讀取的，療程這條路更早就 return 了，
          所以櫃檯勾了也沒用，還是會發一封預約成功簡訊。
          （療程只有第一筆會發，後續週次的通知紀錄寫的是「併入首筆、不重複發送」。） */
@@ -3802,20 +3802,48 @@ async function counterFind() {
   const ct = sc === 'all' ? (d.counts || {}) : {};
   if (!pt && !rows.length) { $('#cf-out').innerHTML = `<p class="muted">查無資料${sc !== 'all' ? `（僅能查詢 ${esc(sc)} 的紀錄）` : '（後台病人資料庫沒有符合的姓名/電話/病歷號）'}</p>`; return; }
   const fmtD2 = v => { const s = String(v || ''); const mm = s.match(/^\d{4}-\d{2}-\d{2}/); return mm ? mm[0] : s.split('T')[0]; };
+  /* ✨ 2026-09-26：取消要分「誰取消的」。院方（櫃檯／管理者）代取消、或系統自動結案，
+     都不該算在病人頭上；只有病人自己線上取消才算病人的取消次數。
+     判斷依據是寫在預約列上的「操作角色」：patient=病人線上、counter/admin/staff=院方、auto=系統。 */
+  const _whoRole = r => String(r['操作角色'] || r.operatorRole || '').toLowerCase();
+  const _isCan = r => /已取消/.test(String(r['狀態'] || r.status || ''));
+  const _canBy = r => {
+    const w = _whoRole(r);
+    if (w === 'patient') return 'patient';
+    if (w === 'auto' || w === 'system') return 'auto';
+    if (w) return 'clinic';
+    return String(r['取消原因'] || '').indexOf('病人') >= 0 ? 'patient' : 'unknown';
+  };
+  const _canLabel = { patient: '病人', clinic: '院方', auto: '系統', unknown: '來源不明' };
+  const tally = { total: rows.length, booked: 0, checked: 0, noShow: 0, resch: 0, canP: 0, canC: 0, canA: 0, canU: 0 };
+  rows.forEach(r => {
+    const st = String(r['狀態'] || r.status || '');
+    if (/已報到/.test(st)) tally.checked++;
+    else if (/未到診/.test(st)) tally.noShow++;
+    else if (/已改約/.test(st)) tally.resch++;
+    else if (_isCan(r)) { const b = _canBy(r); tally[b === 'patient' ? 'canP' : b === 'clinic' ? 'canC' : b === 'auto' ? 'canA' : 'canU']++; }
+    else if (/已預約/.test(st)) tally.booked++;
+  });
+  const canTxt = [
+    tally.canP ? `病人取消 ${tally.canP}` : '',
+    tally.canC ? `院方取消 ${tally.canC}` : '',
+    tally.canA ? `系統取消 ${tally.canA}` : '',
+    tally.canU ? `取消 ${tally.canU}（來源不明）` : ''
+  ].filter(Boolean).join(' · ') || '病人取消 0';
   const summary = pt ? `<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:11px 14px;margin-bottom:10px">
     <b style="font-size:17px">${esc(pt['姓名'] || '(未填)')}</b>
     <span class="muted" style="margin-left:8px">📱 ${esc(pt['電話'] || '—')}</span>
     ${pt['各院區清單'] ? `<div style="margin-top:6px;font-size:14px"><b style="color:#1e40af">🗂 各院區病歷號：</b>${pt['各院區清單'].split('、').map(x => `<span class="tag tag-b" style="margin-right:5px">${esc(x)}</span>`).join('')}</div>`
       : `<span class="muted" style="margin-left:4px">· 病歷號 ${esc(pt['病例號'] || '—')}</span>`}
     <div class="muted" style="font-size:13.5px;margin-top:4px">${sc === 'all'
-      ? `共 ${ct.total ?? rows.length} 次預約 · 已報到 ${ct.checked ?? 0} · 取消 ${ct.cancelled ?? 0} · 改約 ${ct.rescheduled ?? 0}`
-      : `🔒 僅顯示 ${esc(sc)} 的紀錄（共 ${rows.length} 筆）`}</div></div>` : '';
+      ? `共 ${tally.total} 次預約 · 已預約 ${tally.booked} · 已報到 ${tally.checked} · 未到診 ${tally.noShow} · ${canTxt} · 改約 ${tally.resch}`
+      : `🔒 僅顯示 ${esc(sc)} 的紀錄（共 ${tally.total} 筆） · 已報到 ${tally.checked} · 未到診 ${tally.noShow} · ${canTxt}`}</div></div>` : '';
   const tbl = !rows.length ? '<p class="muted">此病人尚無預約紀錄</p>'
     : `<table class="tbl"><thead><tr><th>日期</th><th>時段</th><th>病人</th><th>電話</th><th>院區</th><th>醫師</th><th>類型</th><th>狀態</th><th>拿藥</th></tr></thead><tbody>`
     + rows.slice(0, 100).map(r => `<tr><td>${esc(fmtD2(r['看診日期']) || r.date || '')}</td><td>${esc(apptTime(r))}</td>
       <td>${esc(r.name||r['病人姓名']||'')}</td><td>${esc(r.phone||r['電話']||'')}</td><td>${esc(r.clinic||r['院區']||'')}</td>
       <td>${esc(normDoc(r.doctor||r['醫師']||''))}</td><td>${esc(r.type||r['類型']||'')}</td>
-      <td>${esc(r.status||r['狀態']||'')}</td><td>${esc(r.medicationWeeks||r['拿藥週數']||'')}</td></tr>`).join('')
+      <td>${esc(r.status||r['狀態']||'')}${_isCan(r) ? `<span class="muted" style="font-size:12px">（${_canLabel[_canBy(r)] || '來源不明'}）</span>` : ''}</td><td>${esc(r.medicationWeeks||r['拿藥週數']||'')}</td></tr>`).join('')
     + `</tbody></table>`;
   $('#cf-out').innerHTML = summary + tbl;
 }
