@@ -408,12 +408,13 @@ function doctorMode(){return STATE.entry==='doctor';}
 /* 其他院區：導到擇木良食正式 LINE 官方帳號（@selectgoodfood，rich menu 有「減重門診預約」）加好友；已是好友則直接開聊天室。
    後端指令碼屬性 PILOT_OTHER_URL 有設定時以後端為準。 */
 const PILOT_LINE_ADD_FRIEND='https://line.me/R/ti/p/@selectgoodfood';
-function pilotLocked(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1);}
+function pilotRestricted(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked);}
+function pilotLocked(){return pilotRestricted()&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1;}
 function clinicOptionsHtml(){const opts=APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');return pilotLocked()?opts:'<option value="">選醫師不選院區</option>'+opts;}
 function applyPilotLock(){if(!pilotLocked())return false;const id=APP.data.clinics[0].id;if(STATE.entry==='clinic'&&STATE.clinic===id)return false;STATE.entry='clinic';STATE.clinic=id;STATE.doctor='any';STATE.doctorQuery='';STATE.date='';STATE.time='';STATE.slotId='';STATE.slotFrom=APP.data.today;return true;}
-function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',on);
+function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotRestricted(),lock=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',lock);
  if(staff){el.innerHTML='<strong>全院區測試模式</strong><span>後台已登入，可以測試所有院區。病人從 LINE 進來看到的是試點版。</span>';return;}
- if(!on){el.innerHTML='';return;}const p=APP.data.pilot,name=APP.data.clinics[0].name;el.innerHTML=(expired?'<span class="pilot-warn">後台登入已過期，目前是病人看到的版本。請回後台重新登入。</span>':'')+'<strong>手機預約目前僅開放'+esc(name)+'</strong><span>'+'其他院區請<a href="'+esc(p.otherUrl||PILOT_LINE_ADD_FRIEND)+'" rel="noopener">使用原本的 LINE 預約</a>'+'</span>';}
+ if(!on){el.innerHTML='';return;}const p=APP.data.pilot,name=(APP.data.clinics||[]).map(c=>c.name).join('、');el.innerHTML=(expired?'<span class="pilot-warn">後台登入已過期，目前是病人看到的版本。請回後台重新登入。</span>':'')+'<strong>手機預約目前僅開放'+esc(name)+'</strong><span>'+'其他院區請<a href="'+esc(p.otherUrl||PILOT_LINE_ADD_FRIEND)+'" rel="noopener">使用原本的 LINE 預約</a>'+'</span>';}
 /* 2026-09-23：原本這裡針對三樹院區寫死了醫師順序（head：張慧馨、闕壯理、黃允玫；
    tail：蕭捷健、蕭捷存、黃錦崧），會蓋掉後台「系統管理 → 醫師排序」拖曳存的結果，
    所以後台怎麼調，病人看到的順序都不會變 —— 而且方向正好與老闆要的相反
