@@ -408,8 +408,11 @@ function doctorMode(){return STATE.entry==='doctor';}
 /* 其他院區：導到擇木良食正式 LINE 官方帳號（@selectgoodfood，rich menu 有「減重門診預約」）加好友；已是好友則直接開聊天室。
    後端指令碼屬性 PILOT_OTHER_URL 有設定時以後端為準。 */
 const PILOT_LINE_ADD_FRIEND='https://line.me/R/ti/p/@selectgoodfood';
-function pilotRestricted(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked);}
-function pilotLocked(){return pilotRestricted()&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1;}
+/* 2026-09-29 試點提醒與院區鎖定分開：
+   pilotRestricted() 只要後端有試點限制（locked，或開放院區少於全部院區）就顯示提醒，列出所有開放院區；
+   pilotLocked() 維持原條件（locked 且只有一個院區）才強制鎖定院區、隱藏「選醫師不選院區」。 */
+function pilotRestricted(){const p=APP.data&&APP.data.pilot;if(!p)return false;if(p.locked)return true;const ids=Array.isArray(p.clinicIds)?p.clinicIds:[],all=typeof CLINIC_INFOS==='object'&&CLINIC_INFOS?Object.keys(CLINIC_INFOS).length:0;return ids.length>0&&all>0&&ids.length<all;}
+function pilotLocked(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1);}
 function clinicOptionsHtml(){const opts=APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');return pilotLocked()?opts:'<option value="">選醫師不選院區</option>'+opts;}
 function applyPilotLock(){if(!pilotLocked())return false;const id=APP.data.clinics[0].id;if(STATE.entry==='clinic'&&STATE.clinic===id)return false;STATE.entry='clinic';STATE.clinic=id;STATE.doctor='any';STATE.doctorQuery='';STATE.date='';STATE.time='';STATE.slotId='';STATE.slotFrom=APP.data.today;return true;}
 function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotRestricted(),lock=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',lock);
