@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.61-quicklook';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.62-editappt';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2086,9 +2086,9 @@ async function loadCDaily() {
   box0.innerHTML = '<div id="dc-12"></div><div id="dc-345"><p class="muted" style="padding:10px">檢查中…</p></div>';
   const tel = function(p){ return p ? '<a href="tel:' + esc(p) + '" style="color:var(--blue);font-weight:800">' + esc(p) + '</a>' : '<span style="color:var(--red);font-weight:700">缺電話</span>'; };
   const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
-  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0, stale:0 };
+  const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0, stale:0, nosess:null };
   const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
-  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登') + pill(cnt.stale,'未結案'); };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登') + pill(cnt.stale,'未結案') + pill(cnt.nosess,'無診次'); };
   paintSum();
 
   /* ✨ v31.54 櫃檯忘記按報到是完全靜默的，但後端把「過了看診日還停在已預約」
@@ -2096,12 +2096,14 @@ async function loadCDaily() {
      初診累積 2 次未到就自動封鎖那支電話 —— 客人下次上網約不了，而且沒人知道為什麼。
      這裡回頭掃過去 14 天，把還沒結案的挑出來讓櫃檯補按。一次區間查詢，不逐日打。 */
   const staleFrom = dcShift(today, -14), staleTo = dcShift(today, -1);
-  const [cAppts, rsRes, bY, bT, staleRes] = await Promise.all([
+  const [cAppts, rsRes, bY, bT, staleRes, futRes, _srcS] = await Promise.all([
     getAppts(clinic, callD).catch(function(){ return []; }),
     api.post('getReminderStatus', { date: callD, clinic: clinic }, true),
     api.post('getBloodList', { clinic: clinic, date: yest }, true),
     api.post('getBloodList', { clinic: clinic, date: today }, true),
-    api.post('getReportByRange', { clinic: clinic, from: staleFrom, to: staleTo }, true).catch(function(){ return { ok:false }; })
+    api.post('getReportByRange', { clinic: clinic, from: staleFrom, to: staleTo }, true).catch(function(){ return { ok:false }; }),
+    api.post('getReportByRange', { clinic: clinic, from: today, to: dcShift(today, 120) }, true).catch(function(){ return { ok:false }; }),
+    ensureSrcSessions(clinic).catch(function(){ return null; })
   ]);
   if (!$('#dc-345') || S.cClinic !== clinic) return;
 
@@ -2193,6 +2195,27 @@ async function loadCDaily() {
     return out.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)); });
   })();
   const staleInit = stale.filter(function (x) { return x.type === '初診'; }).length;
+  /* ✨ v31.62 醫師請假系統裡沒有診次的日子，搜博／紙本那邊仍然可能約進來。
+     實例：林秉承週六是隔週 12:30–13:30（10/03、10/17、10/31 有，10/10、10/24 沒有），
+     但搜博每個週六都開，於是 4 位客人約在系統認定「沒有診次」的日子。
+     這種預約在看診表會變成時段外預約，不會消失、也還能報到，但那天醫師根本不在。
+     docOnLeave() 只在診次資料涵蓋範圍內判定，超出範圍回 false，不會亂標。 */
+  const noSess = (function () {
+    const d = (futRes && futRes.ok && futRes.data) || null;
+    if (!d || !S.srcSess) return [];
+    const ds = Array.isArray(d.doctors) ? d.doctors : Object.keys(d.doctors || {}).map(function (k) { return d.doctors[k]; });
+    const out = [];
+    ds.forEach(function (doc) {
+      (doc.details || []).forEach(function (x) {
+        if (String(x.status || '') !== '已預約') return;
+        if (!x.date || x.date < today) return;
+        if (!docOnLeave(doc.doctor, x.date)) return;
+        out.push({ date: x.date, time: x.time, name: x.name, type: x.type, phone: x.phone, doctor: doc.doctor, apptId: x.apptId });
+      });
+    });
+    return out.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)); });
+  })();
+  cnt.nosess = noSess.length;
   cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; cnt.nosms = nosms.length; cnt.stale = stale.length; paintSum();
   $('#dc-345').innerHTML =
       dcCard(nosms.length, '📵', dayBtn + '系統發不出簡訊，要打電話',
@@ -2208,6 +2231,21 @@ async function loadCDaily() {
         (!stale.length ? '' :
           '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>類型</th><th>電話</th><th>前往</th></tr></thead><tbody>'
           + stale.map(function (x) {
+              return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time || '') + '</td>'
+                + '<td>' + esc(normDoc(x.doctor || '')) + '</td><td><b>' + esc(x.name || '(未填)') + '</b></td>'
+                + '<td>' + (x.type === '初診' ? '<span class="tag tag-b">初診</span>' : '複診') + '</td>'
+                + '<td>' + tel(x.phone) + '</td>'
+                + '<td><button class="btn btn-o btn-sm" data-act="dc-goto" data-v="day" data-d="' + esc(x.date) + '">前往</button></td></tr>';
+            }).join('') + '</tbody></table>'),
+        '', '')
+    + dcCard(noSess.length, '📅', '預約落在「醫師沒有診次」的日子',
+        '這些預約的日期，在<b>醫師請假系統</b>裡查不到那位醫師的診次（可能是隔週的班，或臨時請假）。'
+        + '搜博和紙本那邊還是約得進來，所以會出現這種單子。它們在看診表會顯示成<b>時段外預約</b>，'
+        + '不會消失、也還能報到，但<b>那天醫師不一定在</b>。'
+        + '<br>先確認是<b>班表少登</b>還是<b>真的沒診</b>：少登的請補上診次；真的沒診的要打電話請客人改約。',
+        (!noSess.length ? '' :
+          '<table class="tbl"><thead><tr><th>看診日</th><th>時段</th><th>醫師</th><th>姓名</th><th>類型</th><th>電話</th><th>前往</th></tr></thead><tbody>'
+          + noSess.map(function (x) {
               return '<tr><td>' + esc(md(x.date)) + '</td><td>' + esc(x.time || '') + '</td>'
                 + '<td>' + esc(normDoc(x.doctor || '')) + '</td><td><b>' + esc(x.name || '(未填)') + '</b></td>'
                 + '<td>' + (x.type === '初診' ? '<span class="tag tag-b">初診</span>' : '複診') + '</td>'
@@ -3326,6 +3364,7 @@ function openApptDetailFromObj(a, dateStr) {
       <button class="btn btn-a btn-sm" data-act="cd-mark" data-op="bno">✗ 未抽血</button>` : ''}
       <button class="btn btn-p btn-sm" data-act="cd-mark" data-op="notified">已通知</button></div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">關閉</button>
+      <button class="btn btn-p" data-act="c-edit">✏️ 修改資料</button>
       <button class="btn btn-o" data-act="c-retime">調整時段</button>
       <button class="btn btn-a" data-act="c-resch">取消重約</button>
       <button class="btn btn-r" data-act="c-cancel">取消</button>
@@ -3334,6 +3373,98 @@ function openApptDetailFromObj(a, dateStr) {
     t, doctor:normDoc(a.doctor||a['醫師']||''), name:a.name||a['病人姓名']||'', phone:a.phone||a['電話']||'', type:a.type||a['類型']||'複診',
     note:String(a.note||a['備註']||'') });
   window.__cdCurAppt = a;
+}
+/* ✨ v31.62 預約詳情原本完全唯讀，只有櫃檯備註能打字。
+   「每日必查 → 待補登」那條路只列出「欄位是空的」的單子（isIncomplete），
+   所以像「病例號被 key 成姓名」「初診被掛成複診」這種 key 錯但不是空值的資料，
+   櫃檯沒有任何地方可以改，只能用「取消重約」——但那會發一封取消簡訊＋一封新的
+   預約成功簡訊給真實病人，還會掉預約編號與「搜博#編號」的對應，時段也可能被別人佔走。
+   後端 updateAppointmentFields 的 ALLOWED 本來就含姓名／電話／病例號／類型／時段，
+   所以這裡只補介面，後端一行都不動。
+   ≡ 匯入的列「通知方式=none」，而 _autoSendBookingIfReady 第一行就會回 skipped，
+     所以改這些單子不會觸發任何簡訊。 */
+function openEditAppt(a, dateStr) {
+  if (!a) { toast('找不到這筆預約，請重新點一次', 'var(--red)'); return; }
+  const cur = String(a.type || a['類型'] || '複診') === '初診' ? '初診' : '複診';
+  const docN = normDoc(a.doctor || a['醫師'] || ''), ds = a.date || dateStr;
+  const m = modal('<div class="mh">✏️ 修改資料 · ' + esc(ds) + ' ' + esc(apptTime(a)) + ' · ' + esc(docN)
+    + '<button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>'
+    + '<div class="mb">'
+    + '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:9px;padding:9px 12px;font-size:14px;color:#1e40af;margin-bottom:11px">'
+    + '這裡是改<b>key 錯的資料</b>。要換日期或換醫師請用<b>取消重約</b>。<b>修改不會發簡訊。</b></div>'
+    + '<div class="fgrid">'
+    + '<div class="frow"><label>姓名</label><input id="ea-name" value="' + esc(String(a.name || a['病人姓名'] || '').replace(/^[（(]未填[）)]$/, '')) + '"></div>'
+    + '<div class="frow"><label>電話</label><input id="ea-phone" value="' + esc(a.phone || a['電話'] || '') + '"></div>'
+    + '<div class="frow"><label>病歷號</label><input id="ea-case" value="' + esc(caseNoOf(a)) + '"></div>'
+    + '<div class="frow"><label>初診／複診</label><select id="ea-type">'
+    + '<option value="複診"' + (cur === '複診' ? ' selected' : '') + '>複診</option>'
+    + '<option value="初診"' + (cur === '初診' ? ' selected' : '') + '>初診</option></select></div>'
+    + '</div><div id="ea-typebox" style="margin-top:8px"></div><div id="ea-blood" style="margin-top:8px"></div></div>'
+    + '<div class="mf"><button class="btn btn-o" data-act="close-modal">取消</button>'
+    + '<button class="btn btn-g" data-act="ea-save">💾 儲存</button></div>');
+  m.dataset.ea = JSON.stringify({ apptId: a.apptId || a.id || a['預約編號'] || '', clinic: S.cClinic,
+    date: ds, t: apptTime(a), doctor: docN, curType: cur, note: String(a.note || a['備註'] || '') });
+  const b0 = fxBloodSel(a);
+  m.dataset.blood = b0 ? JSON.stringify(b0) : '';
+  m.dataset.qk = JSON.stringify({ date: ds, clinic: S.cClinic, fixed: false });
+  const sel = m.querySelector('#ea-type');
+  if (sel) sel.onchange = function () { eaRefresh(m); };
+}
+/* 切換初複診：算新的結束時間、先檢查會不會撞到同醫師的別筆、初診要選抽血安排。
+   時長一律用 durFor()（系統設定），與 v31.46 / 後端 109 版的規則一致。 */
+async function eaRefresh(m) {
+  const d = JSON.parse(m.dataset.ea), want = m.querySelector('#ea-type').value;
+  const box = m.querySelector('#ea-typebox'), bb = m.querySelector('#ea-blood');
+  if (want === d.curType) { box.innerHTML = ''; bb.innerHTML = ''; return; }
+  const st = t2m(d.t), dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic);
+  box.innerHTML = '<div class="muted" style="font-size:14px">檢查時段…</div>';
+  let clash = [];
+  try {
+    const list = (await getAppts(d.clinic, d.date)) || [];
+    clash = list.filter(function (x) {
+      if (String(x.apptId || x.id || x['預約編號'] || '') === String(d.apptId)) return false;
+      if (isDead(x)) return false;
+      if (normDoc(x.doctor || x['醫師'] || '') !== d.doctor) return false;
+      return t2m(apptTime(x)) < st + dur && apptEndMin(x, d.doctor) > st;
+    });
+  } catch (_) { clash = null; }
+  const names = (clash || []).map(function (x) { return esc(apptTime(x)) + ' ' + esc(x.name || x['病人姓名'] || '(未填)'); });
+  box.innerHTML = '<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:9px;padding:10px 12px;font-size:14px;color:#92400e">'
+    + '改成 <b>' + esc(want) + '</b> 後，這筆會佔 <b>' + esc(d.t) + '–' + esc(m2t(st + dur)) + '</b>（' + dur + ' 分鐘）。'
+    + (clash === null ? '<br>⚠️ 讀不到當天資料，沒辦法幫你檢查會不會撞到別人。'
+       : names.length ? '<br>⚠️ 同一位醫師這段時間還有 <b>' + names.length + '</b> 筆：' + names.join('、') + '。確定要同時段併診再按儲存。'
+       : '<br>✅ 同一位醫師這段時間沒有別人。') + '</div>';
+  bb.innerHTML = want === '初診'
+    ? '<div class="frow"><label>🩸 初診抽血安排 *</label><div id="qk-blood" style="border:2px solid #fecaca;border-radius:10px;padding:11px;background:#fff">'
+      + bloodPickHtml(d.date, d.clinic, (function () { try { return JSON.parse(m.dataset.blood || 'null'); } catch (_) { return null; } })()) + '</div></div>'
+    : '<div class="muted" style="font-size:14px">改成複診後，原本的抽血標記會從備註移除。</div>';
+}
+async function eaSave(m, btn) {
+  const d = JSON.parse(m.dataset.ea), want = m.querySelector('#ea-type').value;
+  const fields = { '病人姓名': m.querySelector('#ea-name').value.trim(),
+                   '電話': m.querySelector('#ea-phone').value.trim(),
+                   '病例號': m.querySelector('#ea-case').value.trim() };
+  let note = d.note;
+  if (want !== d.curType) {
+    const dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic);
+    fields['類型'] = want;
+    fields['開始時段'] = d.t;
+    fields['結束時段'] = m2t(t2m(d.t) + dur);
+    if (want === '初診') {
+      let selB = null; try { selB = JSON.parse(m.dataset.blood || 'null'); } catch (_) {}
+      if (!selB) { toast('請先選抽血安排', 'var(--amber)'); return; }
+      note = tagNote(note, bloodTagOf(selB), [BLOOD_TAG_CLEAR]);
+    } else {
+      note = String(note || '').replace(BLOOD_TAG_CLEAR, '').replace(/\s{2,}/g, ' ').trim();
+    }
+    note = (note ? note + ' ' : '') + '[改' + d.curType + '→' + want + ']';
+  }
+  fields['備註'] = note;
+  btn.disabled = true;
+  const res = await api.post('updateAppointmentFields', { apptId: d.apptId, fields: fields,
+    employeeName: S.cUser.name, employeeRole: S.cUser.role || 'counter', employeeId: S.cUser.employeeId || '' }, true);
+  if (res.ok) { S.apptCache.delete(d.clinic + '|' + d.date); toast('✓ 已修改'); closeModals(); renderCounter(); }
+  else { btn.disabled = false; toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); }
 }
 async function cAction(m, action) {   /* ✨ v31.31 包起來：以前出錯會被 promise 吞掉，畫面毫無反應 */
   try { await cActionGo(m, action); }
@@ -5313,6 +5444,7 @@ document.addEventListener('click', async e => {
       if (x) openFixAppt(x.a, x.ds);
       break; }
     case 'fx-save': fxSave(m, el); break;
+    case 'ea-save': eaSave(m, el); break;
     case 'cd-note-save': {   /* ✨ v31.20 櫃檯自填備註（附加，不覆蓋系統標記） */
       const a = window.__cdCurAppt;
       const box = m.querySelector('#cd-note-in'), msg = m.querySelector('#cd-note-msg');
@@ -5350,6 +5482,7 @@ document.addEventListener('click', async e => {
     case 'c-cancel': cAction(m, 'cancel'); break;
     case 'c-resch': cAction(m, 'resch'); break;
     case 'c-retime': cAction(m, 'retime'); break;
+    case 'c-edit': openEditAppt(window.__cdCurAppt, JSON.parse(m.dataset.appt).date); break;
     case 'q-book': quickBook(); break;
     case 'cf-go': counterFind(); break;
     /* admin */
