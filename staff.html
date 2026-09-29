@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.63-apptsrc';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.64-apptsrc2';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -3330,11 +3330,15 @@ function srcOf(a) {
   const r = String(a.createRole || a['建立角色'] || '').trim();
   const by = String(a.createdBy || a['建立者'] || '').trim();
   if (/匯入/.test(s) || /匯入/.test(by))
-    return { s: '匯入', f: '過渡期匯入的舊資料（' + (s || by) + '）。改或取消要在搜博那邊一起做。', c: '#92400e', b: '#fef3c7' };
+    return { s: '匯入', f: '過渡期匯入的舊資料（' + (s || by) + '）。'
+           + (/搜博/.test(s) ? '改或取消要在搜博那邊一起做。' : '來自紙本登打，搜博那邊沒有這筆。'), c: '#92400e', b: '#fef3c7' };
+  /* ⚠️ auto 要先判。auto_followup（初診的首次複診）的「建立角色」寫的是 patient，
+     因為它是病人線上約初診時系統順手建的。先判 patient 會把它標成「自約」，
+     但那一筆病人沒有自己選過時間，與後端 getSourceStats 的分桂也不一致。 */
+  if (/auto/.test(s) || r === 'auto')
+    return { s: '自動', f: '系統自動建立（' + (s === 'course_auto' ? '療程每週' : '初診的首次複診') + '），病人沒有自己選時間。', c: '#5b21b6', b: '#ede9fe' };
   if (s === 'patient_app' || s === 'line' || r === 'patient')
     return { s: '自約', f: '病人自己約的（' + (s === 'line' ? 'LINE' : '網頁') + '）', c: '#1e40af', b: '#dbeafe' };
-  if (/auto/.test(s) || r === 'auto')
-    return { s: '自動', f: '系統自動建立（' + (s === 'course_auto' ? '療程每週' : '初診的首次複診') + '）', c: '#5b21b6', b: '#ede9fe' };
   if (s === '紙本補登')
     return { s: '補登', f: '櫃檯補登紙本' + (by ? '（' + by + '）' : '') + '。建立時沒發簡訊。', c: '#334155', b: '#e2e8f0' };
   if (s || r)
