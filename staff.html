@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.64-apptsrc2';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.66-retimebusy-batchfix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -652,7 +652,7 @@ function ask(title, fields, okText) {
       <div style="margin-bottom:11px">
         <div style="font-size:15px;color:var(--txt3);font-weight:700;margin-bottom:5px">${f.label}</div>
         ${f.type === 'select'
-          ? `<select id="ask-${i}" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px">${(f.options || []).map(o => `<option value="${esc(o.v)}"${String(o.v) === String(f.value) ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select>`
+          ? `<select id="ask-${i}" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px">${(f.options || []).map(o => `<option value="${esc(o.v)}"${String(o.v) === String(f.value) ? ' selected' : ''}${o.disabled ? ' disabled style="color:#9ca3af"' : ''}>${esc(o.t)}</option>`).join('')}</select>`
           : `<input id="ask-${i}" type="${f.type || 'text'}" value="${esc(f.value == null ? '' : f.value)}"${f.min != null ? ` min="${f.min}"` : ''}${f.max != null ? ` max="${f.max}"` : ''} style="width:100%;box-sizing:border-box;font-size:16px;padding:9px;border:1px solid var(--line);border-radius:8px">`}
         ${f.hint ? `<div style="font-size:13.5px;color:var(--txt3);margin-top:4px">${f.hint}</div>` : ''}
       </div>`).join('');
@@ -1994,7 +1994,10 @@ function htmlCDaily() {
 function bmCount() {
   const n = document.querySelectorAll('#bm-list input[type=checkbox]:checked').length;
   const el = document.querySelector('#bm-n'); if (el) el.textContent = n;
-  const go = document.querySelector('[data-act="bm-go"]'); if (go) go.disabled = !n;
+  /* ✨ v31.66 修：這裡原本用 querySelector，只抓到第一顆「標記未到診」，
+     「標記已報到」永遠解除不了 disabled —— 勾了人還是反灰按不下去
+     （2026-09-30 櫃檯回報）。改成 querySelectorAll，兩顆一起開關。 */
+  document.querySelectorAll('[data-act="bm-go"]').forEach(function (b) { b.disabled = !n; });
 }
 function openBatchMark() {
   const clinic = S.cClinic, date = S.cDate;
@@ -2419,17 +2422,47 @@ function renderMiniCal(m) {
    （2026-10-22 蕭捷存請假：其餘三位醫師都在，只有他那格沒有診次）。
    改為：抓逐日診次，班表有、診次沒有的那天直接顯示停診並鎖住格子。
    ⚠️ 只有在診次資料涵蓋範圍內才判定；超出範圍時不可以誤判成請假。 */
+/* ✨ v31.65 櫃檯端全面改讀「診次」。
+   看診表欄位原本讀「班表」——那是 syncSchedulesFromDrive 每天從雲端硬碟 115.xx 產生的；
+   而訂位引擎、客戶端門診表驗的都是「診次」（醫師請假系統）。
+   兩邊不一致時會出現「客人約得進來、櫃檯却掛不了號」：2026-09-29 實測，
+   土城星期一的何中誠、張簡千郁與星期日的林秉承、張簡千郁，診次有、班表全無，
+   所以櫃檯連醫師下拉都選不到。v31.58 雖然已拿診次做 docOnLeave，
+   但那只會「拿掉」欄位，不會「加上」欄位。
+   範圍：後端 SOURCE_WINDOW_DAYS_ 就是 120 天，要 210 也只會拿到 120，所以收斂成 120。
+   客戶端不受影響，仍是 OPEN_WINDOW_DAYS = 30 天。 */
 async function ensureSrcSessions(clinic) {
   const today = fmtD(new Date());
-  const from = dcShift(today, -31), to = dcShift(today, 210);
+  const from = dcShift(today, -31), to = dcShift(today, 120);
   const c = S.srcSess;
   if (c && c.clinic === clinic && c.from <= from && c.to >= to) return c;
   const r = await api.post('getSessionDays', { clinic: clinic, from: from, to: to }, true);
   if (!r.ok) return null;
   const map = {};
-  (r.data || []).forEach(function (x) { map[normDoc(x.doctor) + '|' + x.date] = true; });
-  S.srcSess = { clinic: clinic, from: from, to: to, map: map, srcFrom: r.from, srcTo: r.to };
+  const byDate = {};
+  (r.data || []).forEach(function (x) {
+    const dn = normDoc(x.doctor);
+    map[dn + '|' + x.date] = true;
+    if (x.start && x.end) (byDate[x.date] = byDate[x.date] || []).push({ doctor: dn, start: x.start, end: x.end });
+  });
+  S.srcSess = { clinic: clinic, from: from, to: to, map: map, byDate: byDate, srcFrom: r.from, srcTo: r.to };
   return S.srcSess;
+}
+/* ✨ v31.65 某一天實際的診次。有診次資料且在涵蓋範圍內就以診次為準；
+   回空陣列代表「那天真的沒診」，不可以因為空就退回班表，否則請假那天又會冒出來。
+   只有「還沒載到」或「超出 120 天窗口」才退回班表。 */
+function daySessions(clinic, date) {
+  const c = S.srcSess;
+  const inRange = c && c.clinic === clinic && c.byDate
+    && (!c.srcFrom || date >= c.srcFrom) && (!c.srcTo || date <= c.srcTo)
+    && date >= c.from && date <= c.to;
+  if (inRange) return { src: '診次', ready: true,
+    list: (c.byDate[date] || []).slice().sort(function (a, b) { return t2m(a.start) - t2m(b.start); }) };
+  const wd = isoWd(date);
+  return { src: '班表', ready: false,
+    list: sched.byClinic(clinic).filter(function (s) { return s.weekday === wd; })
+      .map(function (s) { return { doctor: normDoc(s.doctor), start: s.start, end: s.end }; })
+      .sort(function (a, b) { return t2m(a.start) - t2m(b.start); }) };
 }
 /** 這位醫師這天是不是請假（班表有、診次沒有）。無法判定時回 false，不亂標。 */
 function docOnLeave(dn, date) {
@@ -2443,14 +2476,23 @@ function docOnLeave(dn, date) {
 async function loadCDayGrid() {
   const clinic = S.cClinic, date = S.cDate;
   const wd = isoWd(date);
-  const dayScheds = sched.byClinic(clinic).filter(s => s.weekday === wd)
-    .sort((a,b) => t2m(a.start) - t2m(b.start));
-  const docs = [...new Set(dayScheds.map(s => s.doctor))];
   const box = $('#cd-grid');
   if (!box) return;
-  if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} 本日無排班</p>`; $('#cd-orph').innerHTML=''; return; }
+  /* ✨ v31.65 不阻塞：診次還沒載到就先用班表畫一次（與舊版一樣快），
+     同時背景拉診次，回來且院區／日期沒變就重畫。
+     getSessionDays 每個院區只抓一次（S.srcSess 快取），實測 297 筆／120 天，
+     首次 4.4 秒、之後 1.6～2.2 秒，後續切日期全走快取。 */
+  if (!(S.srcSess && S.srcSess.clinic === clinic && S.srcSess.byDate)) {
+    ensureSrcSessions(clinic).then(function () {
+      if (S.cClinic === clinic && S.cDate === date && S.cMode !== 'week') loadCDayGrid();
+    }).catch(function () {});
+  }
+  const _ds = daySessions(clinic, date);
+  const dayScheds = _ds.list;
+  const docs = [...new Set(dayScheds.map(s => s.doctor))];
+  if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} ${_ds.src === '診次' ? '這一天沒有減重診次' : '本日無排班'}</p>`; $('#cd-orph').innerHTML=''; return; }
   S.apptCache.delete(clinic + '|' + date);
-  const [appts0] = await Promise.all([ getAppts(clinic, date), ensureSrcSessions(clinic) ]);
+  const [appts0] = await Promise.all([ getAppts(clinic, date) ]);
   const appts = (appts0 || []).filter(a => !isDead(a));
   if (S.cClinic !== clinic || S.cDate !== date) return;
   // 網格範圍
@@ -2777,7 +2819,8 @@ function renderBkb(selDoc, selT) {
   if (!box) return;
   const date = S.cDate, clinic = S.cClinic;
   const wd = isoWd(date);
-  const dayDocs = [...new Set(sched.byClinic(clinic).filter(s => s.weekday === wd).map(s => s.doctor))];
+  /* ✨ v31.65 醫師名單改讀診次 */
+  const dayDocs = [...new Set(daySessions(clinic, date).list.map(s => s.doctor))];
   if (!dayDocs.length) { box.innerHTML = ''; return; }
   const prev = box.querySelector('.bkb');
   const keep = sel => prev ? (prev.querySelector(sel)?.value || '') : '';
@@ -2846,7 +2889,8 @@ function bkbRefresh(preferT) {
      沒開超約的醫師行為完全不變。 */
   const free = [], over = [];
   /* ✨ v31.58 醫師當天請假就沒有任何時段可選（與看診表一致） */
-  (docOnLeave(doc, date) ? [] : sched.slotsFor(doc, clinic, wd)).forEach(r => {
+  /* ✨ v31.65 改讀診次（與看診表一致）。診次本身已扣掉請假，不用再 docOnLeave。 */
+  daySessions(clinic, date).list.filter(r => r.doctor === normDoc(doc)).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
       /* ✨ v31.49 超過 21:00 收診時間的，跟「已被預約」一樣歸到需超約那組。
          沒開超約的醫師就整個不列出來 —— 反正後端也會擋。 */
@@ -3059,7 +3103,8 @@ async function bkbSave(btn) {
 async function openQuickBook(date, doctor, time) {
   const clinic = S.cClinic;
   const wd = isoWd(date);
-  const dayDocs = [...new Set(sched.byClinic(clinic).filter(s => s.weekday === wd).map(s => s.doctor))];
+  /* ✨ v31.65 醫師名單改讀診次 */
+  const dayDocs = [...new Set(daySessions(clinic, date).list.map(s => s.doctor))];
   if (!dayDocs.length) { toast('該日此院區無排班', 'var(--amber)'); return; }
   const appts = await getAppts(clinic, date);
   const fixed = !!(doctor && time);
@@ -3108,11 +3153,13 @@ function refreshQkTimes(m, preferT) {
     (blocks[dn] = blocks[dn] || []).push([st, apptEndMin(a, dn)]);
   });
   const free = [];
-  const docs = docSel === '__any__' ? [...new Set(sched.byClinic(clinic).filter(s => s.weekday === wd).map(s => s.doctor))] : [docSel];
+  /* ✨ v31.65 改讀診次 */
+  const _dsq = daySessions(clinic, date).list;
+  const docs = docSel === '__any__' ? [...new Set(_dsq.map(s => s.doctor))] : [docSel];
   docs.forEach(dn => {
     const cfg = cfgFor(dn, clinic);
     const dur = type === '初診' ? cfg.initMin : cfg.followMin;
-    sched.slotsFor(dn, clinic, wd).forEach(r => {
+    _dsq.filter(r => r.doctor === normDoc(dn)).forEach(r => {
       for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
         const conflict = (blocks[normDoc(dn)] || []).some(([bs, be]) => t < be && bs < t + dur);
         if (!conflict) free.push({ t: m2t(t), dn, dur });
@@ -3537,17 +3584,36 @@ async function cActionGo(m, action) {
        時段選項直接由該醫師當天的班表產生，不會再選到班表外的時間。 */
     const _cfg = cfgFor(a.doctor, a.clinic);
     const _dur = (a.type === '初診') ? _cfg.initMin : _cfg.followMin;
-    const _wd = isoWd(a.date);
-    const _segs = sched.byClinic(a.clinic).filter(s => s.weekday === _wd && s.enabled && normDoc(s.doctor) === normDoc(a.doctor));
+    /* ✨ v31.66 兩件事：
+       ① 時段來源改用診次（與看診表一致），不再讀雲端硬碟同步的班表。
+       ② 已經有人的時段反灰並標出是誰。原本把當天每一格都列出來，
+          櫃檯會選到已經有人的時段，送出才被後端 _updateRow 擋下來（slot_unavailable）。
+          目前這筆自己不算占用，標「（目前）」且仍可選。 */
+    const _segs = daySessions(a.clinic, a.date).list.filter(s => s.doctor === normDoc(a.doctor));
+    const _others = ((await getAppts(a.clinic, a.date)) || []).filter(x =>
+      !isDead(x) && normDoc(x.doctor || x['醫師'] || '') === normDoc(a.doctor)
+      && String(x.apptId || x.id || x['預約編號'] || '') !== String(a.apptId));
+    const _busy = _others.map(x => [t2m(apptTime(x)), apptEndMin(x, normDoc(a.doctor)),
+      String(x.name || x['病人姓名'] || '(未填)')]).filter(b => Number.isFinite(b[0]));
     const _opts = [];
-    _segs.forEach(s => { for (let t = t2m(s.start); t + _dur <= t2m(s.end); t += _cfg.followMin) { const v2 = m2t(t); if (!_opts.some(o => o.v === v2)) _opts.push({ v: v2, t: v2 }); } });
-    if (!_opts.length) { toast('這位醫師當天沒有班表時段，請用「取消重約」', 'var(--amber)'); return; }
+    _segs.forEach(s => { for (let t = t2m(s.start); t + _dur <= t2m(s.end); t += _cfg.followMin) {
+      const v2 = m2t(t); if (_opts.some(o => o.v === v2)) continue;
+      const hit = _busy.filter(b => t < b[1] && b[0] < t + _dur);
+      const cur = v2 === a.t;
+      _opts.push({ v: v2, disabled: !cur && hit.length > 0,
+        t: v2 + (cur ? '（目前）' : hit.length ? '　── 已有 ' + hit.map(b => b[2]).join('、') : '') });
+    } });
+    if (!_opts.length) { toast('這位醫師當天沒有診次，請用「取消重約」', 'var(--amber)'); return; }
     _opts.sort((x, y) => t2m(x.v) - t2m(y.v));
-    const _near = _opts.reduce((best, o) => Math.abs(t2m(o.v) - t2m(a.t)) < Math.abs(t2m(best.v) - t2m(a.t)) ? o : best, _opts[0]);
+    const _pick = _opts.filter(o => !o.disabled && o.v !== a.t);
+    if (!_pick.length) { toast('該醫師當天其餘時段都已經有人，請用「取消重約」換日期或醫師', 'var(--amber)'); return; }
+    const _base = _pick;
+    const _near = _base.reduce((best, o) => Math.abs(t2m(o.v) - t2m(a.t)) < Math.abs(t2m(best.v) - t2m(a.t)) ? o : best, _base[0]);
     const _ans = await ask(`🕐 調整時段｜${esc(a.name || '')}（原 ${esc(a.t)}）`,
-      [{ label: '改到哪一個時段', type: 'select', value: _near.v, options: _opts,
+      [{ label: '改到哪一個時段（灰色＝已經有人，不能選）', type: 'select', value: _near.v, options: _opts,
          hint: '只改這一筆的時間，<b>不會取消重掛</b>，預約編號與已發過的通知都保留。'
-             + (_segs.length ? '<br>' + esc(normDoc(a.doctor)) + ' 當天班表：' + _segs.map(s => esc(s.start + '–' + s.end)).join('、') : '') }],
+             + (_segs.length ? '<br>' + esc(normDoc(a.doctor)) + ' 當天診次：' + _segs.map(s => esc(s.start + '–' + s.end)).join('、') : '')
+             + (_busy.length ? '<br>已經有人的時段已反灰：' + _busy.map(b => esc(m2t(b[0]) + ' ' + b[2])).join('、') : '') }],
       '確定調整');
     if (_ans === null) return;
     const _nt = String(_ans[0] || '');
