@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.66-retimebusy-batchfix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.67-qkoverbook';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -3130,6 +3130,7 @@ async function openQuickBook(date, doctor, time) {
       </div>
       <div class="frow" id="qk-blood-row" style="display:none;margin-top:4px"><label>🩸 初診抽血安排</label>
         <div id="qk-blood" style="border:2px solid #fecaca;border-radius:10px;padding:11px;background:#fff"></div></div>
+      <div id="qk-full" style="margin:8px 0"></div>
       <p class="muted" style="font-size:13px">⚡ 卡位規則：<b>電話</b>或<b>已存在的病歷號</b>擇一填寫即可先搶時段；其餘資料稍後從頂部「待補齊」提醒補登。</p>
     </div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">取消</button>
@@ -3167,6 +3168,22 @@ function refreshQkTimes(m, preferT) {
     });
   });
   free.sort((a, b) => a.t.localeCompare(b.t) || a.dn.localeCompare(b.dn, 'zh-Hant'));
+  /* ✨ v31.67 櫃檯回報：時段選得到，送出卻跳「失敗：該日滿診」。
+     原因是這裡只算「時段有沒有被人占」，沒看「該醫師那天是不是被標滿診」。
+     滿診是人為標記，櫃檯確認後本來就可以超約排入，所以不把時段拿掉，
+     只先把話講在前面，送出時再跳一次確認。 */
+  const _qkFull = m.querySelector('#qk-full');
+  if (_qkFull) {
+    const _sts = (docSel === '__any__' ? [...new Set(_dsq.map(x => x.doctor))] : [docSel])
+      .map(function (dn) { return { dn: dn, st: dayStat(clinic, date, dn) }; })
+      .filter(function (x) { return x.st; });
+    _qkFull.innerHTML = !_sts.length ? '' :
+      '<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:9px;padding:9px 12px;font-size:14px;color:#92400e">'
+      + _sts.map(function (x) { return '<b>' + esc(x.dn) + '</b> 這天被標為「' + esc(x.st) + '」'; }).join('、')
+      + (_sts.some(function (x) { return x.st === '停診'; })
+         ? '。<b>停診排不進去</b>，請改選其他醫師或日期。'
+         : '。送出時會跳超約確認，確定診間塞得下再放行。') + '</div>';
+  }
   const sel = m.querySelector('#qk-time');
   const want = preferT || fixedT;
   sel.innerHTML = free.length
@@ -3222,16 +3239,38 @@ async function qkSave(m, btn) {
     let selB = null; try { selB = JSON.parse(m.dataset.blood || 'null'); } catch(_){}
     qNote = tagNote(qNote, bloodTagOf(selB), [BLOOD_TAG_CLEAR]);
   }
-  const res = await api.post('createCounterBooking', {
+  const _qkPayload = {
     clinic, date, startTime: time, endTime: m2t(t2m(time) + dur), doctor: dn,
     name: name || '(未填)', phone: phone, caseFull: caseNo,
     type, note: qNote,
     employeeId: S.cUser.employeeId, employeeName: S.cUser.name, source: 'walk_in'
-  }, true);
+  };
+  let res = await api.post('createCounterBooking', _qkPayload, true);
+  /* ✨ v31.67 超約確認。這段本來只寫在固定掛號列（bkbSave），
+     「快速掛號」這條路沒有，所以後端明明回 slot_taken_can_overbook（可超約），
+     前端卻直接當成失敗、只丟一句「失敗：該日滿診」，櫃檯完全沒有放行的機會
+     （2026-10-02 櫃檯回報：土城 10/07 蕭捷健 劉慧珍）。 */
+  if (!res.ok && res.error === 'slot_taken_can_overbook') {
+    const _why = String(res.message || '此時段已有預約');
+    const _late = _why.indexOf('收診時間') >= 0, _full = _why.indexOf('滿診') >= 0;
+    const go = await ask('⚠️ ' + _why,
+      [{ label: '確定要排入嗎？', type: 'select', value: 'no',
+         options: [{ v:'no', t:'不要，我改選其他時段' }, { v:'yes', t:'確定排入，建立這筆預約' }],
+         hint: esc(dn) + ' 醫師 ' + esc(date) + ' ' + esc(time) + '：' + esc(_why) + '。'
+               + (_late ? '醫師這個時間已經收診，排進去可能看不完。'
+                  : _full ? '這一天被標滿診（人為標記，用來擋病人端）。確定診間塞得下再放行。'
+                  : '排進去後兩位病人會在同一個時段。')
+               + '建立後會在備註標記。' }],
+      '送出');
+    if (go === null || go[0] !== 'yes') { btn.disabled = false; btn.textContent = '✓ 建立掛號'; return; }
+    btn.textContent = '⚠️ 超約建立中…';
+    res = await api.post('createCounterBooking', Object.assign({}, _qkPayload, { allowOverbook: true }), true);
+  }
   if (res.ok) {
     S.apptCache.delete(clinic + '|' + date);
     const inc = !name || (!phoneOK(phone) && type === '複診' && !caseNo);
-    toast(inc ? '✓ 已卡位！記得稍後補齊資料（頂部提醒）' : '✓ 掛號完成');
+    toast(res.overbooked ? '⚠️ 已超約建立（備註已標記）' : (inc ? '✓ 已卡位！記得稍後補齊資料（頂部提醒）' : '✓ 掛號完成'),
+          res.overbooked ? 'var(--amber)' : undefined);
     closeModals(); renderCounter();
   } else { btn.disabled = false; btn.textContent = '✓ 建立掛號'; toast('失敗：' + (res.message || res.error || ''), 'var(--red)'); }
 }
