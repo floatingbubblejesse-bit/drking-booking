@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.68-fullday';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.69-editpatient';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -4071,6 +4071,57 @@ function htmlCFind() {
     <button class="btn btn-p" data-act="cf-go">查詢</button></div>
     <div id="cf-out"></div></div>`;
 }
+/* ✨ v31.69 客戶查詢直接改病人主檔。
+   起因（2026-10-02 chi）：櫃檯是在「預約」那邊改資料，但後端 _upsertPatient
+   是「只補空欄」的設計，主檔本來就有值的欄位永遠不會被覆蓋，
+   所以下次按「🔍 帶入」又把舊的錯資料帶回來。
+   後端 v126 做了兩件事：改預約時會同步寫回主檔（空值不覆蓋）；
+   另外開一支 savePatientMaster 讓這裡直接改主檔（允許清空）。 */
+function openEditPatient(pt) {
+  if (!pt) { toast('請先查詢客戶', 'var(--amber)'); return; }
+  if (pt['_無主檔']) { toast('這位客人沒有病人主檔，請從預約那邊修改', 'var(--amber)'); return; }
+  const g = k => esc(String(pt[k] == null ? '' : pt[k]));
+  const m = modal('<div class="mh">✏️ 修改客戶資料'
+    + '<button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>'
+    + '<div class="mb">'
+    + '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:9px;padding:9px 12px;font-size:14px;color:#1e40af;margin-bottom:11px">'
+    + '這裡改的是<b>病人主檔</b>，改完「🔍 帶入」就會帶出新的資料。'
+    + '<b>不會動到已經存在的預約</b>，也不會發任何簡訊。</div>'
+    + '<div class="fgrid">'
+    + '<div class="frow"><label>姓名</label><input id="cp-name" value="' + g('姓名') + '"></div>'
+    + '<div class="frow"><label>電話</label><input id="cp-phone" value="' + g('電話') + '"></div>'
+    + '<div class="frow"><label>病歷號</label><input id="cp-case" value="' + g('病例號') + '"></div>'
+    + '<div class="frow"><label>生日（民國，例 79/05/01）</label><input id="cp-bd" value="' + g('生日') + '"></div>'
+    + '<div class="frow"><label>身分證</label><input id="cp-id" value="' + g('身分證') + '"></div>'
+    + '<div class="frow"><label>備註</label><input id="cp-note" value="' + g('備註') + '"></div>'
+    + '</div>'
+    + (pt['各院區清單'] ? '<div class="muted" style="font-size:13px;margin-top:8px">🗂 各院區病歷號：' + esc(pt['各院區清單']) + '（改上面的病歷號會自動更新目前院區那一筆）</div>' : '')
+    + '</div>'
+    + '<div class="mf"><button class="btn btn-o" data-act="close-modal">取消</button>'
+    + '<button class="btn btn-g" data-act="cp-save">💾 儲存</button></div>');
+  m.dataset.cp = JSON.stringify({ patientId: String(pt['病人ID'] || ''), phone: String(pt['電話'] || ''), caseFull: String(pt['病例號'] || ''), clinic: String(pt['院區'] || S.cClinic || '') });
+}
+async function cpSave(m, btn) {
+  const d = JSON.parse(m.dataset.cp);
+  const fields = {
+    '姓名': m.querySelector('#cp-name').value.trim(),
+    '電話': m.querySelector('#cp-phone').value.trim(),
+    '病例號': m.querySelector('#cp-case').value.trim(),
+    '生日': m.querySelector('#cp-bd').value.trim(),
+    '身分證': m.querySelector('#cp-id').value.trim(),
+    '備註': m.querySelector('#cp-note').value.trim()
+  };
+  if (!fields['姓名'] && !fields['電話'] && !fields['病例號']) {
+    toast('姓名、電話、病歷號至少要留一個', 'var(--amber)'); return; }
+  btn.disabled = true;
+  const res = await api.post('savePatientMaster', { patientId: d.patientId, phone: d.phone,
+    caseFull: d.caseFull, clinic: d.clinic, fields: fields,
+    employeeName: S.cUser.name, employeeId: S.cUser.employeeId || '' }, true);
+  if (res.ok) { toast('✓ 客戶資料已更新'); closeModals();
+    if (fields['電話']) $('#cf-kw').value = fields['電話'];
+    counterFind(); }
+  else { btn.disabled = false; toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); }
+}
 async function counterFind() {
   const kw = $('#cf-kw').value.trim(); if (!kw) return;
   $('#cf-out').innerHTML = '<p class="muted">查詢中…</p>';
@@ -4080,6 +4131,7 @@ async function counterFind() {
   let rows = d.history || [];
   if (sc !== 'all') rows = rows.filter(r => String(r.clinic || r['院區'] || '') === sc);
   const pt = d.patient || null;
+  window.__cfPatient = pt;   /* ✨ v31.69 修改客戶資料用 */
   const ct = sc === 'all' ? (d.counts || {}) : {};
   if (!pt && !rows.length) { $('#cf-out').innerHTML = `<p class="muted">查無資料${sc !== 'all' ? `（僅能查詢 ${esc(sc)} 的紀錄）` : '（後台病人資料庫沒有符合的姓名/電話/病歷號）'}</p>`; return; }
   const fmtD2 = v => { const s = String(v || ''); const mm = s.match(/^\d{4}-\d{2}-\d{2}/); return mm ? mm[0] : s.split('T')[0]; };
@@ -4131,7 +4183,10 @@ async function counterFind() {
     <span class="muted" style="margin-left:8px">📱 ${esc(pt['電話'] || '—')}</span>
     ${pt['各院區清單'] ? `<div style="margin-top:6px;font-size:14px"><b style="color:#1e40af">🗂 各院區病歷號：</b>${pt['各院區清單'].split('、').map(x => `<span class="tag tag-b" style="margin-right:5px">${esc(x)}</span>`).join('')}</div>`
       : `<span class="muted" style="margin-left:4px">· 病歷號 ${esc(pt['病例號'] || '—')}</span>`}
-    <div class="muted" style="font-size:12.5px;margin-top:3px">${miniStat}</div></div>` : '';
+    <div class="muted" style="font-size:12.5px;margin-top:3px">${miniStat}</div>
+    <div style="margin-top:8px">${pt['_無主檔']
+      ? '<span class="muted" style="font-size:13px">⚠️ 這位客人沒有病人主檔（資料只存在預約裡），請從下方預約點進去用「✏️ 修改資料」更正。</span>'
+      : '<button class="btn btn-p btn-sm" data-act="cf-edit">✏️ 修改客戶資料</button>'}</div></div>` : '';
   const nextCard = future.length
     ? `<div style="background:#ecfdf5;border:2px solid #34d399;border-radius:12px;padding:13px 16px;margin-bottom:10px">
         <div class="muted" style="font-size:13px;margin-bottom:3px">下次預約</div>
@@ -5635,6 +5690,8 @@ document.addEventListener('click', async e => {
     case 'c-edit': openEditAppt(window.__cdCurAppt, JSON.parse(m.dataset.appt).date); break;
     case 'q-book': quickBook(); break;
     case 'cf-go': counterFind(); break;
+    case 'cf-edit': openEditPatient(window.__cfPatient); break;   /* ✨ v31.69 */
+    case 'cp-save': cpSave(m, el); break;
     /* admin */
     case 'a-login': { const u = await counterLogin('#al-id','#al-pw','#al-err', true);
       if (u) { S.aUser = u; aShow(); } break; }   // 權限暫全開，之後再依職位收斂
