@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.67-qkoverbook';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.68-fullday';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2887,16 +2887,22 @@ function bkbRefresh(preferT) {
      （2026-10-01 闕壯理 15:15、16:15：詹佳容/李俐葶 各佔 20 分鐘壓過 15 分格線）。
      改為：可超約的醫師，重疊時段排在可約時段後面並標記，選了才會跳確認框。
      沒開超約的醫師行為完全不變。 */
-  const free = [], over = [];
-  /* ✨ v31.58 醫師當天請假就沒有任何時段可選（與看診表一致） */
+  const free = [], over = [], _why = {};
   /* ✨ v31.65 改讀診次（與看診表一致）。診次本身已扣掉請假，不用再 docOnLeave。 */
-  daySessions(clinic, date).list.filter(r => r.doctor === normDoc(doc)).forEach(r => {
+  /* ✨ v31.68 那一天被標滿診時，整天每一格後端都會要求超約確認，
+     所以不再分「可約／需確認」兩組 —— 全部歸到需確認，標「滿診・可超約」。
+     停診則一格也不列（醫師真的不在，後端硬擋）。 */
+  const _dst = dayStat(clinic, date, doc);
+  if (_dst !== '停診') daySessions(clinic, date).list.filter(r => r.doctor === normDoc(doc)).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
-      /* ✨ v31.49 超過 21:00 收診時間的，跟「已被預約」一樣歸到需超約那組。
-         沒開超約的醫師就整個不列出來 —— 反正後端也會擋。 */
+      const v2 = m2t(t);
       const late = t + dur > LAST_END_MIN;
-      if (!late && !blocks.some(([bs, be]) => t < be && bs < t + dur)) free.push(m2t(t));
-      else if (cfg.overbook) over.push(m2t(t));
+      const taken = blocks.some(([bs, be]) => t < be && bs < t + dur);
+      const full = _dst === '滿診';
+      if (!late && !taken && !full) { free.push(v2); continue; }
+      if (!cfg.overbook) continue;
+      _why[v2] = late ? '超時' : (taken && full) ? '已有人滿診' : taken ? '已有人' : '滿診';
+      over.push(v2);
     }
   });
   const sel = bkb.querySelector('#bkb-time');
@@ -2904,15 +2910,19 @@ function bkbRefresh(preferT) {
   /* 注意：bkbSave 是用 textContent.split('～')[0] 取開始時間，
      所以標記一定要加在結束時間「後面」，不能動到前面那段。 */
   const _opt = (t, ob) => {
-    const late = t2m(t) + dur > LAST_END_MIN;
-    const tag = !ob ? '' : late ? '　⚠️ 超過 ' + m2t(LAST_END_MIN) + ' 收診' : '　⚠️ 已有人・可超約';
+    const w = _why[t] || '';
+    const tag = !ob ? ''
+      : w === '超時' ? '　⚠️ 超過 ' + m2t(LAST_END_MIN) + ' 收診'
+      : w === '已有人滿診' ? '　⚠️ 已有人・滿診・可超約'
+      : w === '滿診' ? '　⚠️ 滿診・可超約'
+      : '　⚠️ 已有人・可超約';
     return `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${tag}</option>`;
   };
   sel.innerHTML = (free.length + over.length)
     ? free.map(t => _opt(t, false)).join('')
       + (free.length && over.length ? '<option disabled>──── 以下時段需要確認才能排（已有人／超過收診時間）────</option>' : '')
       + over.map(t => _opt(t, true)).join('')
-    : '<option value="">（無可約時段）</option>';
+    : '<option value="">' + (_dst === '停診' ? '（當日停診，排不進去）' : '（無可約時段）') + '</option>';
   bkb.querySelector('[data-act="bkb-save"]').disabled = !(free.length + over.length);
   // 初診 → 抽血列
   const bEl = bkb.querySelector('.bkb-blood');
