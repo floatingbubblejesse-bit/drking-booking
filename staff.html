@@ -160,6 +160,24 @@ nav .tabs button.on{background:var(--blue);color:#fff}
   #page-counter .tbl,#page-admin .tbl{font-size:16px}
   #page-counter .card,#page-admin .card{padding:24px}
 }
+/* ✨ v31.71 唯讀帳號（編輯權＝不可）：把會改資料的入口收起來。
+   後端 v127 也會硬擋，這裡只是不要讓人白按一輪。 */
+body.ro-user #cd-book,
+body.ro-user [data-act="cd-batch"],
+body.ro-user [data-act="c-menu"][data-v="quick"],
+body.ro-user [data-act="c-edit"],
+body.ro-user [data-act="c-retime"],
+body.ro-user [data-act="c-resch"],
+body.ro-user [data-act="c-cancel"],
+body.ro-user [data-act="c-checkin"],
+body.ro-user [data-act="cd-mark"],
+body.ro-user [data-act="cd-note-save"],
+body.ro-user [data-act="cf-edit"],
+body.ro-user [data-act="fx-open"],
+body.ro-user [data-act="dc-blood"],
+body.ro-user [data-act="blk-add"],
+body.ro-user [data-act="blk-del"]{display:none!important}
+body.ro-user [data-act="cd-slot"]{pointer-events:none;cursor:default!important}
 .side{background:#fff;border-radius:var(--r);padding:14px;height:fit-content}
 .side .who{font-size:15px;color:var(--txt3)}.side .whon{font-weight:700;font-size:17px;margin:2px 0 10px}
 .side .mi{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;font-size:16px;color:var(--txt2);cursor:pointer;margin-bottom:2px}
@@ -411,6 +429,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="profile">醫師介紹編輯</div>
       <div class="mi" data-act="a-menu" data-v="sms">簡訊內容</div>
       <div class="mi" data-act="a-menu" data-v="emp">使用者權限</div>
+      <div class="mi" data-act="a-menu" data-v="perm">權限設定</div>
       <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
       <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
     </div>
@@ -426,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.70-fillany';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.71-perm';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -497,8 +516,25 @@ function authLost() {
   } catch(_){}
 }
 
+/* ✨ v31.71 前端唯讀闘門（後端 v127 才是真正的那道）。
+   清單跟後端 STAFF_WRITE_ACTIONS_ 一致，兩邊要一起改。 */
+const RO_BLOCK_ACTIONS = ['createCounterBooking','updateAppointmentStatus','updateAppointmentFields',
+  'rescheduleAppointment','batchUpdateStatus','savePatientMaster','savePatientMemory','importEmployees',
+  'sendSMS','cancelScheduledSMS','saveService','deleteService','saveNotifyTemplate','deleteNotifyTemplate',
+  'saveDoctorPhoto','restoreDoctorPhotos','deleteDoctorPhoto','saveEmployee','deleteEmployee',
+  'saveTimeSetting','deleteTimeSetting','saveDoctorOrder','resetDoctorOrder','saveDoctorSetting',
+  'approveAndSendNotify','markApptNotified','checkInWithQueue','saveSchedule','deleteSchedule','toggleSchedule',
+  'syncSchedulesFromDrive','triggerDriveSync','syncDoctorPhotos','setupDailySync',
+  'approvePendingSchedule','rejectPendingSchedule','markConflictHandled','applyExistingPendingFixed',
+  'saveDoctorProfile','updateMedRequestStatus','fillBloodRegistration','syncLeaveSystem','repairLeadingZeros',
+  'resendBookingSms','setDayStatus','addBlacklist','removeBlacklist','addLineBinding','removeLineBinding',
+  'sweepNotifyDate','saveSmsTemplate','markMedicationReady','savePermissions'];
 const api = {
   async post(action, payload, withToken) {
+    if (withToken && RO_BLOCK_ACTIONS.indexOf(action) >= 0 && typeof canEdit === 'function' && !canEdit()) {
+      toast('這個帳號是唯讀權限，無法變更資料', 'var(--amber)');
+      return { ok:false, error:'readonly_role', message:'唯讀權限' };
+    }
     const body = { action, payload: payload || {} };
     if (withToken) body.token = S.session || '';
     const ctl = new AbortController();
@@ -880,7 +916,8 @@ async function getAppts(clinic, date) {
   const k = clinic + '|' + date;
   if (S.apptCache.has(k)) return S.apptCache.get(k);
   const res = await api.get('getAppointmentsByClinicDate', { clinic, date });
-  const list = (res.ok && Array.isArray(res.data)) ? res.data : [];
+  let list = (res.ok && Array.isArray(res.data)) ? res.data : [];
+  if (myDoctor()) list = list.filter(inMyDoc);   /* ✨ v31.71 檢視權＝自己的診 */
   S.apptCache.set(k, list);
   return list;
 }
@@ -1905,24 +1942,54 @@ function matchClinic(name) {
     || CLINICS.find(c => name.includes(c.name.replace('院區', '')));
   return hit ? hit.name : '';
 }
-/* ✨ v23 檢視範圍：減重櫃檯/管理職＝全院區；其他身份＝僅自己執登院區 */
-function userScope(u) {
-  if (!u) return 'all';
-  if (u.employeeId === '0006' || u.role === 'admin') return 'all';
+/* ✨ v31.71 權限改由後端「權限設定」分頁決定（後端 v127）。
+   登入時後端會回 view / edit / permGroup，並且權限表裡填了「院區」的人
+   會直接蓋過員工表的所屬院區（因為員工表不是我們能改的）。
+   範圍值：全院區／所屬院區／自己的診／不可。
+   舊版本沒有 view 時（後端還沒部署）退回舊規則，不會把人鎖在門外。 */
+function userViewRaw(u) {
+  const v = String((u && u.view) || '');
+  if (v) return v;
+  if (!u) return '全院區';
+  if (u.employeeId === '0006' || u.role === 'admin') return '全院區';
   const label = String(u.roleLabel || '') + String(u.role || '');
-  if (/減重櫃檯|管理|執行長|總院長|院長|admin|shareholder/.test(label)) return 'all';
-  const c = (u.clinics || []).map(matchClinic).find(Boolean);
-  return c || 'all';   // 過渡期：未填院區者暫不鎖（請盡快補所屬院區）
+  if (/減重櫃檯|管理|執行長|總院長|admin|shareholder/.test(label)) return '全院區';
+  return '所屬院區';
 }
-const cScope = () => (S.cUser && S.cUser.scope) || 'all';
+/** 看得到哪些院區；null 代表全部 */
+function viewList() {
+  const u = S.cUser || {};
+  if (userViewRaw(u) === '全院區') return null;
+  const cs = (u.clinics || []).map(matchClinic).filter(Boolean);
+  return cs.length ? cs : null;   /* 沒填院區就不鎖，與舊版一致，避免一片空白 */
+}
+const inView = c => { const l = viewList(); return !l || l.indexOf(c) >= 0; };
+/** 舊程式共用：全院區回 'all'，只有一個回院區名，多個回 'multi' */
+const cScope = () => { const l = viewList(); return !l ? 'all' : (l.length === 1 ? l[0] : 'multi'); };
+/** 編輯權：「不可」就是唯讀（後端 v127 也會硬擋，這裡只是不要讓人白按） */
+const canEdit = () => String((S.cUser && S.cUser.edit) || '') !== '不可';
+/** 檢視權＝自己的診時，只看挂在自己名下的；名字對不到任何醫師就不過濾（寯可多看也不要給空白） */
+function myDoctor() {
+  const u = S.cUser || {};
+  if (userViewRaw(u) !== '自己的診') return '';
+  const nm = normDoc(u.name || '');
+  if (!nm) return '';
+  const known = (S.doctors || []).some(d => normDoc(d.name || d) === nm) || sched.byDoctor(nm).length > 0;
+  return known ? nm : '';
+}
+const inMyDoc = a => { const d = myDoctor(); return !d || normDoc((a && (a.doctor || a['醫師'])) || '') === d; };
 function cShow() {
-  S.cUser.scope = userScope(S.cUser);
+  S.cUser.scope = cScope();
   $('#c-login').style.display = 'none'; $('#c-main').style.display = 'grid';
-  $('#c-who').textContent = `${S.cUser.name}（${S.cUser.clinic||'全院區'}）`;
+  /* ✨ v31.71 標題列把權限寫清楚，櫃檯才知道自己為什麼看不到某些東西 */
+  const _vl = viewList();
+  const _scopeTxt = !_vl ? '全院區' : _vl.join('、');
+  const _md = myDoctor();
+  $('#c-who').textContent = `${S.cUser.name}（${_md ? _md + ' 醫師自己的診' : _scopeTxt}${canEdit() ? '' : '・唯讀'}）`;
+  document.body.classList.toggle('ro-user', !canEdit());
   if (!S.cDate) S.cDate = fmtD(new Date());
-  const _sc = cScope();
-  if (_sc !== 'all') S.cClinic = _sc;
-  else if (!S.cClinic) S.cClinic = (S.cUser.clinics || []).map(matchClinic).find(Boolean) || CLINICS[0].name;
+  if (_vl && _vl.indexOf(S.cClinic) < 0) S.cClinic = _vl[0];
+  if (!S.cClinic) S.cClinic = CLINICS[0].name;
   renderCounter();
 }
 function renderCounter() {
@@ -1953,7 +2020,7 @@ function renderCounter() {
     c.innerHTML = `<div class="card"><h3>💊 拿藥需求</h3>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0 10px">
         <button class="btn btn-sm ${S.cmAll?'btn-o':'btn-p'}" data-act="cm-scope" data-v="0">${esc(S.cClinic)}</button>
-        ${cScope() === 'all' ? `<button class="btn btn-sm ${S.cmAll?'btn-p':'btn-o'}" data-act="cm-scope" data-v="1">全部院區</button>` : ''}
+        ${(viewList() || CLINICS).length > 1 ? `<button class="btn btn-sm ${S.cmAll?'btn-p':'btn-o'}" data-act="cm-scope" data-v="1">全部院區</button>` : ''}
         <span style="flex:1"></span><button class="btn btn-o btn-sm" data-act="cm-reload">🔄</button></div>
       <div id="cm-box" class="muted" style="padding:14px">載入中…</div></div>`;
     loadCMeds();
@@ -2287,8 +2354,7 @@ async function loadCDaily() {
 }
 /* ── 今日看診表 ── */
 function clinicOpts() {
-  const sc = cScope();
-  const list = sc === 'all' ? CLINICS : CLINICS.filter(c => c.name === sc);
+  const list = CLINICS.filter(c => inView(c.name));   /* ✨ v31.71 多院區也列得出來 */
   return list.map(c => `<option ${c.name===S.cClinic?'selected':''}>${c.name}</option>`).join('');
 }
 function weekStart(ds) {
@@ -2489,8 +2555,9 @@ async function loadCDayGrid() {
   }
   const _ds = daySessions(clinic, date);
   const dayScheds = _ds.list;
-  const docs = [...new Set(dayScheds.map(s => s.doctor))];
-  if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} ${_ds.src === '診次' ? '這一天沒有減重診次' : '本日無排班'}</p>`; $('#cd-orph').innerHTML=''; return; }
+  const _myd = myDoctor();
+  const docs = [...new Set(dayScheds.map(s => s.doctor))].filter(d => !_myd || d === _myd);   /* ✨ v31.71 */
+  if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} ${_myd ? _myd + ' 醫師這一天沒有診' : (_ds.src === '診次' ? '這一天沒有減重診次' : '本日無排班')}</p>`; $('#cd-orph').innerHTML=''; return; }
   S.apptCache.delete(clinic + '|' + date);
   const [appts0] = await Promise.all([ getAppts(clinic, date) ]);
   const appts = (appts0 || []).filter(a => !isDead(a));
@@ -2770,8 +2837,7 @@ function svFillKeys(m, preset) {
   const mode = m.dataset.svMode;
   const sel = m.querySelector('#sv-key');
   if (mode === 'clinic') {
-    const sc = cScope();
-    const names = CLINICS.filter(c => (sc === 'all' || c.name === sc) && sched.byClinic(c.name).length).map(c => c.name);
+    const names = CLINICS.filter(c => inView(c.name) && sched.byClinic(c.name).length).map(c => c.name);
     sel.innerHTML = names.map(n => `<option ${n===preset?'selected':''}>${esc(n)}</option>`).join('');
   } else {
     sel.innerHTML = S.doctors.map(d => `<option ${d.shortName===preset?'selected':''}>${esc(d.shortName)}</option>`).join('');
@@ -3936,7 +4002,7 @@ async function loadCBlood() {
 async function loadCBlack() {
   const box = $('#blk-box'); if (!box) return;
   const [res, auto] = await Promise.all([
-    api.post('getBlacklist', cScope() === 'all' ? {} : { clinic: cScope() }, true),
+    api.post('getBlacklist', (viewList() && viewList().length === 1) ? { clinic: viewList()[0] } : {}, true),
     api.post('getAutoBlockedList', {}, true),   // ✨ v31.18 自動封鎖中的號碼也列出來
   ]);
   if (!document.querySelector('#blk-box')) return;
@@ -4175,9 +4241,8 @@ async function counterFind() {
   $('#cf-out').innerHTML = '<p class="muted">查詢中…</p>';
   const res = await api.post('searchPatientHistory', { keyword: kw }, true);
   const d = (res.ok && res.data) || {};
+  let rows = (d.history || []).filter(r => inView(String(r.clinic || r['院區'] || '')) && inMyDoc(r));   /* ✨ v31.71 */
   const sc = cScope();
-  let rows = d.history || [];
-  if (sc !== 'all') rows = rows.filter(r => String(r.clinic || r['院區'] || '') === sc);
   const pt = d.patient || null;
   window.__cfPatient = pt;   /* ✨ v31.69 修改客戶資料用 */
   const ct = sc === 'all' ? (d.counts || {}) : {};
@@ -4527,6 +4592,80 @@ function aShow() {
   $('#a-who').textContent = S.aUser.name;
   renderAdmin();
 }
+/* ✨ v31.71 權限設定（系統管理）。資料存在後端「權限設定」分頁。
+   解析順序：個人例外（鍵值可填員工編號或姓名）→ 職位關鍵字（照排序）→ 其他。
+   「院區」填了就蓋過員工表的所屬院區——員工表改不到的人靠這一欄。 */
+let AP_ROWS = [], AP_SCOPES = ['全院區', '所屬院區', '自己的診', '不可'];
+async function loadAPerm() {
+  const box = $('#ap-box'); if (!box) return;
+  const res = await api.post('getPermissions', {}, true);
+  if (!res || !res.ok) { box.innerHTML = '<p style="color:var(--red)">載入失敗：' + esc((res && (res.message || res.error)) || '') + '</p>'; return; }
+  if (Array.isArray(res.scopes) && res.scopes.length) AP_SCOPES = res.scopes;
+  AP_ROWS = (res.rows || []).map(function (r) { return Object.assign({}, r); });
+  apRender();
+}
+function apSplitCli(v) { return String(v || '').split(/[、,，\/／\s]+/).filter(Boolean); }
+function apRender() {
+  const box = $('#ap-box'); if (!box) return;
+  const scopeSel = (cls, v, i) => `<select class="${cls}" data-i="${i}" style="font-size:14px">`
+    + AP_SCOPES.map(x => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('') + '</select>';
+  const cliCell = (v, i) => {
+    const on = apSplitCli(v);
+    return `<details class="ap-cli"><summary style="cursor:pointer;font-size:14px">${on.length ? esc(on.join('、')) : '<span class="muted">（照員工表）</span>'}</summary>`
+      + `<div style="padding:6px 0;display:flex;gap:6px"><button class="btn btn-o btn-sm" data-act="ap-all" data-i="${i}">全選</button>`
+      + `<button class="btn btn-o btn-sm" data-act="ap-none" data-i="${i}">全不選</button></div>`
+      + CLINICS.map(c => `<label style="display:block;font-size:14px;white-space:nowrap"><input type="checkbox" class="ap-c" data-i="${i}" value="${esc(c.name)}"${on.indexOf(c.name) >= 0 ? ' checked' : ''}> ${esc(c.name)}</label>`).join('')
+      + '</details>';
+  };
+  box.innerHTML = '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:9px;padding:10px 13px;font-size:14px;color:#1e40af;margin-bottom:12px;line-height:1.7">'
+    + '<b>解析順序：個人例外 → 職位關鍵字（排序小的先）→ 其他。</b><br>'
+    + '・<b>個人例外</b>的鍵值填<b>員工編號或姓名</b>。員工表改不到的人（例：減重櫃檯）用這行授權。<br>'
+    + '・<b>院區</b>填了就蓋過員工表的所屬院區；空白就照員工表。<br>'
+    + '・<b>關鍵字</b>是拿來比對員工表的「職位」文字，用逗號分隔，包含就算命中。<br>'
+    + '・編輯權「<b>不可</b>」是唯讀，<b>後端會硬擋</b>，不是只把按鈕藏起來。</div>'
+    + '<div style="overflow:auto"><table class="tbl"><thead><tr>'
+    + '<th>類型</th><th>鍵值</th><th>關鍵字</th><th>院區</th><th>檢視權</th><th>編輯權</th><th>排序</th><th>啟用</th><th>說明</th><th></th></tr></thead><tbody>'
+    + AP_ROWS.map((r, i) => `<tr>`
+      + `<td><select class="ap-type" data-i="${i}" style="font-size:14px"><option${r.type === '職位' ? ' selected' : ''}>職位</option><option${r.type === '個人' ? ' selected' : ''}>個人</option></select></td>`
+      + `<td><input class="ap-key" data-i="${i}" value="${esc(r.key || '')}" style="width:110px"></td>`
+      + `<td><input class="ap-kw" data-i="${i}" value="${esc(r.keywords || '')}" style="width:220px" placeholder="職位關鍵字，逗號分隔"></td>`
+      + `<td>${cliCell(r.clinics, i)}</td>`
+      + `<td>${scopeSel('ap-view', r.view, i)}</td>`
+      + `<td>${scopeSel('ap-edit', r.edit, i)}</td>`
+      + `<td><input class="ap-order" data-i="${i}" type="number" value="${esc(String(r.order == null ? 999 : r.order))}" style="width:70px"></td>`
+      + `<td style="text-align:center"><input class="ap-on" data-i="${i}" type="checkbox"${r.enabled === false ? '' : ' checked'}></td>`
+      + `<td><input class="ap-note" data-i="${i}" value="${esc(r.note || '')}" style="width:200px"></td>`
+      + `<td><button class="btn btn-r btn-sm" data-act="ap-del" data-i="${i}">刪</button></td></tr>`).join('')
+    + '</tbody></table></div>'
+    + '<div style="margin-top:12px;display:flex;gap:8px">'
+    + '<button class="btn btn-o" data-act="ap-add">＋ 新增一列</button>'
+    + '<button class="btn btn-g" data-act="ap-save">💾 儲存全部</button>'
+    + '<span id="ap-msg" class="muted" style="align-self:center"></span></div>';
+}
+function apCollect() {
+  const box = $('#ap-box');
+  const g = (cls, i) => box.querySelector(`.${cls}[data-i="${i}"]`);
+  return AP_ROWS.map((r, i) => {
+    const cli = [...box.querySelectorAll(`.ap-c[data-i="${i}"]`)].filter(x => x.checked).map(x => x.value);
+    return { type: g('ap-type', i).value, key: g('ap-key', i).value.trim(),
+             keywords: g('ap-kw', i).value.trim(), clinics: cli.join('、'),
+             view: g('ap-view', i).value, edit: g('ap-edit', i).value,
+             order: Number(g('ap-order', i).value) || 999,
+             enabled: g('ap-on', i).checked, note: g('ap-note', i).value.trim() };
+  });
+}
+async function apSave(btn) {
+  const rows = apCollect();
+  const msg = $('#ap-msg');
+  if (!rows.some(r => r.enabled && r.edit === '全院區')) {
+    if (!confirm('沒有任何一列是「編輯權＝全院區」。確定要儲存嗎？可能會讓所有人都改不了資料。')) return;
+  }
+  btn.disabled = true; msg.textContent = '儲存中…';
+  const res = await api.post('savePermissions', { rows: rows }, true);
+  btn.disabled = false;
+  if (res && res.ok) { msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已儲存 ' + res.saved + ' 列（已登入的人要重新登入才生效）</span>'; loadAPerm(); }
+  else { msg.innerHTML = '<span style="color:var(--red)">儲存失敗：' + esc((res && (res.message || res.error)) || '') + '</span>'; }
+}
 function renderAdmin() {
   document.querySelectorAll('#a-main .mi').forEach(el => el.classList.toggle('on', el.dataset.v === S.aView));
   const c = $('#a-content');
@@ -4537,6 +4676,7 @@ function renderAdmin() {
   else if (S.aView === 'profile') c.innerHTML = htmlAProfile();
   else if (S.aView === 'sms') { c.innerHTML = `<div class="card"><h3>簡訊內容設定</h3><div id="as-box" class="muted" style="padding:14px">載入中…</div></div>`; loadASms(); }
   else if (S.aView === 'emp') { c.innerHTML = `<div class="card"><h3>使用者權限</h3><div id="ae-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAEmp(); }
+  else if (S.aView === 'perm') { c.innerHTML = `<div class="card"><h3>權限設定</h3><div id="ap-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAPerm(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
 }
@@ -5797,6 +5937,11 @@ document.addEventListener('click', async e => {
       if (res.ok) { S.timeCfg.overrides[d] = { initMin, followMin, initCap, capFrom, openDays, overbook }; toast(`✓ ${d}：初診 ${initMin} / 複診 ${followMin} 分${initCap?`・每診初診上限 ${initCap} 位${capFrom?`（${capFrom.slice(5).replace('-','/')} 起）`:'（立即生效）'}`:'・初診不限量'}`); renderAdmin(); }
       else toast('儲存失敗：'+(res.error||'後端未部署 saveTimeSetting'), 'var(--red)');
       break; }
+    case 'ap-add': { AP_ROWS = apCollect(); AP_ROWS.push({ type:'職位', key:'', keywords:'', clinics:'', view:'所屬院區', edit:'所屬院區', order:500, enabled:true, note:'' }); apRender(); break; }
+    case 'ap-del': { const i = +el.dataset.i; AP_ROWS = apCollect(); AP_ROWS.splice(i, 1); apRender(); break; }
+    case 'ap-all': { const i = el.dataset.i; document.querySelectorAll(`.ap-c[data-i="${i}"]`).forEach(c => { c.checked = true; }); break; }
+    case 'ap-none': { const i = el.dataset.i; document.querySelectorAll(`.ap-c[data-i="${i}"]`).forEach(c => { c.checked = false; }); break; }
+    case 'ap-save': apSave(el); break;
     case 'tc-reset': {
       const d = el.dataset.d;
       const res = await api.post('deleteTimeSetting', { doctor:d }, true);
