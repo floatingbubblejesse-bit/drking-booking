@@ -426,7 +426,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.69-editpatient';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.70-fillany';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2837,7 +2837,7 @@ function renderBkb(selDoc, selT) {
       <span class="bkb-msg muted"></span>
     </div>
     <div class="bkb-r2">
-      <input id="bkb-case" class="w1" placeholder="病歷號" value="${esc(keep('#bkb-case'))}">
+      <input id="bkb-case" class="w1" placeholder="病歷號" title="病歷號、電話、姓名填任一個，按「🔍 帶入」就會補齊其他兩個" value="${esc(keep('#bkb-case'))}">
       <button class="btn btn-o btn-sm" data-act="bkb-case-fill">🔍 帶入</button>
       <input id="bkb-phone" class="w2" type="tel" placeholder="電話（或病歷號擇一）" value="${esc(keep('#bkb-phone'))}">
       <input id="bkb-name" class="w3" placeholder="姓名(可空)" value="${esc(keep('#bkb-name'))}">
@@ -4121,6 +4121,54 @@ async function cpSave(m, btn) {
     if (fields['電話']) $('#cf-kw').value = fields['電話'];
     counterFind(); }
   else { btn.disabled = false; toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); }
+}
+/* ✨ v31.70 「🔍 帶入」原本只吃病歷號，櫃檯手上常常只有姓名或電話
+   （2026-10-03 chi）。後端 lookupPatient 本來就會搜姓名／電話／病歷號／生日／身分證，
+   是前端只把病歷號那一格丟進去而已。
+   優先序：病歷號 → 電話 → 姓名（前面的越唯一）。
+   用姓名查會可能中好幾位，所以超過一位就跳清單讓櫃檯選，
+   不可以默默拿第一筆 —— 帶錯人比沒帶到更麻煩。 */
+async function patientFillAny(scope, ids) {
+  const q = sel => scope.querySelector(sel);
+  const elC = q(ids.caseSel), elP = q(ids.phoneSel), elN = q(ids.nameSel), msg = q(ids.msgSel);
+  const caseNo = (elC && elC.value || '').trim();
+  const phone  = (elP && elP.value || '').trim();
+  const name   = (elN && elN.value || '').trim();
+  const kw = caseNo || phone || name;
+  if (!kw) { msg.innerHTML = '<span style="color:#b45309">請先填病歷號、電話或姓名其中一個再按帶入</span>'; return; }
+  msg.textContent = '查詢中…';
+  const res = await api.post('lookupPatient', { keyword: kw, clinic: S.cClinic }, true);
+  let list = (res.ok && res.data) || [];
+  /* 用姓名查時再篩一次：後端還會比對電話／生日／身分證，不過濾會冒出不相干的人 */
+  if (!caseNo && !phone && name) list = list.filter(x => String(x['姓名'] || '').indexOf(name) >= 0);
+  if (!list.length) {
+    scope.dataset.caseVerified = '';
+    msg.innerHTML = '<span style="color:var(--red)">✗ 後台查無此人</span><span style="color:#b45309">｜仍可先卡位，建議補電話</span>';
+    return;
+  }
+  let hit = list[0];
+  if (list.length > 1) {
+    const opts = list.slice(0, 20).map(function (x, i) {
+      return { v: String(i), t: (x['姓名'] || '(未填)') + '　' + (x['電話'] || '無電話') + '　' + (x['病例號'] || '無病歷號') };
+    });
+    const ans = await ask('找到 ' + list.length + ' 位，請選一位',
+      [{ label: '要帶入哪一位？', type: 'select', value: '0', options: opts,
+         hint: '以 <b>' + esc(kw) + '</b> 查到多筆。選錯會掛到別人身上，請核對電話或病歷號。'
+               + (list.length > 20 ? '<br>只顯示前 20 位，請改用電話或病歷號縮小範圍。' : '') }],
+      '帶入');
+    if (ans === null) { msg.textContent = ''; return; }
+    hit = list[+ans[0]] || list[0];
+  }
+  const nm = hit['姓名'] || hit.name || '';
+  const ph = hit['電話'] || hit.phone || '';
+  const cs = hit['病例號'] || '';
+  if (elN) elN.value = nm;
+  if (elP) elP.value = ph;
+  if (elC) elC.value = cs;
+  scope.dataset.caseVerified = cs || '';
+  msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已帶入：' + esc(nm || '(後台無姓名)') + '</span>'
+    + (ph ? '' : '<span style="color:var(--red);font-weight:700">｜此人從未登錄手機 → 電話必填</span>')
+    + (cs ? '' : '<span style="color:#b45309">｜後台沒有病歷號</span>');
 }
 async function counterFind() {
   const kw = $('#cf-kw').value.trim(); if (!kw) return;
@@ -5590,50 +5638,18 @@ document.addEventListener('click', async e => {
     case 'bkb-blood': {
       $('#cd-book').dataset.blood = JSON.stringify(el.dataset.v === 'date' ? { mode:'date', ds: el.dataset.ds } : { mode: el.dataset.v });
       bkbRefresh(); break; }
-    case 'bkb-case-fill': {
-      const box = $('#cd-book');
-      const caseNo = box.querySelector('#bkb-case').value.trim();
-      const msg = box.querySelector('.bkb-msg');
-      if (!caseNo) { msg.textContent = '請先輸入病歷號'; break; }
-      msg.textContent = '查詢中…';
-      const res = await api.post('lookupPatient', { keyword: caseNo, clinic: S.cClinic }, true);
-      const hit = (res.ok && res.data && res.data[0]) || null;
-      if (hit) {
-        box.querySelector('#bkb-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
-        box.querySelector('#bkb-phone').value = hit.phone || hit['電話'] || '';
-        box.dataset.caseVerified = caseNo;
-        msg.innerHTML = box.querySelector('#bkb-phone').value.trim()
-          ? '<span style="color:var(--green);font-weight:700">✓ 已帶入</span>'
-          : '<span style="color:var(--red);font-weight:700">✓ 已帶入，但此病歷號從未登錄手機 → 電話必填（否則收不到簡訊）</span>';
-      } else {
-        box.dataset.caseVerified = '';
-        msg.innerHTML = '<span style="color:var(--red)">✗ 查無此病歷號</span><span style="color:#b45309">｜仍可先卡位，建議補電話</span>';
-      }
-      break; }
+    case 'bkb-case-fill':   /* ✨ v31.70 改成病歷號／電話／姓名 任一都能帶入 */
+      await patientFillAny($('#cd-book'), { caseSel:'#bkb-case', phoneSel:'#bkb-phone', nameSel:'#bkb-name', msgSel:'.bkb-msg' });
+      break;
     case 'bkb-save': bkbSave(el); break;
     case 'cw-add': openQuickBook(el.dataset.ds, null, null); break;
     case 'qk-type': {
       m.dataset.type = el.dataset.v;
       m.querySelectorAll('.qk-vt').forEach(b => b.classList.toggle('on', b === el));
       refreshQkTimes(m); break; }
-    case 'qk-case-fill': {
-      const caseNo = m.querySelector('#qk-case').value.trim();
-      const msg = m.querySelector('#qk-case-msg');
-      if (!caseNo) { msg.textContent = '請先輸入病歷號'; break; }
-      msg.textContent = '查詢中…';
-      const res = await api.post('lookupPatient', { keyword: caseNo, clinic: S.cClinic }, true);
-      const hit = (res.ok && res.data && res.data[0]) || null;
-      if (hit) {
-        m.querySelector('#qk-name').value = hit.name || hit['病人姓名'] || hit['姓名'] || '';
-        m.querySelector('#qk-phone').value = hit.phone || hit['電話'] || '';
-        m.dataset.caseVerified = caseNo;
-        msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已帶入：' + esc(m.querySelector('#qk-name').value || '(後台無姓名)') + '</span>'
-          + (m.querySelector('#qk-phone').value.trim() ? '' : '<span style="color:var(--red);font-weight:700">｜此病歷號從未登錄手機 → 電話必填</span>');
-      } else {
-        m.dataset.caseVerified = '';
-        msg.innerHTML = '<span style="color:var(--red)">✗ 後台查無此病歷號</span><span style="color:#b45309">｜仍可先卡位，建議補電話</span>';
-      }
-      break; }
+    case 'qk-case-fill':   /* ✨ v31.70 同上 */
+      await patientFillAny(m, { caseSel:'#qk-case', phoneSel:'#qk-phone', nameSel:'#qk-name', msgSel:'#qk-case-msg' });
+      break;
     case 'qk-blood': {
       const v = el.dataset.v;
       m.dataset.blood = JSON.stringify(v === 'date' ? { mode:'date', ds: el.dataset.ds } : { mode: v });
