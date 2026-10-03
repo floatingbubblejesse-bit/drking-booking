@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.71-perm';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.72-permfix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -4611,7 +4611,7 @@ function apRender() {
     + AP_SCOPES.map(x => `<option${x === v ? ' selected' : ''}>${esc(x)}</option>`).join('') + '</select>';
   const cliCell = (v, i) => {
     const on = apSplitCli(v);
-    return `<details class="ap-cli"><summary style="cursor:pointer;font-size:14px">${on.length ? esc(on.join('、')) : '<span class="muted">（照員工表）</span>'}</summary>`
+    return `<details class="ap-cli"><summary style="cursor:pointer;font-size:14px;white-space:nowrap">${on.length ? esc(on.join('、')) : '<span class="muted">（照員工表）</span>'}</summary>`
       + `<div style="padding:6px 0;display:flex;gap:6px"><button class="btn btn-o btn-sm" data-act="ap-all" data-i="${i}">全選</button>`
       + `<button class="btn btn-o btn-sm" data-act="ap-none" data-i="${i}">全不選</button></div>`
       + CLINICS.map(c => `<label style="display:block;font-size:14px;white-space:nowrap"><input type="checkbox" class="ap-c" data-i="${i}" value="${esc(c.name)}"${on.indexOf(c.name) >= 0 ? ' checked' : ''}> ${esc(c.name)}</label>`).join('')
@@ -4623,13 +4623,13 @@ function apRender() {
     + '・<b>院區</b>填了就蓋過員工表的所屬院區；空白就照員工表。<br>'
     + '・<b>關鍵字</b>是拿來比對員工表的「職位」文字，用逗號分隔，包含就算命中。<br>'
     + '・編輯權「<b>不可</b>」是唯讀，<b>後端會硬擋</b>，不是只把按鈕藏起來。</div>'
-    + '<div style="overflow:auto"><table class="tbl"><thead><tr>'
+    + '<div style="overflow:auto"><table class="tbl" style="min-width:1150px"><thead><tr>'
     + '<th>類型</th><th>鍵值</th><th>關鍵字</th><th>院區</th><th>檢視權</th><th>編輯權</th><th>排序</th><th>啟用</th><th>說明</th><th></th></tr></thead><tbody>'
     + AP_ROWS.map((r, i) => `<tr>`
       + `<td><select class="ap-type" data-i="${i}" style="font-size:14px"><option${r.type === '職位' ? ' selected' : ''}>職位</option><option${r.type === '個人' ? ' selected' : ''}>個人</option></select></td>`
       + `<td><input class="ap-key" data-i="${i}" value="${esc(r.key || '')}" style="width:110px"></td>`
-      + `<td><input class="ap-kw" data-i="${i}" value="${esc(r.keywords || '')}" style="width:220px" placeholder="職位關鍵字，逗號分隔"></td>`
-      + `<td>${cliCell(r.clinics, i)}</td>`
+      + `<td><input class="ap-kw" data-i="${i}" value="${esc(r.keywords || '')}" style="width:300px" placeholder="職位關鍵字，逗號分隔"></td>`
+      + `<td style="min-width:170px">${cliCell(r.clinics, i)}</td>`
       + `<td>${scopeSel('ap-view', r.view, i)}</td>`
       + `<td>${scopeSel('ap-edit', r.edit, i)}</td>`
       + `<td><input class="ap-order" data-i="${i}" type="number" value="${esc(String(r.order == null ? 999 : r.order))}" style="width:70px"></td>`
@@ -4637,10 +4637,10 @@ function apRender() {
       + `<td><input class="ap-note" data-i="${i}" value="${esc(r.note || '')}" style="width:200px"></td>`
       + `<td><button class="btn btn-r btn-sm" data-act="ap-del" data-i="${i}">刪</button></td></tr>`).join('')
     + '</tbody></table></div>'
-    + '<div style="margin-top:12px;display:flex;gap:8px">'
+    + '<div id="ap-msg" style="margin-top:12px;font-size:15px;font-weight:700;min-height:22px"></div>'
+    + '<div style="display:flex;gap:8px">'
     + '<button class="btn btn-o" data-act="ap-add">＋ 新增一列</button>'
-    + '<button class="btn btn-g" data-act="ap-save">💾 儲存全部</button>'
-    + '<span id="ap-msg" class="muted" style="align-self:center"></span></div>';
+    + '<button class="btn btn-g" data-act="ap-save">💾 儲存全部</button></div>';
 }
 function apCollect() {
   const box = $('#ap-box');
@@ -4654,17 +4654,32 @@ function apCollect() {
              enabled: g('ap-on', i).checked, note: g('ap-note', i).value.trim() };
   });
 }
+/* ✨ v31.72 這支本來沒包 try/catch，apSave 是 async，
+   裡面一拋例外就變成未捕捉的 promise rejection——
+   畫面上完全沒反應，什麼訊息都沒有（2026-10-04 chi 回報）。 */
 async function apSave(btn) {
-  const rows = apCollect();
   const msg = $('#ap-msg');
-  if (!rows.some(r => r.enabled && r.edit === '全院區')) {
-    if (!confirm('沒有任何一列是「編輯權＝全院區」。確定要儲存嗎？可能會讓所有人都改不了資料。')) return;
+  try {
+    const rows = apCollect();
+    if (!rows.length) { msg.innerHTML = '<span style="color:var(--red)">沒有任何一列可以儲存</span>'; return; }
+    if (!rows.some(r => r.enabled && r.edit === '全院區')
+        && !confirm('沒有任何一列是「編輯權＝全院區」。確定要儲存嗎？可能會讓所有人都改不了資料。')) return;
+    btn.disabled = true;
+    msg.innerHTML = '<span class="muted">儲存中…（' + rows.length + ' 列）</span>';
+    const res = await api.post('savePermissions', { rows: rows }, true);
+    btn.disabled = false;
+    if (res && res.ok) {
+      msg.innerHTML = '<span style="color:var(--green)">✓ 已儲存 ' + res.saved + ' 列。已登入的人要<b>重新登入</b>才生效。</span>';
+      loadAPerm();
+    } else {
+      msg.innerHTML = '<span style="color:var(--red)">儲存失敗：' + esc((res && (res.message || res.error)) || '後端沒有回應') + '</span>'
+        + '<div class="muted" style="font-size:13px;font-weight:400;margin-top:4px">原始回應：' + esc(JSON.stringify(res)).slice(0, 300) + '</div>';
+    }
+  } catch (e) {
+    btn.disabled = false;
+    msg.innerHTML = '<span style="color:var(--red)">發生錯誤：' + esc(String((e && e.message) || e)) + '</span>'
+      + '<div class="muted" style="font-size:13px;font-weight:400;margin-top:4px">請把這行截圖給我</div>';
   }
-  btn.disabled = true; msg.textContent = '儲存中…';
-  const res = await api.post('savePermissions', { rows: rows }, true);
-  btn.disabled = false;
-  if (res && res.ok) { msg.innerHTML = '<span style="color:var(--green);font-weight:700">✓ 已儲存 ' + res.saved + ' 列（已登入的人要重新登入才生效）</span>'; loadAPerm(); }
-  else { msg.innerHTML = '<span style="color:var(--red)">儲存失敗：' + esc((res && (res.message || res.error)) || '') + '</span>'; }
 }
 function renderAdmin() {
   document.querySelectorAll('#a-main .mi').forEach(el => el.classList.toggle('on', el.dataset.v === S.aView));
