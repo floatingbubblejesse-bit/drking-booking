@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.72-permfix';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.73-reqphone';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2782,6 +2782,22 @@ async function loadCDayGrid() {
 }
 /* ── 快速掛號（看診表直接點格）── */
 const phoneOK = p => /^09\d{8}$/.test(String(p||'').replace(/\D/g,''));
+/* ✨ v31.73 櫃檯掛號一律要「姓名＋電話」。
+   v31.19 曾放寬成「電話或病歷號擇一」，用意是臨櫃忙的時候先卡位、
+   之後再從「每日必查 → 待補登」補齊。實際跑下來沒人回頭補：
+   2026-10-05 查到 4 筆電話空白的 walk_in（Lulu 10/20、楊蕙瑜 10/27、
+   温孟潔 11/07、温于萱 11/07），預約成功簡訊與前一日提醒兩封都發不出去，
+   病人等於沒收到任何通知，而且補發也救不回來（根本沒號碼可發）。
+   所以改成硬性必填。老客只要打病歷號按「🔍 帶入」，姓名電話會自動補上
+   （v31.70 patientFillAny），櫃檯不會因此變慢。 */
+function requireNamePhone(name, phone) {
+  const n = String(name || '').trim();
+  if (!n || n.indexOf('未填') >= 0) return '請填病人姓名';
+  const p = String(phone || '').trim();
+  if (!p) return '請填電話（沒有電話就發不出預約成功簡訊與前一日提醒）';
+  if (!phoneOK(p)) return '電話格式不對，要 09 開頭共 10 碼';
+  return '';
+}
 function caseNoOf(a) { return String(a.caseNo || a['病例號'] || '').trim(); }
 function isIncomplete(a) {
   const name = String(a.name || a['病人姓名'] || '').trim();
@@ -2905,8 +2921,8 @@ function renderBkb(selDoc, selT) {
     <div class="bkb-r2">
       <input id="bkb-case" class="w1" placeholder="病歷號" title="病歷號、電話、姓名填任一個，按「🔍 帶入」就會補齊其他兩個" value="${esc(keep('#bkb-case'))}">
       <button class="btn btn-o btn-sm" data-act="bkb-case-fill">🔍 帶入</button>
-      <input id="bkb-phone" class="w2" type="tel" placeholder="電話（或病歷號擇一）" value="${esc(keep('#bkb-phone'))}">
-      <input id="bkb-name" class="w3" placeholder="姓名(可空)" value="${esc(keep('#bkb-name'))}">
+      <input id="bkb-phone" class="w2" type="tel" placeholder="電話＊必填" value="${esc(keep('#bkb-phone'))}">
+      <input id="bkb-name" class="w3" placeholder="姓名＊必填" value="${esc(keep('#bkb-name'))}">
       ${type === '複診' ? `<select id="bkb-course" title="選擇療程 → 建立時自動連續 N 週同時段預約">
         <option value="">無療程</option>
         <option value="猛健樂8週療程|8" ${keep('#bkb-course')==='猛健樂8週療程|8'?'selected':''}>猛健樂 8 週療程</option>
@@ -3041,9 +3057,10 @@ async function bkbSave(btn) {
   const name = bkb.querySelector('#bkb-name').value.trim();
   const caseVerified = box.dataset.caseVerified === caseNo && caseNo;
   const msg = bkb.querySelector('.bkb-msg');
-  /* ✨ v31.19 有電話或有病歷號就能卡位（含查無病歷號的老客）；姓名/電話稍後從待補清單補齊 */
-  if (!phoneOK(phone) && !caseNo) {
-    msg.innerHTML = `<span style="color:#b45309;font-weight:700">請填電話或病歷號（擇一即可先卡位）</span>`;
+  /* ✨ v31.73 姓名＋電話必填（取代 v31.19 的「擇一即可」） */
+  const _needBkb = requireNamePhone(name, phone);
+  if (_needBkb) {
+    msg.innerHTML = `<span style="color:#b45309;font-weight:700">⚠️ ${_needBkb}</span>`;
     return;
   }
   btn.disabled = true; btn.textContent = '建立中…';
@@ -3200,8 +3217,8 @@ async function openQuickBook(date, doctor, time) {
           <div style="display:flex;gap:6px"><input id="qk-case" placeholder="例：B1234" style="flex:1">
           <button class="btn btn-o btn-sm" data-act="qk-case-fill">🔍 帶入</button></div>
           <div id="qk-case-msg" class="muted" style="font-size:13px;min-height:18px"></div></div>
-        <div class="frow"><label>電話（或病歷號擇一）</label><input id="qk-phone" type="tel" placeholder="09xxxxxxxx"></div>
-        <div class="frow"><label>姓名（可先留空卡位）</label><input id="qk-name"></div>
+        <div class="frow"><label>電話 <span style="color:#dc2626;font-weight:700">＊必填</span></label><input id="qk-phone" type="tel" placeholder="09xxxxxxxx"></div>
+        <div class="frow"><label>姓名 <span style="color:#dc2626;font-weight:700">＊必填</span></label><input id="qk-name"></div>
         <div class="frow"><label>備註</label><input id="qk-note"></div>
       </div>
       <div class="frow" id="qk-blood-row" style="display:none;margin-top:4px"><label>🩸 初診抽血安排</label>
@@ -3303,11 +3320,9 @@ async function qkSave(m, btn) {
   const caseNo = m.querySelector('#qk-case').value.trim();
   const name = m.querySelector('#qk-name').value.trim();
   const caseVerified = m.dataset.caseVerified === caseNo && caseNo;
-  /* ✨ v31.19 有電話或有病歷號就能卡位 */
-  if (!phoneOK(phone) && !caseNo) {
-    toast('請填電話或病歷號（擇一即可先卡位）', 'var(--amber)');
-    return;
-  }
+  /* ✨ v31.73 姓名＋電話必填（取代 v31.19 的「擇一即可」） */
+  const _needQk = requireNamePhone(name, phone);
+  if (_needQk) { toast('⚠️ ' + _needQk, 'var(--amber)'); return; }
   btn.disabled = true; btn.textContent = '建立中…';
   const dur = durFor(type === '初診' ? 'initial' : 'followup', dn, $('#q-clinic') ? $('#q-clinic').value : S.cClinic);
   let qNote = m.querySelector('#qk-note').value.trim();
@@ -3385,6 +3400,9 @@ async function fxSave(m, btn) {
     '病人姓名': $('#fx-name').value.trim(), '電話': $('#fx-phone').value.trim(),
     '病例號': $('#fx-case').value.trim()
   };
+  /* ✨ v31.73 補登也一樣：姓名跟電話沒齊就不算補完 */
+  const _needFx = requireNamePhone(fields['病人姓名'], fields['電話']);
+  if (_needFx) { toast('⚠️ ' + _needFx, 'var(--amber)'); btn.disabled = false; return; }
   if (type === '初診') {
     let selB = null; try { selB = JSON.parse(m.dataset.blood || 'null'); } catch(_){}
     if (!selB) { toast('請選擇抽血安排', 'var(--amber)'); btn.disabled = false; return; }
@@ -3641,6 +3659,9 @@ async function eaSave(m, btn) {
   const fields = { '病人姓名': m.querySelector('#ea-name').value.trim(),
                    '電話': m.querySelector('#ea-phone').value.trim(),
                    '病例號': m.querySelector('#ea-case').value.trim() };
+  /* ✨ v31.73 改資料也不允許把姓名或電話清掉 */
+  const _needEa = requireNamePhone(fields['病人姓名'], fields['電話']);
+  if (_needEa) { toast('⚠️ ' + _needEa, 'var(--amber)'); return; }
   let note = d.note;
   if (want !== d.curType) {
     const dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic);
