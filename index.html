@@ -255,7 +255,7 @@ dialog h2:focus{outline:none}
 <header class="brand-header"><button class="brand-mark brand-home" type="button" data-view="booking" aria-label="返回預約首頁"><img fetchpriority="high" decoding="async" src="image-24ae883abca41cd4.jpg" width="1000" height="311" alt="金鶯診所鳥標"></button><h1 class="brand-title"><strong>金鶯診所</strong><span>減重診預約<small id="pilot-badge" class="pilot-badge" hidden>Beta</small></span></h1><button class="header-lookup" id="header-lookup" type="button" data-view="lookup" aria-label="查詢／取消預約" title="查詢／取消預約" aria-pressed="false"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4M7 2v4m8-4v4M3 9h16"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m19 19 3 3"/></svg></button></header>
 
 <main id="booking-view">
-<section class="panel" id="clinic-section" aria-labelledby="clinic-heading"><div class="section-top"><span class="step-no">1</span><h2 id="clinic-heading">選擇院區</h2><div id="clinic-contact" class="clinic-tools icon-row" hidden></div></div><div id="app-status" class="notice" role="status">正在取得可選時段…</div>
+<section class="panel" id="clinic-section" aria-labelledby="clinic-heading"><div class="section-top"><span class="step-no">1</span><h2 id="clinic-heading">選擇院區</h2><button type="button" id="geo-sort" class="small-btn">📍 依距離排序</button><div id="clinic-contact" class="clinic-tools icon-row" hidden></div></div><div id="app-status" class="notice" role="status">正在取得可選時段…</div>
 <div id="pending-alert" class="notice warning" hidden><strong>有一筆送出結果尚待確認。</strong><p>請勿重新建立另一筆；請以相同送出編號查回結果。</p><button class="small-btn" id="recover-create">重新確認上次送出</button></div>
 <div id="staff-entry-banner" class="notice staff-entry-banner" hidden><span id="staff-entry-source">櫃檯代填</span><button class="small-btn" id="leave-staff-entry" type="button">返回櫃檯</button></div>
 <label class="sr-only" for="clinic-select">看診院區</label><div class="select-wrap"><select id="clinic-select"><option value="">選醫師不選院區</option></select><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 9 6 6 6-6"/></svg></div><div id="pilot-note" class="pilot-note" role="note" hidden></div></section>
@@ -280,6 +280,37 @@ dialog h2:focus{outline:none}
 <script>
 const DOCTOR_IMAGES={"doc_ba79ffc268":"image-6a7a7e9b09ff3950.webp","doc_67da0bf09e":"image-8836e9c997a39871.webp","doc_a9f22fcfa1":"image-1d8cbcb4b9c6fea7.webp","doc_b672d1865e":"image-363cfc8653079980.webp","doc_d08db0069b":"image-444bdc606ff750a8.webp","doc_871d9b74a2":"image-6160395b2906db9c.webp","hsiao_chieh_chien":"image-0c82cc6f0a59cc22.webp","doc_c9343cc4c2":"image-c8e164a1314903b7.webp","doc_4b75a2ce3b":"image-a58e5ec716d1ed13.webp","doc_c42fc5812c":"image-b23b00a9b601be3d.webp","doc_df5e3817b1":"image-28e628727e6f1c27.webp","doc_899a7d80e0":"image-a09ad72e490201a0.webp","doc_48d653ae97":"image-aa2d6fdc49c96876.webp","doc_5b981bd680":"image-084ce356e12a9d9f.webp","doc_f63d073785":"image-490fa1f95b28ef7b.webp","doc_dcd52a7f52":"image-247f47d28b6189eb.webp","doc_e9f709556e":"image-93ab574f5d3f24ab.webp","doc_0f4c7cd6af":"image-37023d4e3abdc49e.webp","doc_8112d4e1f2":"image-b0e3231703dcfb06.webp","doc_7464498fab":"image-88082bf2e893b098.webp","doc_04986ada45":"image-beda0ba1f3589146.webp","doc_dd907b086b":"image-33f27dff2c593189.webp","doc_d2c51cf572":"image-c9cd3ed07d835d06.webp","doc_0d7ba793bf":"image-ec69bcbd8c9a3621.webp","doc_5f83bd8574":"image-c51c7ad7811be29f.webp","doc_54591aa78d":"image-9f62be7caa594c90.webp","doc_31a0396b41":"image-eff257747e1b44f4.webp","doc_27437e9a7a":"image-46f4cb1f974c4f3e.webp","hsiao_chieh_tsuen":"image-f68e8a7fdbc7e420.webp","huang_chin_sung":"image-8241c09bc705540f.webp"};
 window.ORIGINAL_DOCTOR_IMAGES=Object.freeze({...DOCTOR_IMAGES});
+/* ✨ 2026-10-07 依距離排序。座標取自 Google 地圖門牌（2026-10-07）。
+   座標只在客人手機上運算，不回傳後端、不留紀錄。
+   沒按按鈕、拒絕授權、或拿不到位置 → 維持原本順序。 */
+const CLINIC_GEO={'鶯歌':[24.953019,121.351332],'三樹':[24.9458728,121.3817918],
+ '樹林':[24.9806516,121.4176074],'桃園':[24.9820138,121.3193165],'土城':[24.9765441,121.4421573],
+ '八德':[24.9304146,121.2911793],'龍潭':[24.8664383,121.2147782],'大溪':[24.8840177,121.2894696],
+ '大竹':[25.0216235,121.2632456],'大湳':[24.9647034,121.2993709],'平鎮':[24.9024476,121.2114049],
+ '埔心':[24.9099334,121.1822147],'觀音':[25.0468336,121.1422956],'龍岡':[24.9328648,121.2557877]};
+const CLINIC_LAST_=['樹林'];   /* 恆定排最後 */
+const PHONE_ONLY_CLINICS=[{name:'虎尾幼安耳鼻喉科',phone:'05-636-5353',lat:23.7101246,lng:120.434893}];
+const GEO={lat:null,lng:null,state:'idle'};
+function geoKey_(n){return String(n||'').replace(/院區$/,'').trim();}
+function geoDist_(aLat,aLng,bLat,bLng){var R=6371,t=Math.PI/180,x=(bLat-aLat)*t,y=(bLng-aLng)*t;
+ var s=Math.sin(x/2)*Math.sin(x/2)+Math.cos(aLat*t)*Math.cos(bLat*t)*Math.sin(y/2)*Math.sin(y/2);
+ return 2*R*Math.asin(Math.min(1,Math.sqrt(s)));}
+function geoText_(km){if(km==null||!isFinite(km))return '';
+ return km<1?('約 '+Math.round(km*1000)+' 公尺'):('約 '+km.toFixed(1)+' 公里');}
+function geoOf_(name){var g=CLINIC_GEO[geoKey_(name)];
+ if(!g||GEO.state!=='ok'||GEO.lat==null)return null;return geoDist_(GEO.lat,GEO.lng,g[0],g[1]);}
+function geoSortStart(){var btn=document.getElementById('geo-sort');
+ if(!navigator.geolocation){GEO.state='unsupported';if(btn)btn.textContent='此裝置不支援定位';return;}
+ GEO.state='asking';if(btn){btn.disabled=true;btn.textContent='定位中…';}
+ navigator.geolocation.getCurrentPosition(function(p){
+  GEO.lat=p.coords.latitude;GEO.lng=p.coords.longitude;GEO.state='ok';
+  if(btn){btn.disabled=false;btn.textContent='📍 已依距離排序';}
+  try{document.getElementById('clinic-select').innerHTML=clinicOptionsHtml();render();}catch(_){}
+ },function(){GEO.state='denied';
+  if(btn){btn.disabled=false;btn.textContent='📍 依距離排序（未取得位置）';}
+ },{enableHighAccuracy:false,timeout:8000,maximumAge:300000});}
+document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('#geo-sort'):null;
+ if(b){e.preventDefault();geoSortStart();}});
 const CLINIC_INFOS={"c0":{"name":"鶯歌","address":"新北市鶯歌區國慶街167號","phone":"02-2670-2559"},"c1":{"name":"三樹","address":"新北市樹林區學成路600號","phone":"02-2680-7101"},"c2":{"name":"樹林","address":"新北市樹林區中華路124號","phone":"02-8685-0096"},"c3":{"name":"桃園","address":"桃園市桃園區桃鶯路333號","phone":"03-366-8311"},"c4":{"name":"土城","address":"新北市土城區中央路二段155號","phone":"02-2262-5113"},"c5":{"name":"八德","address":"桃園市八德區興豐路493號","phone":"03-365-5225"},"c6":{"name":"龍潭","address":"桃園市龍潭區北龍路154號","phone":"03-499-0306"},"c7":{"name":"大溪","address":"桃園市大溪區慈湖路13號","phone":"03-388-0868"},"c8":{"name":"大竹","address":"桃園市蘆竹區大竹路436號","phone":"03-323-1266"},"c9":{"name":"大湳","address":"桃園市八德區大智路13號","phone":"03-363-0811"},"c10":{"name":"平鎮","address":"桃園市平鎮區中豐路山頂段150-2號","phone":"03-469-0006"},"c11":{"name":"埔心","address":"桃園市楊梅區瑞溪路二段203號","phone":"03-482-8666"},"c12":{"name":"觀音","address":"桃園市觀音區大觀路二段113號","phone":"03-483-3366"}};
 'use strict';
 const APP_SOURCE = (new URLSearchParams(location.search).get('source')||'').toLowerCase()==='line'?'LINE':'WEB';
@@ -413,7 +444,20 @@ const PILOT_LINE_ADD_FRIEND='https://line.me/R/ti/p/@selectgoodfood';
    pilotLocked() 維持原條件（locked 且只有一個院區）才強制鎖定院區、隱藏「選醫師不選院區」。 */
 function pilotRestricted(){const p=APP.data&&APP.data.pilot;if(!p)return false;if(p.locked)return true;const ids=Array.isArray(p.clinicIds)?p.clinicIds:[],all=typeof CLINIC_INFOS==='object'&&CLINIC_INFOS?Object.keys(CLINIC_INFOS).length:0;return ids.length>0&&all>0&&ids.length<all;}
 function pilotLocked(){const p=APP.data&&APP.data.pilot;return !!(p&&p.locked&&Array.isArray(APP.data.clinics)&&APP.data.clinics.length===1);}
-function clinicOptionsHtml(){const opts=APP.data.clinics.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');return pilotLocked()?opts:'<option value="">選醫師不選院區</option>'+opts;}
+function clinicOptionsHtml(){
+ var list=APP.data.clinics.slice();
+ if(GEO.state==='ok')list.sort(function(a,b){
+  var la=CLINIC_LAST_.indexOf(geoKey_(a.name))>=0?1:0,lb=CLINIC_LAST_.indexOf(geoKey_(b.name))>=0?1:0;
+  if(la!==lb)return la-lb;
+  var da=geoOf_(a.name),db=geoOf_(b.name);
+  if(da==null&&db==null)return 0; if(da==null)return 1; if(db==null)return -1; return da-db;});
+ var opts=list.map(function(c){var d=geoOf_(c.name);
+  return '<option value="'+esc(c.id)+'">'+esc(c.name)+(d!=null?'（'+esc(geoText_(d))+'）':'')+'</option>';}).join('');
+ var extra='';
+ PHONE_ONLY_CLINICS.forEach(function(p){
+  var d=(GEO.state==='ok'&&GEO.lat!=null)?geoDist_(GEO.lat,GEO.lng,p.lat,p.lng):null;
+  extra+='<option value="" disabled>'+esc(p.name)+(d!=null?'（'+esc(geoText_(d))+'）':'')+' ・ 需致電 '+esc(p.phone)+'</option>';});
+ return (pilotLocked()?opts:'<option value="">選醫師不選院區</option>'+opts)+extra;}
 function applyPilotLock(){if(!pilotLocked())return false;const id=APP.data.clinics[0].id;if(STATE.entry==='clinic'&&STATE.clinic===id)return false;STATE.entry='clinic';STATE.clinic=id;STATE.doctor='any';STATE.doctorQuery='';STATE.date='';STATE.time='';STATE.slotId='';STATE.slotFrom=APP.data.today;return true;}
 function renderPilotNote(){const el=$('pilot-note'),badge=$('pilot-badge');if(!el)return;const on=pilotRestricted(),lock=pilotLocked(),staff=!!(APP.data&&APP.data.staff),expired=!!(APP.data&&APP.data.staffExpired);el.hidden=!(on||staff);el.classList.toggle('staff',staff);if(badge){badge.hidden=!(on||staff);badge.textContent=staff?'測試':'Beta';}const wrap=$('clinic-select').parentNode;if(wrap&&wrap.classList)wrap.classList.toggle('locked',lock);
  if(staff){el.innerHTML='<strong>全院區測試模式</strong><span>後台已登入，可以測試所有院區。病人從 LINE 進來看到的是試點版。</span>';return;}
