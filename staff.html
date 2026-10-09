@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.74-orphclick';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.75-obconfirm';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2375,7 +2375,7 @@ function htmlCDay() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       ${modeToggle()}
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="sv-open">📋 門診表</button>
@@ -2401,7 +2401,7 @@ function htmlCWeek() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-7">← 上週</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">本週</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="7">下週 →</button>
-      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${fmtD(ws).replace(/-/g,'/')} — ${fmtD(we).replace(/-/g,'/')}<span class="pe">✏️</span></button>
+      <button class="dpill" data-act="cd-pill">📅 ${fmtD(ws).replace(/-/g,'/')} — ${fmtD(we).replace(/-/g,'/')}<span class="pe">✏️</span></button>
       ${modeToggle()}
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="sv-open">📋 門診表</button>
@@ -2460,7 +2460,8 @@ async function loadCWeek() {
 }
 /* ── 迷你月曆（日期 pill 點開）── */
 function openMiniCal() {
-  const m = modal(`<div class="mh">📅 選擇日期 <button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>
+  /* ✨ v31.75 工具列只留日期 pill；鍵盤直接輸入日期的功能搬進這裡（同一個 #cd-date，沿用原本的 change 處理）。 */
+  const m = modal(`<div class="mh">📅 選擇日期 <input type="date" id="cd-date" value="${S.cDate}" title="直接輸入日期，可跨月" style="margin-left:10px;padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;color:var(--txt2)"> <button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>
     <div class="mb" id="mc-body"></div>`);
   const d = new Date(S.cDate + 'T00:00');
   m.dataset.y = d.getFullYear(); m.dataset.m = d.getMonth() + 1;
@@ -2557,9 +2558,16 @@ function orphBoxHtml_(list, docsArr, idx) {
                : !docsArr.includes(dn) ? '醫師當日無班表' : '時段外';
     const key = dn + '|' + (a.__key || apptTime(a) || '');
     const i = ((idx || {})[key] || []).indexOf(a);
-    const btn = i >= 0
+    /* ✨ v31.75 「✓ 確認正常」：只給「時段外／醫師當日無班表」而且還沒確認過的列。
+       按下去走後端 confirmOverbook（v134）：寫超約確認、備註蓋 ⚠️超約、簡訊解鎖。 */
+    const _aid = a.id || a['預約編號'] || '';
+    const _already = !!String(a['超約確認'] || '').trim() || /⚠️超約/.test(String(a.note || a['備註'] || ''));
+    const _canOb = !done && dn && dn !== '系統指派' && !_already && _aid;
+    const btn = (i >= 0
       ? `<button class="btn btn-o btn-sm" data-act="appt-detail" data-k="${esc(key)}" data-i="${i}">開啟</button>`
-      : '';
+      : '') + (_canOb
+      ? ` <button class="btn btn-a btn-sm" data-act="ob-confirm" data-id="${esc(_aid)}" data-nm="${esc(a.name || a['病人姓名'] || '')}" data-ph="${esc(a.phone || a['電話'] || '')}" data-nt="${esc(String(a.notify || a['通知方式'] || 'sms'))}" title="確認這個人約在非減重診時段是正常的">✓ 確認正常</button>`
+      : (_already && !done ? ' <span class="muted" style="font-size:12px">已確認</span>' : ''));
     return `<tr><td>${esc(a.name || a['病人姓名'] || '(未填)')}</td><td>${esc(a.phone || a['電話'] || '')}</td>
       <td>${esc(apptTime(a))}</td><td>${esc(a.type || a['類型'] || '')}</td><td>${esc(dn || '—')}</td>
       <td style="color:${done ? 'var(--muted)' : 'var(--red)'}">${esc(prob)}</td><td>${btn}</td></tr>`;
@@ -3878,7 +3886,7 @@ function htmlCCall() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cc-tomorrow">明日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-sm ${S.ccInitOnly?'btn-p':'btn-o'}" data-act="cc-initonly">只看初診</button>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
@@ -4030,7 +4038,7 @@ function htmlCBlood() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
     </div>
@@ -4143,7 +4151,7 @@ async function loadCMeds() {
           : '<span style="color:#1d4ed8;font-weight:700">已開單</span>'}</td>
         <td>${String(r['狀態'])==='待處理'
           ? `<button class="btn btn-a btn-sm" data-act="cm-order" data-i="${i}" title="藥單已送出給藥局">✓ 已預約拿藥</button>`
-          : `<button class="btn btn-p btn-sm" data-act="cm-pick" data-i="${i}" title="病人已到院領藥">✓ 已領藥</button>`}</td></tr>`;
+          : '<span class="muted">已結案</span>'}</td></tr>`;   /* ✨ v31.75 拿藥單段：不再有「已領藥」 */
     }).join('')}</tbody></table>`;
 }
 async function fillMedBanner() {
@@ -4157,7 +4165,7 @@ async function fillMedBanner() {
   const toPick = mine.length - toOrder;
   const n = mine.filter(r => String(r['建立時間']||'').slice(0,10) === today).length;
   el.innerHTML = `<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:10px;padding:9px 14px;margin:8px 0;display:flex;align-items:center;gap:10px;font-size:14px;flex-wrap:wrap">
-    💊 <b>${esc(S.cClinic)}</b> 拿藥需求：${toOrder?`<b style="color:#b45309;font-size:16px">${toOrder}</b> 筆待開單`:''}${toOrder&&toPick?'、':''}${toPick?`<b style="color:#1d4ed8;font-size:16px">${toPick}</b> 筆已開單待領藥`:''}${n?`（今日新增 ${n} 筆）`:''}
+    💊 <b>${esc(S.cClinic)}</b> 拿藥需求：${toOrder?`<b style="color:#b45309;font-size:16px">${toOrder}</b> 筆待開單`:''}${n?`（今日新增 ${n} 筆）`:''}
     <span style="flex:1"></span><button class="btn btn-p btn-sm" data-act="cm-goto">查看名單</button></div>`;
 }
 /* ── 🖨 當日看診名單（列印） ── */
@@ -4399,7 +4407,7 @@ function htmlCNotify() {
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="-1">←</button>
       <button class="btn btn-p btn-sm" data-act="cd-today">今日</button>
       <button class="btn btn-o btn-sm" data-act="cd-nav" data-d="1">→</button>
-      <input type="date" id="cd-date" value="${S.cDate}" title="直接選或輸入日期，可跨月" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;color:var(--txt2)"><button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
+      <button class="dpill" data-act="cd-pill">📅 ${S.cDate.replace(/-/g,'/')}（週${WDS[d.getDay()]}）<span class="pe">✏️</span></button>
       <span style="flex:1"></span>
       <button class="btn btn-o btn-sm" data-act="cd-refresh">🔄</button>
       <button class="btn btn-p btn-sm" data-act="audit-unsent" title="掃描所有未來預約，列出「預約成功簡訊沒真正送出」的名單並一鍵補發">🩹 勾稽補發</button>
@@ -5617,9 +5625,9 @@ document.addEventListener('click', async e => {
     case 'cm-scope': S.cmAll = el.dataset.v === '1'; renderCounter(); break;
     case 'cm-reload': S._medCache = null; loadCMeds(); break;
     case 'cm-goto': S.cView = 'meds'; renderCounter(); break;
-    case 'cm-order': case 'cm-pick': {
+    case 'cm-order': {   /* ✨ v31.75 拿藥單段：開單即結案（cm-pick 已移除） */
       const r = (window.__cmIndex || [])[+el.dataset.i]; if (!r) break;
-      const to = act === 'cm-order' ? '已開單' : '已領藥';
+      const to = '已開單';
       el.disabled = true; el.textContent = '處理中…';
       const res = await api.post('updateMedRequestStatus', { '通知編號': r['通知編號'], to, operator: (S.cUser && S.cUser.name) || 'counter' }, true);
       if (res.ok) { toast(to === '已開單' ? '✓ 已開單給藥局' : '✓ 領藥完成，已結案'); S._medCache = null; loadCMeds(); }
@@ -5849,6 +5857,20 @@ document.addEventListener('click', async e => {
       if (a) openApptDetailFromObj(a, el.dataset.k.split('|')[0]);
       break; }
     case 'appt-detail': openApptDetail(el.dataset.k, +el.dataset.i || 0); break;
+    case 'ob-confirm': {   /* ✨ v31.75 超約確認（配合後端 v134） */
+      const _id = el.dataset.id, _nm = el.dataset.nm || '', _ph = el.dataset.ph || '', _sms = (el.dataset.nt || 'sms') === 'sms';
+      const _ans = await ask('✓ 確認正常｜' + _nm + ' ' + _ph, [{ label: _sms
+          ? '按下去系統會「立刻」發預約成功簡訊給這位客人。先確認姓名、電話都對。'
+          : '這筆是不發簡訊的（匯入／紙本補登），確認後只會解除排班檢查，不會發簡訊。',
+        type: 'select', value: 'no',
+        options: [{ v:'no', t:'先不要' }, { v:'yes', t: _sms ? '確認正常，立刻發簡訊' : '確認正常' }] }], '送出');
+      if (_ans === null || _ans[0] !== 'yes') break;
+      el.disabled = true; el.textContent = '處理中…';
+      const _r = await api.post('confirmOverbook', { apptId: _id, employeeName: (S.cUser && S.cUser.name) || 'counter' }, true);
+      if (_r.ok) { toast(_sms && _r.send && _r.send.queued ? '✓ 已確認，簡訊已排入發送' : '✓ 已確認'); S.apptCache.delete(S.cClinic + '|' + S.cDate); renderCounter(); }
+      else { el.disabled = false; el.textContent = '✓ 確認正常'; toast('失敗：' + (_r.message || _r.error || ''), 'var(--red)'); }
+      break;
+    }
     case 'cd-slot': bkbSet(el.dataset.doc, el.dataset.t); break;
     case 'sv-open': openSchedViewer(); break;
     case 'sv-mode': {
@@ -6057,7 +6079,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'cr-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.crDate = e.target.value; loadCReport(); return; }
   if (e.target.id === 'cd-clinic') { S.cClinic = e.target.value; renderCounter(); }
   /* ✨ v31.24 日期直接輸入：跨月不用翻日曆 */
-  if (e.target.id === 'cd-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.cDate = e.target.value; S.apptCache.clear(); renderCounter(); }
+  if (e.target.id === 'cd-date' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { S.cDate = e.target.value; S.apptCache.clear(); closeModals(); renderCounter(); }   /* ✨ v31.75 在迷你月曆裡，選完就關 */
   if (e.target.id === 'ad-clinic') { S.adClinic = e.target.value; S.adDoctor = ''; loadADash(); }
   if (e.target.id === 'ad-doctor') { S.adDoctor = e.target.value; loadADash(); }
   if (e.target.classList && e.target.classList.contains('ord-title')) {
