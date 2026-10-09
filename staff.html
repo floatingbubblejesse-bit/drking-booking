@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.73-reqphone';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.74-orphclick';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2539,6 +2539,62 @@ function docOnLeave(dn, date) {
   if (date < c.from || date > c.to) return false;
   return !c.map[normDoc(dn) + '|' + date];
 }
+/* ✨ v31.74 待補登黃框原本是純表格、沒有任何按鈕 —— 櫃檯看得到卻按不到，
+   不能報到也不能調整（2026-09-24 林玉珍 09:50 就是這樣）。
+   改為每一列都可以點開預約詳情，沿用看診表卡片那一條路（appt-detail），
+   不新增任何後端呼叫。 */
+function orphSettled_(a) {
+  return /已報到|checked_in|已完成|未到診|no_show|已取消|cancelled|已改約|rescheduled/i
+    .test(String(a.status || a['狀態'] || '').trim());
+}
+function orphBoxHtml_(list, docsArr, idx) {
+  if (!list.length) return '';
+  const rows = list.map(a => {
+    const dn = normDoc(a.doctor || a['醫師'] || '');
+    const done = orphSettled_(a);
+    const prob = done ? ('已處理：' + String(a.status || a['狀態'] || ''))
+               : (!dn || dn === '系統指派') ? '未指派醫師'
+               : !docsArr.includes(dn) ? '醫師當日無班表' : '時段外';
+    const key = dn + '|' + (a.__key || apptTime(a) || '');
+    const i = ((idx || {})[key] || []).indexOf(a);
+    const btn = i >= 0
+      ? `<button class="btn btn-o btn-sm" data-act="appt-detail" data-k="${esc(key)}" data-i="${i}">開啟</button>`
+      : '';
+    return `<tr><td>${esc(a.name || a['病人姓名'] || '(未填)')}</td><td>${esc(a.phone || a['電話'] || '')}</td>
+      <td>${esc(apptTime(a))}</td><td>${esc(a.type || a['類型'] || '')}</td><td>${esc(dn || '—')}</td>
+      <td style="color:${done ? 'var(--muted)' : 'var(--red)'}">${esc(prob)}</td><td>${btn}</td></tr>`;
+  }).join('');
+  return `<div class="orph">
+    <b style="color:#92400e">⚠️ 待補登／待指派預約（${list.length} 筆）</b>
+    <table class="tbl" style="margin-top:8px"><thead><tr><th>病人</th><th>電話</th><th>時段</th><th>類型</th><th>醫師</th><th>問題</th><th></th></tr></thead><tbody>`
+    + rows + `</tbody></table></div>`;
+}
+/* ✨ v31.74 該院區當天完全沒有減重診次時，原本 loadCDayGrid 直接 return
+   並把 #cd-orph 清空 —— 那天的預約（紙本／搜博匯入、
+   醫師請假當天仍留著的單）整批從畫面上消失，
+   櫃檯連「有這個人」都不知道
+   （2026-10-10 龍潭 黃雲祥 10/26 何冠達請假就是這個情況）。
+   改為：沒有診次就不畫格子，但仍把當天預約列在黃框裡，並建好索引讓它能點開。
+   這裡刻意不過濾已報到／未到診 —— 沒有格子可以回頭查，全部留著給櫃檯看。 */
+async function renderOrphanOnly_(clinic, date) {
+  const el = $('#cd-orph');
+  if (!el) return;
+  let list = [];
+  try {
+    S.apptCache.delete(clinic + '|' + date);
+    list = ((await getAppts(clinic, date)) || []).filter(a => !isDead(a));
+  } catch (e) { return; }
+  if (S.cClinic !== clinic || S.cDate !== date) return;
+  const idx = {};
+  list.forEach(a => {
+    const dn = normDoc(a.doctor || a['醫師'] || '');
+    const t = apptTime(a) || '';
+    a.__key = t;
+    (idx[dn + '|' + t] = idx[dn + '|' + t] || []).push(a);
+  });
+  window.__cdApptIndex = idx;
+  el.innerHTML = orphBoxHtml_(list, [], idx);
+}
 async function loadCDayGrid() {
   const clinic = S.cClinic, date = S.cDate;
   const wd = isoWd(date);
@@ -2557,7 +2613,11 @@ async function loadCDayGrid() {
   const dayScheds = _ds.list;
   const _myd = myDoctor();
   const docs = [...new Set(dayScheds.map(s => s.doctor))].filter(d => !_myd || d === _myd);   /* ✨ v31.71 */
-  if (!docs.length) { box.innerHTML = `<p class="muted">😴 ${clinic} ${_myd ? _myd + ' 醫師這一天沒有診' : (_ds.src === '診次' ? '這一天沒有減重診次' : '本日無排班')}</p>`; $('#cd-orph').innerHTML=''; return; }
+  if (!docs.length) {
+    box.innerHTML = `<p class="muted">😴 ${clinic} ${_myd ? _myd + ' 醫師這一天沒有診' : (_ds.src === '診次' ? '這一天沒有減重診次' : '本日無排班')}</p>`;
+    await renderOrphanOnly_(clinic, date);   /* ✨ v31.74 不再清空黃框 */
+    return;
+  }
   S.apptCache.delete(clinic + '|' + date);
   const [appts0] = await Promise.all([ getAppts(clinic, date) ]);
   const appts = (appts0 || []).filter(a => !isDead(a));
@@ -2747,16 +2807,7 @@ async function loadCDayGrid() {
     const tM = t2m(apptTime(a));
     return !(docRanges[dn]||[]).some(([s,e]) => tM >= s && tM < e);
   });
-  $('#cd-orph').innerHTML = !orph.length ? '' : `<div class="orph">
-    <b style="color:#92400e">⚠️ 待補登／待指派預約（${orph.length} 筆）</b>
-    <table class="tbl" style="margin-top:8px"><thead><tr><th>病人</th><th>電話</th><th>時段</th><th>類型</th><th>醫師</th><th>問題</th></tr></thead><tbody>`
-    + orph.map(a => {
-      const dn = normDoc(a.doctor||a['醫師']||'');
-      const prob = (!dn || dn==='系統指派') ? '未指派醫師' : !docs.includes(dn) ? '醫師當日無班表' : '時段外';
-      return `<tr><td>${esc(a.name||a['病人姓名']||'(未填)')}</td><td>${esc(a.phone||a['電話']||'')}</td>
-        <td>${esc(apptTime(a))}</td><td>${esc(a.type||a['類型']||'')}</td><td>${esc(dn||'—')}</td>
-        <td style="color:var(--red)">${prob}</td></tr>`;
-    }).join('') + `</tbody></table></div>`;
+  $('#cd-orph').innerHTML = orphBoxHtml_(orph, docs, byDocT);   /* ✨ v31.74 改用可點的共用 renderer */
   // ✨ v25.1 banner 統一在待補登區塊之後插入（避免被 innerHTML 蓋掉）
   const orphEl = $('#cd-orph');
   if (orphEl) orphEl.insertAdjacentHTML('afterbegin', incompleteBanner(incItems));
