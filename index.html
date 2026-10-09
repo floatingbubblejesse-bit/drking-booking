@@ -353,7 +353,11 @@ function dayClosedKey(clinicName,date,doctorName){return String(clinicName||'')+
    背景只再確認那一天；不再做逐日預讀。沒有或過期時照舊逐日向後端確認。 */
 const BUSY_TTL=120000,BUSY_INDEX={ref:null,map:null};
 const BOOT_UPDATE={done:!window.PUBLIC_BOOTSTRAP_UPDATE};
-if(window.PUBLIC_BOOTSTRAP_UPDATE)Promise.resolve(window.PUBLIC_BOOTSTRAP_UPDATE).then(r=>{if(r&&r.ok&&r.data&&Array.isArray(r.data.busy)&&APP.data&&APP.data.backend==='LEGACY'){APP.data.busy=r.data.busy;APP.data.busyAt=r.data.busyAt;}}).catch(()=>{}).finally(()=>{BOOT_UPDATE.done=true;if(APP.ready)render();});
+if(window.PUBLIC_BOOTSTRAP_UPDATE)Promise.resolve(window.PUBLIC_BOOTSTRAP_UPDATE).then(r=>{if(!(r&&r.ok&&r.data&&APP.data&&APP.data.backend==='LEGACY'))return;
+/* ✨ 2026-10-10 背景抓到新目錄時，原本只複製 busy，院區／醫師清單不換 —— 新開放的院區（龍潭）要關掉重開第二次才看得到。
+   publicVersion 不同就整包換掉（保留 slots）並重畫院區下拉；已經選好院區／醫師、或正在送出的人不打擾。 */
+if(r.data.publicVersion&&r.data.publicVersion!==APP.data.publicVersion&&!STATE.clinic&&!STATE.doctor&&!APP.pending&&!APP.createBusy){Object.assign(APP.data,r.data,{slots:APP.data.slots});APP.today=parseDate(r.data.today);try{$('clinic-select').innerHTML=clinicOptionsHtml();applyPilotLock();}catch(_){}}
+else if(Array.isArray(r.data.busy)){APP.data.busy=r.data.busy;APP.data.busyAt=r.data.busyAt;}}).catch(()=>{}).finally(()=>{BOOT_UPDATE.done=true;if(APP.ready)render();});
 function busyFresh(){const d=APP.data;return !!(d&&Array.isArray(d.busy)&&Number.isFinite(d.busyAt)&&Date.now()-d.busyAt<BUSY_TTL);}
 function busyMap(){const b=APP.data.busy;if(BUSY_INDEX.ref!==b){BUSY_INDEX.ref=b;BUSY_INDEX.map=new Map();(b||[]).forEach(x=>{const k=x[1]+'|'+x[0];if(!BUSY_INDEX.map.has(k))BUSY_INDEX.map.set(k,[]);BUSY_INDEX.map.get(k).push(x);});}return BUSY_INDEX.map;}
 function slotBusy(s){if(!s||!busyFresh())return false;const list=busyMap().get(s.doctorId+'|'+s.date);if(!list)return false;const t=legacyMinutes_(s.time),e=t+Number(s.durationMinutes||0);return list.some(x=>t<x[3]&&x[2]<e);/* 與後端 bridgeOpen_ 相同：同醫師同一天、不分院區 */}
