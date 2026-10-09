@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.75-obconfirm';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.76-auditclinic';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -3495,8 +3495,13 @@ function loadAuditInBg() {
     if (r.ok) { window.__auditCache = { at: Date.now(), list: r.data || [] }; paintAuditBanner(); }
   }).catch(() => {});
 }
+/* ✨ v31.76 看診表的簡訊勾稽紅幅只列「目前院區」的。後端回的是全院清單，
+   原本直接整包顯示，龍潭帳號在龍潭看診表會看到三樹／土城的待補發（2026-10-10 chi 回報）。 */
+function auditListForClinic_() {
+  return (((window.__auditCache || {}).list) || []).filter(x => String(x.clinic || '') === String(S.cClinic || ''));
+}
 function paintAuditBanner() {
-  const list = ((window.__auditCache || {}).list) || [];
+  const list = auditListForClinic_();
   const orphEl = $('#cd-orph');
   if (!orphEl || !list.length || orphEl.querySelector('.audit-bn')) return;
   orphEl.insertAdjacentHTML('afterbegin', `<div class="audit-bn" data-act="audit-open-cached" style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:11px 14px;margin:8px 0;cursor:pointer;display:flex;align-items:center;gap:10px">
@@ -5765,8 +5770,8 @@ document.addEventListener('click', async e => {
       const list = r.data || [];
       if (!list.length) { toast('✅ 未來預約的成功簡訊都已正常發送'); break; }
       openAuditModal(list); break; }
-    case 'audit-open-cached': {   // ✨ v31.11 從紅色橫幅點開
-      openAuditModal((window.__auditCache || {}).list || []); break; }
+    case 'audit-open-cached': {   // ✨ v31.11 從紅色橫幅點開；v31.76 只列目前院區
+      openAuditModal(auditListForClinic_()); break; }
     case 'resend-one': {
       el.disabled = true;
       const r1 = await api.post('resendBookingSms', { apptId: el.dataset.id }, true);
