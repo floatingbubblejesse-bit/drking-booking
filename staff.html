@@ -445,7 +445,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
 'use strict';
 
 /* ───── 設定 ───── */
-const FE_VER = 'v31.76-auditclinic';   // ✨ 前端版本（側欄可見，部署後一眼確認）
+const FE_VER = 'v31.77-dailylite';   // ✨ 前端版本（側欄可見，部署後一眼確認）
 /* ✨ v27 前後台分流 + 院區鎖定（LINE 試營運用）
    前台（客戶）：index.html            → 只看得到「減重預約」
    前台鎖院區　：index.html?c=三樹     → 只開放三樹院區
@@ -2047,7 +2047,10 @@ function htmlCDaily() {
     + '<span class="muted" style="font-size:14.5px">建議每天 <b>14:30–15:00</b> 走一次，四塊都變綠就完成</span>'
     + '<span style="flex:1"></span>'
     + '<select id="cd-clinic" data-act2="cd-clinic">' + clinicOpts() + '</select>'
-    + '<button class="btn btn-o btn-sm" data-act="dc-reload">🔄 重新檢查</button></div>'
+    + '<button class="btn btn-o btn-sm" data-act="dc-reload">🔄 重新檢查</button>'
+    /* ✨ v31.77 每日必查櫃檯版：簡訊相關的卡與上方數字列預設收起（簡訊由系統自動補發，櫃檯不用檢查）。只有管理員有開關。 */
+    + ((S.cUser && String(S.cUser.role || '') === 'admin') ? '<button class="btn btn-o btn-sm" data-act="dc-sms">' + (S.dcSms ? '隱藏簡訊檢查' : '顯示簡訊檢查') + '</button>' : '')
+    + '</div>'
     + '<div class="muted" style="font-size:14px;margin-top:4px">' + esc(today.replace(/-/g,'/')) + '（週' + WDS[d.getDay()] + '）· ' + esc(S.cClinic) + '</div>'
     + '<div id="dc-sum" style="display:flex;gap:9px;flex-wrap:wrap;margin:13px 0 4px"></div>'
     + '<div id="dc-box" class="muted" style="padding:14px">檢查中…</div></div>';
@@ -2158,7 +2161,8 @@ async function loadCDaily() {
   const md = function(ds){ return String(ds || '').slice(5).replace('-', '/'); };
   const cnt = { need:null, unsent:null, fails:0, bl:0, rpt:0, nosms:0, stale:0, nosess:null };
   const pill = function(n, label){ const un = (n === null); return '<div style="border:2px solid ' + (un?'#e2e8f0':(n?'#fca5a5':'#bbf7d0')) + ';background:' + (un?'#f8fafc':(n?'#fef2f2':'#f0fdf4')) + ';border-radius:10px;padding:7px 14px;font-weight:800;font-size:15px;color:' + (un?'#64748b':(n?'#b91c1c':'#166534')) + '">' + (un?'⏳':(n?'⚠️':'✅')) + ' ' + label + ' ' + (un?'檢查中':n) + '</div>'; };
-  const paintSum = function(){ const s = $('#dc-sum'); if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登') + pill(cnt.stale,'未結案') + pill(cnt.nosess,'無診次'); };
+  const paintSum = function(){ const s = $('#dc-sum'); if (s && !S.dcSms) { s.innerHTML = ''; return; }   /* ✨ v31.77 數字列只在簡訊檢查開啟時顯示 */
+    if (s) s.innerHTML = pill(cnt.need,'待補登') + pill(cnt.nosms,'無法發簡訊') + pill(cnt.unsent,'簡訊未送達') + pill(cnt.fails,'待電話') + pill(cnt.rpt,'初診報告') + pill(cnt.bl,'抽血未補登') + pill(cnt.stale,'未結案') + pill(cnt.nosess,'無診次'); };
   paintSum();
 
   /* ✨ v31.54 櫃檯忘記按報到是完全靜默的，但後端把「過了看診日還停在已預約」
@@ -2288,11 +2292,11 @@ async function loadCDaily() {
   cnt.nosess = noSess.length;
   cnt.fails = fails.length; cnt.bl = bl.length; cnt.rpt = rptPending.length; cnt.nosms = nosms.length; cnt.stale = stale.length; paintSum();
   $('#dc-345').innerHTML =
-      dcCard(nosms.length, '📵', dayBtn + '系統發不出簡訊，要打電話',
+      (!S.dcSms ? '' : dcCard(nosms.length, '📵', dayBtn + '系統發不出簡訊，要打電話',
         '這些人的電話缺漏或不是有效號碼（例如搜博匯入時用的 0900000000 佔位號），<b>系統不會發、也不會列在下面的「通知失敗」裡</b>，因為根本沒試著發。'
         + '請直接打電話或用 LINE 通知，並到看診表把正確電話補上，下次才會自動發。',
         t0, 'call', '前往通知頁', callD)
-    + dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD)
+    + dcCard(fails.length, '☎', dayBtn + '通知失敗要人工聯繫', '系統自動發的提醒，這些是失敗的，要打電話或 LINE。⚠️ 提醒目前傍晚才發，下午請看「今天」、隔天開診前補看。', remHint + t3, 'call', '前往通知頁', callD))
     + dcCard(rptPending.length, '🩸', md(callD) + ' 初診的抽血報告', '這些初診病人還沒標記「院內報告OK／外院報告」。看診前要把報告調出來夾進病歷；到通知頁可直接按標記。', t5, 'call', '前往標記報告', callD)
     + dcCard(stale.length, '', '前幾天還沒結案的預約（過去 14 天）',
         '這些預約過了看診日還停在「已預約」。<b>系統會一律當成未到診</b>，而且<b>初診累積 2 次未到就會自動封鎖那支電話</b>，客人下次上網就約不了、也不會有人知道原因。'
@@ -2308,7 +2312,7 @@ async function loadCDaily() {
                 + '<td><button class="btn btn-o btn-sm" data-act="dc-goto" data-v="day" data-d="' + esc(x.date) + '">前往</button></td></tr>';
             }).join('') + '</tbody></table>'),
         '', '')
-    + dcCard(noSess.length, '📅', '預約落在「醫師沒有診次」的日子',
+    + (!S.dcSms ? '' : dcCard(noSess.length, '📅', '預約落在「醫師沒有診次」的日子',
         '這些預約的日期，在<b>醫師請假系統</b>裡查不到那位醫師的診次（可能是隔週的班，或臨時請假）。'
         + '搜博和紙本那邊還是約得進來，所以會出現這種單子。它們在看診表會顯示成<b>時段外預約</b>，'
         + '不會消失、也還能報到，但<b>那天醫師不一定在</b>。'
@@ -2322,7 +2326,7 @@ async function loadCDaily() {
                 + '<td>' + tel(x.phone) + '</td>'
                 + '<td><button class="btn btn-o btn-sm" data-act="dc-goto" data-v="day" data-d="' + esc(x.date) + '">前往</button></td></tr>';
             }).join('') + '</tbody></table>'),
-        '', '')
+        '', ''))
     + dcCard(bl.length, '🩸', '抽血日到了沒補登（昨天／今天）', '排了抽血卻還沒補病歷號或生日，可能是當天沒來。<b>看診預約不要取消</b>，先電話或 LINE 聯繫：能來就「改日期」或「改當日抽」，不來抽血的就按「未報到」並提醒<b>看診當天帶 14 天內外院報告</b>。', t4, 'blood', '前往抽血名單');
 
   /* ①② 慢的 auditUnsentBookings（掃全部通知紀錄，約 40 秒） */
@@ -2340,7 +2344,7 @@ async function loadCDaily() {
     cnt.need = need.length; cnt.unsent = unsent.length; paintSum();
     $('#dc-12').innerHTML =
         dcCard(need.length, '⚠️', '待補登資料', '姓名或電話沒填齊，簡訊發不出去，而且提醒也不會發（系統只提醒「預約成功簡訊已成功」的人），所以這塊要最先處理。', t1, 'day', '前往補登')
-      + dcCard(unsent.length, '📵', '預約成功簡訊未送達', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', '');
+      + (!S.dcSms ? '' : dcCard(unsent.length, '📵', '預約成功簡訊未送達', '客人沒收到預約成功簡訊。資料齊的可直接補發；顯示「需先補資料」的要先補齊上面那塊。', t2, '', ''));
   };
   const c = window.__auditCache;
   if (c && Date.now() - c.at < 300e3) { paint12(c.list || []); return; }
@@ -5805,6 +5809,7 @@ document.addEventListener('click', async e => {
       } else toast('同步失敗：' + (r.error || ''), 'var(--red)');
       break; }
     case 'dc-reload': S.apptCache.clear(); window.__auditCache = null; loadCDaily(); break;
+    case 'dc-sms': S.dcSms = !S.dcSms; renderCounter(); break;   /* ✨ v31.77 */
     case 'dc-day': S.dcDay = el.dataset.v; loadCDaily(); break;   /* ✨ v31.26 通知那塊切換今天／明天 */
     case 'dc-blood': {   /* ✨ v31.30 抽血沒來的三種處理，看診預約一律保留 */
       const op = el.dataset.op, id = el.dataset.id, vd = el.dataset.vd;
