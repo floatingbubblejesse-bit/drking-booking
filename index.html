@@ -414,7 +414,7 @@ const BACKEND_URL='https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2Kn
    只在 LINE App 內才載入 LIFF SDK；一般瀏覽器完全不受影響。
    送出預約時只附上 ID Token（1 小時有效），由後端向 LINE 驗證換出 userId——
    依 LINE 官方建議，不從前端直接傳 userId。驗證不過就只發簡訊，預約照常成立。 */
-const LIFF_ID='';   /* ← 在 LINE Developers 建好 LIFF 後填入，例如 2000123456-AbCdEfGh */
+const LIFF_ID='2007733363-o3Ux4wSa';   /* ← 在 LINE Developers 建好 LIFF 後填入，例如 2000123456-AbCdEfGh */
 const LIFF_STATE={ready:false};
 function inLineApp(){return /\bLine\//i.test(navigator.userAgent||'');}
 async function initLiff(){if(!LIFF_ID||!inLineApp())return;try{if(!window.liff){await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://static.line-scdn.net/liff/edge/2/sdk.js';s.async=true;s.onload=ok;s.onerror=()=>no(new Error('liff sdk'));document.head.appendChild(s);});}await window.liff.init({liffId:LIFF_ID});LIFF_STATE.ready=!!window.liff.isLoggedIn();}catch(_){LIFF_STATE.ready=false;}}
