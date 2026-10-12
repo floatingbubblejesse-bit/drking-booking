@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+<script>
+/* 2026-10-12 LIFF 分流：圖文選單用 https://liff.line.me/<LIFF_ID>/line.html 開啟時，LINE 會先載入本頁並帶 liff.state=/line.html，
+   再由 SDK 轉去 line.html，中間會閃一下預約頁。這裡在畫面畫出來之前就直接轉過去；只處理 /line.html，其他照舊。 */
+(function(){try{var m=/[?&]liff\.state=([^&#]+)/.exec(location.search);if(!m)return;var p=decodeURIComponent(m[1]);if(p.indexOf('/line.html')===0){location.replace('line.html'+p.slice(10));}}catch(_){}})();
+</script>
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <script id="early-bootstrap">
