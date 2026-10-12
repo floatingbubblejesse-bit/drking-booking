@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>金鶯診所減重預約</title>
+<style>
+  :root{
+    --teal:#2f7a7e; --teal-d:#245f63; --teal-l:#e6f2f2;
+    --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --bg:#f4f7f7;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--ink);
+    min-height:100vh; min-height:100dvh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:0 20px calc(28px + env(safe-area-inset-bottom));
+  }
+  .top{
+    width:100%; background:var(--teal); color:#fff;
+    margin:0 -20px; padding:calc(18px + env(safe-area-inset-top)) 20px 18px;
+    width:calc(100% + 40px); text-align:center;
+  }
+  .top .logo{
+    width:52px;height:52px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 10px;
+    font-size:26px;
+  }
+  .top h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.5px}
+  .wrap{width:100%;max-width:420px;flex:1;display:flex;flex-direction:column}
+  h2{
+    margin:26px 0 6px; font-size:22px; font-weight:800; text-align:center; letter-spacing:.5px;
+  }
+  .sub{margin:0 0 22px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6}
+  a.card{
+    display:block; text-decoration:none; color:inherit;
+    background:#fff; border:1.5px solid var(--line); border-radius:16px;
+    padding:20px 18px; margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+    transition:transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  a.card:active{transform:scale(.985);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  a.card.primary{border-color:var(--teal);background:linear-gradient(180deg,#fff 0%,var(--teal-l) 100%)}
+  .ct{display:flex;align-items:center;gap:12px}
+  .ico{
+    flex:0 0 auto;width:44px;height:44px;border-radius:12px;
+    background:var(--teal-l); color:var(--teal);
+    display:flex;align-items:center;justify-content:center;font-size:22px;
+  }
+  a.card.primary .ico{background:var(--teal);color:#fff}
+  .tx{flex:1;min-width:0}
+  .tt{font-size:17px;font-weight:700;line-height:1.35}
+  .dd{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .arrow{flex:0 0 auto;color:#9ca3af;font-size:20px}
+  .tag{
+    display:inline-block;background:var(--teal);color:#fff;
+    font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;margin-left:6px;
+    vertical-align:2px;
+  }
+  .foot{
+    margin-top:auto; padding-top:26px; text-align:center;
+    color:var(--muted); font-size:12.5px; line-height:1.7;
+  }
+  .foot .hr{height:1px;background:var(--line);margin:0 0 14px}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="logo">🕊️</div>
+  <h1>金鶯診所</h1>
+</div>
+
+<div class="wrap">
+  <h2>減重門診預約</h2>
+  <p class="sub">請選擇您要預約的院區</p>
+
+  <!-- ① 新系統 -->
+  <a class="card primary" id="btn-new" href="#">
+    <div class="ct">
+      <div class="ico">📅</div>
+      <div class="tx">
+        <div class="tt"><span id="new-clinics">三樹 ・ 土城 ・ 龍潭</span><span class="tag">線上預約</span></div>
+        <div class="dd">即時查看空檔，直接選醫師與時段</div>
+      </div>
+      <div class="arrow">›</div>
+    </div>
+  </a>
+
+  <!-- ② 搜博 -->
+  <a class="card" id="btn-old" href="#">
+    <div class="ct">
+      <div class="ico">🏥</div>
+      <div class="tx">
+        <div class="tt">其他院區</div>
+        <div class="dd">鶯歌・樹林・桃園・八德・大湳・平鎮・埔心・大溪・大竹・龍岡</div>
+      </div>
+      <div class="arrow">›</div>
+    </div>
+  </a>
+
+  <div class="foot">
+    <div class="hr"></div>
+    兩個預約系統皆由金鶯診所提供<br>
+    如需協助請洽各院區櫃檯
+  </div>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  要改的東西全部在這裡，改完存檔即可，底下不用動                ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+var CONFIG = {
+
+  /* ① 新系統（本院自建）的網址。source=line 是用來統計來源的，不要拿掉 */
+  NEW_URL : 'index.html?source=line',   /* 相對路徑：在 LIFF 裡開會留在同一個視窗，index.html 才拿得到 LINE 身分 */
+
+  /* ② 搜博預約系統的網址 */
+  OLD_URL : 'https://elite.seeker.net.tw/book/services',
+
+  /* ③ 新系統目前開放哪些院區。新院區開通就加進來（桃園、平鎮上線後加 '桃園', '平鎮'） */
+  NEW_CLINICS : ['三樹', '土城', '龍潭']
+};
+
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+
+  /* 院區名稱 */
+  $('#new-clinics').textContent = CONFIG.NEW_CLINICS.join(' ・ ');
+
+  /* 綁連結；沒設定網址的就提示而不是連到空白頁 */
+  function bind(el, url, label) {
+    if (url) { el.setAttribute('href', url); return; }
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      alert(label + '的連結尚未設定，請洽櫃檯。');
+    });
+    el.style.opacity = '.55';
+  }
+  bind($('#btn-new'), CONFIG.NEW_URL, '線上預約');
+  bind($('#btn-old'), CONFIG.OLD_URL, '其他院區預約');
+})();
+</script>
+
+</body>
+</html>
