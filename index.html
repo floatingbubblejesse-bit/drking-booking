@@ -23,7 +23,7 @@ if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SES
  function pilotOf(p){if(!p||typeof p!=='object')return null;const ids=Array.isArray(p.clinicIds)?p.clinicIds.filter(x=>typeof x==='string').slice(0,20):[];const u=typeof p.otherUrl==='string'&&/^https:\/\/[^\s"'<>]+$/.test(p.otherUrl)?p.otherUrl:'';return {locked:p.locked===true,clinicIds:ids,from:typeof p.from==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(p.from)?p.from:'',otherUrl:u};}
  function publicOnly(r){
   const d=r&&r.ok&&r.data,c=d&&d.publicCatalog,now=Date.now();
-  if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||now-c.at>30*86400000||c.expiresAt-c.at>60000||c.expiresAt<c.at||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
+  if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||now-c.at>86400000||c.expiresAt-c.at>60000||c.expiresAt<c.at||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
   const clinics=d.clinics.map(x=>({id:x.id,name:x.name,sourceCode:x.sourceCode}));
   const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank,specialties:Array.isArray(x.specialties)?x.specialties.filter(s=>typeof s==='string'&&s.length<=30).slice(0,8):undefined}));
   const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
