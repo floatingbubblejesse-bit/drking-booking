@@ -3155,8 +3155,9 @@ async function bkbSave(btn) {
     if (!pv.ok) { btn.disabled = false; btn.textContent = '✓ 建立';
       toast('療程試算失敗：' + (pv.message || pv.error || ''), 'var(--red)'); return; }
     let _allowOver = false;
-    if (pv.needOverbook || pv.blocked) {
+    if (pv.needOverbook || pv.blocked || pv.inject) {   /* ✨ v31.78 隔週醫師休息週＝只打針，也要攤給櫃檯看 */
       const _ic = { ok: '<span style="color:var(--green);font-weight:700">可約</span>',
+                    inject: '<span style="color:#7c3aed;font-weight:800">💉只打針</span>',
                     overbook: '<span style="color:#b45309;font-weight:800">需超約</span>',
                     blocked: '<span style="color:var(--red);font-weight:800">建不了</span>' };
       const _tbl = '<table style="border-collapse:collapse;font-size:14px;margin-top:6px">'
@@ -3172,6 +3173,8 @@ async function bkbSave(btn) {
           }).join('') + '</tbody></table>'
         + (pv.blocked ? '<div style="color:var(--red);font-weight:700;margin-top:8px">建不了的那 '
             + pv.blocked + ' 週不會建立，要另外找時段補掛。</div>' : '')
+        + (pv.inject ? '<div style="color:#7c3aed;font-weight:700;margin-top:8px">💉 只打針的 '
+            + pv.inject + ' 週：醫師那週不在，系統照樣建預約讓病人回來打針（醫師欄寫原醫師、不佔看診名額，備註會標「💉只打針（醫師不在）」）。</div>' : '')
         /* ✨ v31.61 先講清楚會不會發簡訊，免得櫃檯不敢按 */
         + '<div style="margin-top:8px;color:var(--txt2)">'
         + (bkb.querySelector('#bkb-paper')?.checked
@@ -3182,7 +3185,7 @@ async function bkbSave(btn) {
         ? [{ v:'no', t:'先不要，我重新安排' }, { v:'yes', t:'放行超約，建立其餘 ' + (pv.times - pv.blocked) + ' 次' }]
         : [{ v:'no', t:'先不要' }, { v:'yes', t:'知道了，建立可約的 ' + (pv.times - pv.blocked) + ' 次' }];
       const _ans = await ask('療程逐週檢查｜' + esc(doc) + ' ' + esc(t),
-        [{ label: pv.needOverbook ? '有 ' + pv.needOverbook + ' 週需要超約，確定放行嗎？' : '有幾週建不了，確定繼續嗎？',
+        [{ label: pv.needOverbook ? '有 ' + pv.needOverbook + ' 週需要超約，確定放行嗎？' : pv.blocked ? '有幾週建不了，確定繼續嗎？' : '有 ' + pv.inject + ' 週是只打針，確定建立嗎？',
            type: 'select', value: 'no', options: _opts, hint: _tbl }], '送出');
       if (_ans === null || _ans[0] !== 'yes') { btn.disabled = false; btn.textContent = '✓ 建立'; return; }
       _allowOver = !!pv.needOverbook;
@@ -3202,7 +3205,7 @@ async function bkbSave(btn) {
     }, true);
     btn.disabled = false; btn.textContent = '✓ 建立';
     if (!r0.ok) { toast('失敗：' + (r0.message || r0.error || ''), 'var(--red)'); return; }
-    const results = (r0.course && r0.course.results || []).map(x => ({ w: x.week, ds: x.date, ok: x.ok, why: x.why || '' }));
+    const results = (r0.course && r0.course.results || []).map(x => ({ w: x.week, ds: x.date, ok: x.ok, why: x.why || '', inject: !!x.inject }));
     for (let w = 0; w < cWeeks; w++) { const dW = new Date(date + 'T00:00'); dW.setDate(dW.getDate() + w * 7); S.apptCache.delete(clinic + '|' + fmtD(dW)); }
     const okN = results.filter(x => x.ok).length;
     modal(`<div class="mh">💊 ${esc(cName)}｜建立結果 <button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>
@@ -3210,7 +3213,7 @@ async function bkbSave(btn) {
         <div style="font-size:17px;font-weight:800;margin-bottom:10px">${okN === cWeeks ? '✅' : '⚠️'} 成功 ${okN}/${cWeeks} 週（每週${WDS[new Date(date + 'T00:00').getDay()]} ${esc(t)}・${esc(doc)} 醫師）</div>
         <table class="tbl"><thead><tr><th>週次</th><th>日期</th><th>結果</th></tr></thead><tbody>
         ${results.map(x => `<tr style="${x.ok ? '' : 'background:#fef2f2'}"><td>第 ${x.w} 週</td><td>${esc(x.ds.replace(/-/g, '/'))}</td>
-          <td>${x.ok ? '<span style="color:var(--green);font-weight:700">✓ 已預約</span>' : `<span style="color:var(--red);font-weight:700">✗ ${esc(x.why)}</span>`}</td></tr>`).join('')}</tbody></table>
+          <td>${x.ok ? (x.inject ? '<span style="color:#7c3aed;font-weight:700">💉 只打針（醫師不在）</span>' : '<span style="color:var(--green);font-weight:700">✓ 已預約</span>') : `<span style="color:var(--red);font-weight:700">✗ ${esc(x.why)}</span>`}</td></tr>`).join('')}</tbody></table>
         ${okN < cWeeks ? '<p class="muted" style="margin-top:8px">✗ 的週次請另選時段手動補掛。</p>' : ''}
       </div>
       <div class="mf"><button class="btn btn-p" style="width:100%" data-act="close-modal">完成</button></div>`);
