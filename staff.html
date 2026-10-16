@@ -730,8 +730,37 @@ const durFor = (type, doc, cli) => type === 'initial' ? cfgFor(doc, cli).initMin
    後端 bridgeOpen_／bridgeBusy_ 已同步改為相同規則（109 版），兩邊必須一致，
    否則會出現「前端說空、後端說滿」。
    這個函式只用來算「被佔用區間」，不用於任何畫面顯示，所以不會改到看診表上的時間。 */
+/* ✨ v31.79 單診規則（與後端 bridgeSoloCell_／前台 legacySolo_ 同規則）
+   同院區、同時間沒有其他減重醫師＝單診。設定在「系統管理 → 預約時間設定」。
+   沒設規則的醫師第一行就回 null。 */
+function soloCell(doc, cli, ds, t) {
+  const cfg = cfgFor(doc, cli), n = +cfg.soloPerHour || 0;
+  if (!(n > 0) || !Number.isFinite(t) || !/^\d{4}-\d{2}-\d{2}$/.test(String(ds || ''))) return null;
+  const days = String(cfg.soloDays || '');
+  if (days && days.indexOf('日一二三四五六'.charAt(new Date(ds + 'T12:00:00Z').getUTCDay())) < 0) return null;
+  let list; try { list = (daySessions(cli, ds) || {}).list || []; } catch (_) { return null; }
+  const me = normDoc(doc), cell = Math.max(5, Math.round(60 / n)), cs = t - (t % cell), ce = cs + cell;
+  let own = false, other = false;
+  list.forEach(r => { const a = t2m(r.start), b = t2m(r.end); if (r.doctor === me) { if (a <= cs && ce <= b) own = true; } else if (a < ce && cs < b) other = true; });
+  return own && !other ? { start: cs, end: ce, followOnly: !!cfg.soloFollowOnly } : null;
+}
+function soloCtl(p, c) {
+  const n = +c.soloPerHour || 0, days = String(c.soloDays || '');
+  return `<select class="${p}-solo" style="padding:3px;font-size:13px" title="同院區同時間沒有其他減重醫師時套用">
+      <option value="0" ${n ? '' : 'selected'}>不啟用</option><option value="1" ${n === 1 ? 'selected' : ''}>1 位/時</option><option value="2" ${n === 2 ? 'selected' : ''}>2 位/時</option></select>
+    <label style="white-space:nowrap;font-size:13px"><input type="checkbox" class="${p}-solo-fo" ${c.soloFollowOnly ? 'checked' : ''} style="width:15px;height:15px;vertical-align:-2px"> 只收複診</label>
+    <span style="white-space:nowrap;font-size:12.5px" title="都不勾＝每天">${'一二三四五六日'.split('').map(w => `<label style="margin-right:2px"><input type="checkbox" class="${p}-solo-d" value="${w}" ${days.indexOf(w) >= 0 ? 'checked' : ''} style="width:13px;height:13px;vertical-align:-2px">${w}</label>`).join('')}</span>`;
+}
+function soloRead(tr, p) {
+  const sel = tr.querySelector('.' + p + '-solo');
+  if (!sel) return {};
+  return { soloPerHour: +sel.value || 0, soloFollowOnly: !!(tr.querySelector('.' + p + '-solo-fo') || {}).checked,
+           soloDays: [...tr.querySelectorAll('.' + p + '-solo-d')].filter(x => x.checked).map(x => x.value).join('') };
+}
+function soloTxt(c) { const n = +c.soloPerHour || 0; return n ? '・單診 ' + n + ' 位/時' + (c.soloFollowOnly ? '只收複診' : '') + (c.soloDays ? '（週' + c.soloDays + '）' : '') : ''; }
 function apptEndMin(a, docN) {
   const st = t2m(apptTime(a));
+  { const _so = soloCell(docN, a.clinic || a['院區'] || '', String(a.date || a['看診日期'] || '').slice(0, 10), st); if (_so) return _so.end; }   /* ✨ v31.79 單診一格整格佔用 */
   const type = String(a.type || a['類型'] || '') === '初診' ? 'initial' : 'followup';
   return st + durFor(type, docN, a.clinic || a['院區'] || '');
 }
@@ -1375,8 +1404,11 @@ async function loadStep3Slots() {
     const cfg = cfgFor(r.doctor, b.clinic);
     const dur = b.type === 'initial' ? cfg.initMin : cfg.followMin;
     const endM = t2m(r.end);
-    for (let t = t2m(r.start); t + dur <= endM; t += cfg.followMin)
-      fine.push({ m:t, t:m2t(t), doctor:r.doctor, dur });
+    for (let t = t2m(r.start); t + dur <= endM; t += cfg.followMin) {
+      const _so = soloCell(r.doctor, b.clinic, b.date, t);   /* ✨ v31.79 */
+      if (_so && (t !== _so.start || (b.type === 'initial' && _so.followOnly))) continue;
+      fine.push({ m:t, t:m2t(t), doctor:r.doctor, dur: _so ? _so.end - _so.start : dur });
+    }
   });
   fine.sort((a,b2) => a.m - b2.m);
   const appts = await getAppts(b.clinic, b.date);
@@ -1758,7 +1790,10 @@ async function rsFillTimes(m) {
   sched.slotsFor(doc, cli, wd).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
       if (slotSoon(ds, m2t(t))) continue;   // ✨ v25 24h 內不開放
-      if (!blocks.some(([bs, be]) => t < be && bs < t + dur)) free.push(m2t(t));
+      const _so = soloCell(doc, cli, ds, t);   /* ✨ v31.79 */
+      if (_so && (t !== _so.start || (type === 'initial' && _so.followOnly))) continue;
+      const _dd = _so ? _so.end - _so.start : dur;
+      if (!blocks.some(([bs, be]) => t < be && bs < t + _dd)) free.push(m2t(t));
     }
   });
   timeSel.innerHTML = free.length
@@ -3041,8 +3076,12 @@ function bkbRefresh(preferT) {
   if (_dst !== '停診') daySessions(clinic, date).list.filter(r => r.doctor === normDoc(doc)).forEach(r => {
     for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
       const v2 = m2t(t);
+      const _so = soloCell(doc, clinic, date, t);   /* ✨ v31.79 單診：只開整點；初診需超約確認 */
+      if (_so && t !== _so.start) continue;
+      const _dd = _so ? _so.end - _so.start : dur;
+      if (_so && type === '初診' && _so.followOnly) { _why[v2] = '單診只收複診'; over.push(v2); continue; }
       const late = t + dur > LAST_END_MIN;
-      const taken = blocks.some(([bs, be]) => t < be && bs < t + dur);
+      const taken = blocks.some(([bs, be]) => t < be && bs < t + _dd);
       const full = _dst === '滿診';
       if (!late && !taken && !full) { free.push(v2); continue; }
       if (!cfg.overbook) continue;
@@ -3060,6 +3099,7 @@ function bkbRefresh(preferT) {
       : w === '超時' ? '　⚠️ 超過 ' + m2t(LAST_END_MIN) + ' 收診'
       : w === '已有人滿診' ? '　⚠️ 已有人・滿診・可超約'
       : w === '滿診' ? '　⚠️ 滿診・可超約'
+      : w === '單診只收複診' ? '　⚠️ 單診只收複診・可超約'
       : '　⚠️ 已有人・可超約';
     return `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${tag}</option>`;
   };
@@ -3321,7 +3361,10 @@ function refreshQkTimes(m, preferT) {
     const dur = type === '初診' ? cfg.initMin : cfg.followMin;
     _dsq.filter(r => r.doctor === normDoc(dn)).forEach(r => {
       for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
-        const conflict = (blocks[normDoc(dn)] || []).some(([bs, be]) => t < be && bs < t + dur);
+        const _so = soloCell(dn, clinic, date, t);   /* ✨ v31.79 */
+        if (_so && (t !== _so.start || (type === '初診' && _so.followOnly))) continue;
+        const _dd = _so ? _so.end - _so.start : dur;
+        const conflict = (blocks[normDoc(dn)] || []).some(([bs, be]) => t < be && bs < t + _dd);
         if (!conflict) free.push({ t: m2t(t), dn, dur });
       }
     });
@@ -3805,7 +3848,9 @@ async function cActionGo(m, action) {
     const _opts = [];
     _segs.forEach(s => { for (let t = t2m(s.start); t + _dur <= t2m(s.end); t += _cfg.followMin) {
       const v2 = m2t(t); if (_opts.some(o => o.v === v2)) continue;
-      const hit = _busy.filter(b => t < b[1] && b[0] < t + _dur);
+      const _so = soloCell(a.doctor, a.clinic, a.date, t);   /* ✨ v31.79 */
+      if (_so && t !== _so.start && v2 !== a.t) continue;
+      const hit = _busy.filter(b => t < b[1] && b[0] < t + (_so ? _so.end - _so.start : _dur));
       const cur = v2 === a.t;
       _opts.push({ v: v2, disabled: !cur && hit.length > 0,
         t: v2 + (cur ? '（目前）' : hit.length ? '　── 已有 ' + hit.map(b => b[2]).join('、') : '') });
@@ -5309,6 +5354,7 @@ function htmlATimeCfg() {
       <td><input type="date" class="tc-from" value="${c.capFrom || ''}" style="font-size:13.5px;padding:3px" title="看診日在這天之前不受限制；空白＝立即生效">${(c.initCap || 0) && !(c.capFrom || '') ? '<div style="font-size:12px;color:#b45309;font-weight:700">立即生效</div>' : ''}</td>
       <td><input type="number" class="tc-days" value="${c.openDays || 0}" min="0" max="120" step="1" style="width:66px" title="0＝用公版 30 天"> 天${(c.openDays || 0) ? '' : ' <span class="muted" style="font-size:12.5px">(公版)</span>'}</td>
       <td style="text-align:center"><input type="checkbox" class="tc-ob" ${c.overbook ? 'checked' : ''} style="width:19px;height:19px" title="勾選後，櫃檯遇到「該時段已被預約」可確認後仍建立（過渡期紙本用）。病人端不受影響。">${c.overbook ? '<div style="font-size:12px;color:#b45309;font-weight:700">可超約</div>' : ''}</td>
+      <td style="min-width:170px">${soloCtl('tc', c)}</td>
       <td>${ov ? '<span class="tag tag-b">個別設定</span>' : '<span class="muted">公版</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-p btn-sm" data-act="tc-save" data-d="${esc(d.shortName)}">儲存</button>
@@ -5316,10 +5362,10 @@ function htmlATimeCfg() {
         ${ov ? `<button class="btn btn-o btn-sm" data-act="tc-reset" data-d="${esc(d.shortName)}">回公版</button>` : ''}
         ${d.clinics.length > 1 ? `<button class="btn btn-o btn-sm" data-act="tc-cli-toggle" data-d="${esc(d.shortName)}" style="font-size:13px" title="不同院區用不同時長">🏥 院區別</button>` : ''}
       </td></tr>
-      ${(d.clinics.length < 2 && !d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl])) ? '' : `<tr data-d="${esc(d.shortName)}" class="tcc-row" style="${d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl]) ? '' : 'display:none'}"><td colspan="8" style="background:#f8fafc;padding:7px 12px">
+      ${(d.clinics.length < 2 && !d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl])) ? '' : `<tr data-d="${esc(d.shortName)}" class="tcc-row" style="${d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl]) ? '' : 'display:none'}"><td colspan="10" style="background:#f8fafc;padding:7px 12px">
         <span style="font-size:13px;color:#64748b;margin-right:6px">🏥 院區別（優先於上列設定）：</span>
         ${d.clinics.map(cl => { const k = d.shortName + '|' + cl; const co = (S.timeCfg.clinicOv||{})[k];
-          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin}${(co.initCap||0)?'・初診上限 '+co.initCap+(co.capFrom?'（'+co.capFrom.slice(5).replace('-','/')+' 起）':'（立即）'):''}${(co.openDays||0)?'・限 '+co.openDays+' 天內':''} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
+          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin}${(co.initCap||0)?'・初診上限 '+co.initCap+(co.capFrom?'（'+co.capFrom.slice(5).replace('-','/')+' 起）':'（立即）'):''}${(co.openDays||0)?'・限 '+co.openDays+' 天內':''}${soloTxt(co)} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
         <select class="tcc-cli" style="padding:4px 6px;font-size:13px">${d.clinics.map(cl => `<option>${esc(cl)}</option>`).join('')}</select>
         初 <input type="number" class="tcc-i" value="${c.initMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
         複 <input type="number" class="tcc-f" value="${c.followMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
@@ -5327,6 +5373,7 @@ function htmlATimeCfg() {
         起 <input type="date" class="tcc-from" value="${c.capFrom || ''}" style="font-size:13px;padding:3px" title="看診日在這天之前不受限制；空白＝立即生效">
         預約天數 <input type="number" class="tcc-days" value="${c.openDays || 0}" min="0" max="120" step="1" style="width:52px;padding:4px" title="0＝用公版 30 天">
         <label style="white-space:nowrap;font-size:13px"><input type="checkbox" class="tcc-ob" ${c.overbook ? 'checked' : ''} style="width:16px;height:16px;vertical-align:-2px" title="櫃檯可超約"> 可超約</label>
+        <span style="white-space:nowrap;font-size:13px">單診 ${soloCtl('tcc', c)}</span>
         <button class="btn btn-o btn-sm" data-act="tc-save-cli" data-d="${esc(d.shortName)}" style="font-size:13px">＋ 設定此院區</button>
       </td></tr>`}`;
   }).join('');
@@ -5337,8 +5384,8 @@ function htmlATimeCfg() {
       ① <b>已預約的客戶完全不受影響</b>，照原時段看診　② 新預約立即改用新分鐘數切格<br>
       ③ 系統以「時間重疊」自動避開舊預約，<b>絕不重複掛號</b>　④ 空隙塞不下新時長時，客戶端自然顯示額滿，<b>不需再手動按滿診</b><br>
       過渡期（舊預約消化完前，約 2~4 週）可能出現塞不進新客的小空隙，屬正常現象。</div>
-    <p class="muted" style="margin-bottom:12px">個別調整範例：林秉承 → 初診 10 / 複診 10 = 10 分鐘一位不分初複診。改完立即生效（前台＋櫃台同步）。<br><b>每診初診上限</b>：同一位醫師在<b>同一個班表時段</b>內最多接幾位初診，超過就不給建立（病人端與櫃檯都擋，複診不受影響）。<b>0 ＝ 不限制</b>。<br><b>上限生效日</b>：<b>看診日</b>在這天之前完全不受限制，已經排好的近期診次不會被影響；空白＝立即生效。<br><b>網路預約天數</b>：病人在手機上最多能約多少天內的診（例：蕭捷健設 14，病人只看得到 14 天內）。<b>0 ＝ 用公版 30 天</b>；<b>櫃檯代約完全不受此限</b>。<br><b>櫃檯可超約</b>（過渡期用）：勾選後，櫃檯遇到「該時段已被預約」時會跳確認，確認後仍可建立，並在備註標記 ⚠️超約。<b>只放行這一項</b> —— 醫師沒門診、請假、停診一律照擋；<b>初診上限仍硬擋</b>；<b>病人端完全不受影響</b>。過渡期結束取消勾選即回復原本行為。</p>
-    <table class="tbl"><thead><tr><th>醫師</th><th>初診</th><th>複診</th><th title="同一個班表時段內最多幾位初診，0＝不限制">每診初診上限</th><th title="看診日在這天之前不受限制，空白＝立即生效">上限生效日</th><th title="病人網路預約最多能約多少天內，0＝用公版 30 天。櫃檯代約不受限">網路預約天數</th><th title="勾選後櫃檯遇到「時段已被預約」可確認後仍建立；病人端不受影響">櫃檯可超約</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <p class="muted" style="margin-bottom:12px">個別調整範例：林秉承 → 初診 10 / 複診 10 = 10 分鐘一位不分初複診。改完立即生效（前台＋櫃台同步）。<br><b>每診初診上限</b>：同一位醫師在<b>同一個班表時段</b>內最多接幾位初診，超過就不給建立（病人端與櫃檯都擋，複診不受影響）。<b>0 ＝ 不限制</b>。<br><b>上限生效日</b>：<b>看診日</b>在這天之前完全不受限制，已經排好的近期診次不會被影響；空白＝立即生效。<br><b>網路預約天數</b>：病人在手機上最多能約多少天內的診（例：蕭捷健設 14，病人只看得到 14 天內）。<b>0 ＝ 用公版 30 天</b>；<b>櫃檯代約完全不受此限</b>。<br><b>櫃檯可超約</b>（過渡期用）：勾選後，櫃檯遇到「該時段已被預約」時會跳確認，確認後仍可建立，並在備註標記 ⚠️超約。<b>只放行這一項</b> —— 醫師沒門診、請假、停診一律照擋；<b>初診上限仍硬擋</b>；<b>病人端完全不受影響</b>。過渡期結束取消勾選即回復原本行為。<br><b>單診規則</b>：同院區、同時間班表上<b>沒有其他減重醫師</b>時才套用（系統每天依班表自動判斷）。「1 位/時」＝從整點起每小時一格、一格只約一位；「2 位/時」＝整點與半點各一格。勾「只收複診」→ 病人端單診時段約不到初診，櫃檯確認後可超約。星期都不勾＝每天套用。院區不同要分開設定時，用「🏥 院區別」。</p>
+    <table class="tbl"><thead><tr><th>醫師</th><th>初診</th><th>複診</th><th title="同一個班表時段內最多幾位初診，0＝不限制">每診初診上限</th><th title="看診日在這天之前不受限制，空白＝立即生效">上限生效日</th><th title="病人網路預約最多能約多少天內，0＝用公版 30 天。櫃檯代約不受限">網路預約天數</th><th title="勾選後櫃檯遇到「時段已被預約」可確認後仍建立；病人端不受影響">櫃檯可超約</th><th title="同院區同時間沒有其他減重醫師時才套用">單診規則</th><th>狀態</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ── 班表管理 + Drive sync ── */
@@ -6036,9 +6083,10 @@ document.addEventListener('click', async e => {
       const ob2 = !!(tr.querySelector('.tcc-ob') || {}).checked;                    /* ✨ v31.37 */
       if (!i2 || !f2) { toast('請填分鐘數', 'var(--amber)'); break; }
       el.disabled = true;
-      const res = await api.post('saveTimeSetting', { doctor: el.dataset.d, clinic: cli, initMin: i2, followMin: f2, initCap: cap2, capFrom: from2, openDays: days2, overbook: ob2, by: (S.aUser && S.aUser.name) || 'admin' }, true);
+      const solo2 = soloRead(tr, 'tcc');   /* ✨ v31.79 */
+      const res = await api.post('saveTimeSetting', { doctor: el.dataset.d, clinic: cli, initMin: i2, followMin: f2, initCap: cap2, capFrom: from2, openDays: days2, overbook: ob2, ...solo2, by: (S.aUser && S.aUser.name) || 'admin' }, true);
       el.disabled = false;
-      if (res.ok) { S.timeCfg.clinicOv[el.dataset.d + '|' + cli] = { initMin: i2, followMin: f2, initCap: cap2, capFrom: from2, openDays: days2, overbook: ob2 }; toast(`✓ ${el.dataset.d}／${cli}：初 ${i2} 分・複 ${f2} 分`); renderAdmin(); }
+      if (res.ok) { S.timeCfg.clinicOv[el.dataset.d + '|' + cli] = { initMin: i2, followMin: f2, initCap: cap2, capFrom: from2, openDays: days2, overbook: ob2, ...solo2 }; toast(`✓ ${el.dataset.d}／${cli}：初 ${i2} 分・複 ${f2} 分`); renderAdmin(); }
       else toast('失敗：' + (res.message || res.error || ''), 'var(--red)');
       break; }
     case 'tc-del-cli': {
@@ -6055,8 +6103,9 @@ document.addEventListener('click', async e => {
       const openDays = Math.max(0, +(tr.querySelector('.tc-days') || {}).value || 0);  /* ✨ v31.29 網路預約天數，0＝公版 */
       const overbook = !!(tr.querySelector('.tc-ob') || {}).checked;                    /* ✨ v31.37 櫃檯可超約 */
       if (!(initMin >= 5 && followMin >= 5)) { toast('分鐘數需 ≥ 5', 'var(--amber)'); break; }
-      const res = await api.post('saveTimeSetting', { doctor:d, initMin, followMin, initCap, capFrom, openDays, overbook, by:S.aUser.name }, true);
-      if (res.ok) { S.timeCfg.overrides[d] = { initMin, followMin, initCap, capFrom, openDays, overbook }; toast(`✓ ${d}：初診 ${initMin} / 複診 ${followMin} 分${initCap?`・每診初診上限 ${initCap} 位${capFrom?`（${capFrom.slice(5).replace('-','/')} 起）`:'（立即生效）'}`:'・初診不限量'}`); renderAdmin(); }
+      const solo = soloRead(tr, 'tc');   /* ✨ v31.79 */
+      const res = await api.post('saveTimeSetting', { doctor:d, initMin, followMin, initCap, capFrom, openDays, overbook, ...solo, by:S.aUser.name }, true);
+      if (res.ok) { S.timeCfg.overrides[d] = { initMin, followMin, initCap, capFrom, openDays, overbook, ...solo }; toast(`✓ ${d}：初診 ${initMin} / 複診 ${followMin} 分${initCap?`・每診初診上限 ${initCap} 位${capFrom?`（${capFrom.slice(5).replace('-','/')} 起）`:'（立即生效）'}`:'・初診不限量'}`); renderAdmin(); }
       else toast('儲存失敗：'+(res.error||'後端未部署 saveTimeSetting'), 'var(--red)');
       break; }
     case 'ap-add': { AP_ROWS = apCollect(); AP_ROWS.push({ type:'職位', key:'', keywords:'', clinics:'', view:'所屬院區', edit:'所屬院區', order:500, enabled:true, note:'' }); apRender(); break; }
