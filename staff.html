@@ -757,7 +757,7 @@ function soloRead(tr, p) {
   return { soloPerHour: +sel.value || 0, soloFollowOnly: !!(tr.querySelector('.' + p + '-solo-fo') || {}).checked,
            soloDays: [...tr.querySelectorAll('.' + p + '-solo-d')].filter(x => x.checked).map(x => x.value).join('') };
 }
-function soloTxt(c) { const n = +c.soloPerHour || 0; return n ? '・單診 ' + n + ' 位/時' + (c.soloFollowOnly ? '只收複診' : '') + (c.soloDays ? '（週' + c.soloDays + '）' : '') : ''; }
+function soloTxt(c) { const n = +c.soloPerHour || 0; return n ? '・單診 ' + n + ' 位/時' + (c.soloFollowOnly ? '・只收複診' : '') + (c.soloDays ? '（週' + c.soloDays + '）' : '') : ''; }
 function apptEndMin(a, docN) {
   const st = t2m(apptTime(a));
   { const _so = soloCell(docN, a.clinic || a['院區'] || '', String(a.date || a['看診日期'] || '').slice(0, 10), st); if (_so) return _so.end; }   /* ✨ v31.79 單診一格整格佔用 */
@@ -3079,7 +3079,7 @@ function bkbRefresh(preferT) {
       const _so = soloCell(doc, clinic, date, t);   /* ✨ v31.79 單診：只開整點；初診需超約確認 */
       if (_so && t !== _so.start) continue;
       const _dd = _so ? _so.end - _so.start : dur;
-      if (_so && type === '初診' && _so.followOnly) { _why[v2] = '單診只收複診'; over.push(v2); continue; }
+      if (_so && type === '初診' && _so.followOnly) { _why[v2] = blocks.some(([bs, be]) => t < be && bs < t + _dd) ? '單診只收複診已有人' : '單診只收複診'; over.push(v2); continue; }
       const late = t + dur > LAST_END_MIN;
       const taken = blocks.some(([bs, be]) => t < be && bs < t + _dd);
       const full = _dst === '滿診';
@@ -3100,6 +3100,7 @@ function bkbRefresh(preferT) {
       : w === '已有人滿診' ? '　⚠️ 已有人・滿診・可超約'
       : w === '滿診' ? '　⚠️ 滿診・可超約'
       : w === '單診只收複診' ? '　⚠️ 單診只收複診・可超約'
+      : w === '單診只收複診已有人' ? '　⚠️ 單診只收複診・已有人・可超約'
       : '　⚠️ 已有人・可超約';
     return `<option ${t===prevVal?'selected':''}>${t}～${m2t(t2m(t)+dur)}${tag}</option>`;
   };
@@ -5373,7 +5374,7 @@ function htmlATimeCfg() {
         起 <input type="date" class="tcc-from" value="${c.capFrom || ''}" style="font-size:13px;padding:3px" title="看診日在這天之前不受限制；空白＝立即生效">
         預約天數 <input type="number" class="tcc-days" value="${c.openDays || 0}" min="0" max="120" step="1" style="width:52px;padding:4px" title="0＝用公版 30 天">
         <label style="white-space:nowrap;font-size:13px"><input type="checkbox" class="tcc-ob" ${c.overbook ? 'checked' : ''} style="width:16px;height:16px;vertical-align:-2px" title="櫃檯可超約"> 可超約</label>
-        <span style="white-space:nowrap;font-size:13px">單診 ${soloCtl('tcc', c)}</span>
+        <span style="white-space:nowrap;font-size:13px">單診 ${soloCtl('tcc', (S.timeCfg.clinicOv||{})[d.shortName+'|'+d.clinics[0]] || {})}</span>
         <button class="btn btn-o btn-sm" data-act="tc-save-cli" data-d="${esc(d.shortName)}" style="font-size:13px">＋ 設定此院區</button>
       </td></tr>`}`;
   }).join('');
