@@ -742,6 +742,7 @@ function soloCell(doc, cli, ds, t) {
   const me = normDoc(doc), cell = Math.max(5, Math.round(60 / n)), cs = t - (t % cell), ce = cs + cell;
   let own = false, other = false;
   list.forEach(r => { const a = t2m(r.start), b = t2m(r.end); if (r.doctor === me) { if (a <= cs && ce <= b) own = true; } else if (a < ce && cs < b) other = true; });
+  if (own && !other) other = (S.soloBusy || []).some(x => x[0] === ds && x[1] === cli && normDoc(x[2]) !== me && t2m(x[3]) < ce && cs < t2m(x[4]));   /* ✨ v31.80 健保門診也算 */
   return own && !other ? { start: cs, end: ce, followOnly: !!cfg.soloFollowOnly } : null;
 }
 function soloCtl(p, c) {
@@ -767,6 +768,8 @@ function apptEndMin(a, docN) {
 async function loadTimeCfg() {
   const res = await api.get('getTimeSettings');
   if (res.ok) S.timeCfg = { defaults: res.defaults || {initMin:30, followMin:15}, overrides: res.overrides || {}, clinicOv: res.clinicOverrides || {} };
+  /* ✨ v31.80 單診判斷用的同院區健保門診；背景載入，不拖慢開機 */
+  api.get('getSoloBusy').then(r => { if (r && r.ok && Array.isArray(r.data)) S.soloBusy = r.data; }).catch(() => {});
 }
 async function loadDocOrder() {
   const res = await api.get('getDoctorOrder');
