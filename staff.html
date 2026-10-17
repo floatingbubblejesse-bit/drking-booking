@@ -432,6 +432,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="perm">權限設定</div>
       <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
       <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
+      <div class="mi" data-act="a-menu" data-v="linebind">LINE 綁定名單</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -4835,6 +4836,34 @@ function renderAdmin() {
   else if (S.aView === 'perm') { c.innerHTML = `<div class="card"><h3>權限設定</h3><div id="ap-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAPerm(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
+  else if (S.aView === 'linebind') { c.innerHTML = `<div class="card"><h3>LINE 綁定名單</h3><div id="lb-box" class="muted" style="padding:14px">載入中…</div></div>`; loadALineBind(); }
+}
+/* ✨ v31.82 LINE 綁定名單（系統管理）：病人在分流頁自助綁定或從 LINE 自助預約／查詢時自動綁定。
+   綁定後所有通知（含櫃檯代約）都走 LINE。「同意行銷」＝自助綁定頁有勾同意；自動綁定的為空白，行銷用途請只取 Y。 */
+async function loadALineBind() {
+  const el = $('#lb-box'); if (!el) return;
+  const res = await api.post('getLineBindList', {}, true);
+  if (!$('#lb-box')) return;
+  if (!res.ok || !Array.isArray(res.data)) { el.innerHTML = '<p class="muted">讀取失敗：' + esc(res.error || '') + '</p>'; return; }
+  S.lineBindRows = res.data;
+  const rows = res.data.slice().sort((a, b) => String(b.boundAt).localeCompare(String(a.boundAt)));
+  const nY = rows.filter(r => r.consent === 'Y').length;
+  el.className = ''; el.style.padding = '';
+  el.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 10px">
+      <span>共 <b>${rows.length}</b> 筆綁定，其中 <b>${nY}</b> 筆有勾「同意行銷」</span>
+      <button class="btn btn-p btn-sm" data-act="lb-export">⬇ 下載 Excel（CSV）</button>
+      <button class="btn btn-o btn-sm" data-act="lb-reload">重新整理</button></div>
+    <p class="muted" style="margin:0 0 10px">綁定後，這支手機的所有預約通知（含櫃檯代約）都改走 LINE。行銷用途請只取「同意行銷 = Y」的名單。</p>
+    <div style="overflow:auto"><table class="tbl"><thead><tr><th>姓名</th><th>手機</th><th>院區</th><th>看診醫師</th><th>看診次數</th><th>最近看診</th><th>下次預約</th><th>同意行銷</th><th>來源</th><th>綁定日</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.clinics)}</td><td>${esc(r.doctors)}</td><td style="text-align:center">${r.visits}</td><td>${esc(r.lastVisit)}</td><td>${esc(r.nextVisit)}</td><td style="text-align:center">${r.consent === 'Y' ? '<b style="color:var(--green)">Y</b>' : ''}</td><td>${esc(r.source)}</td><td>${esc(r.boundAt)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">目前沒有綁定資料</td></tr>'}</tbody></table></div>`;
+}
+function lineBindExport() {
+  const rows = S.lineBindRows || [];
+  const H = ['姓名','手機','院區','看診醫師','看診次數','最近看診','下次預約','同意行銷','來源','綁定日','LINE_USER_ID'];
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const csv = '\ufeff' + [H.join(',')].concat(rows.map(r => [r.name, "'" + r.phone, r.clinics, r.doctors, r.visits, r.lastVisit, r.nextVisit, r.consent, r.source, r.boundAt, r.userId].map(q).join(','))).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'LINE綁定名單_' + fmtD(new Date()).replace(/-/g, '') + '.csv'; a.click();
 }
 /* ✨ v31.41 顧客來源報表（系統管理）
    問題：目前分不清楚一筆預約是「病人自己上網/LINE 約的」還是「櫃檯幫忙掛的」，
@@ -5904,6 +5933,8 @@ document.addEventListener('click', async e => {
     case 'cr-today': { S.crDate = fmtD(new Date()); loadCReport(); break; }
     case 'cn-all': { S.cnAll = !S.cnAll; loadCNotify(); break; }   /* ✨ v31.41 明日通知：只看異常 ⇄ 看全部 */
     /* ✨ v31.41 顧客來源報表：換區間 */
+    case 'lb-export': lineBindExport(); break;   /* ✨ v31.82 */
+    case 'lb-reload': loadALineBind(); break;
     case 'src-go': { S.srcFrom = $('#src-from').value || S.srcFrom; S.srcTo = $('#src-to').value || S.srcTo; loadASource(); break; }
     case 'src-month': { S.srcFrom = srcMonthStart(); S.srcTo = fmtD(new Date()); renderAdmin(); break; }
     case 'cr-doc': { S.crDoc = el.dataset.n || '__all'; renderCReport(); break; }
