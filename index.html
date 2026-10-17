@@ -429,7 +429,7 @@ async function initLiff(){if(!LIFF_ID||!inLineApp())return;try{if(!window.liff){
 function lineIdTokenNow(){try{if(!LIFF_STATE.ready)return '';const d=window.liff.getDecodedIDToken();if(!d||!d.exp||d.exp*1000<Date.now()+60000)return '';return window.liff.getIDToken()||'';}catch(_){return '';}}
 async function rpc(method,payload,timeout=45000){
  /* 送出預約時才取 ID Token（重試時也是當下重取），不存進待確認的送出內容 */
- if(method==='createBooking'){const tok=lineIdTokenNow();if(tok)payload=Object.assign({},payload,{lineIdToken:tok});}
+ if(method==='createBooking'||method==='lookupBooking'){const tok=lineIdTokenNow();if(tok)payload=Object.assign({},payload,{lineIdToken:tok});}   /* 2026-10-17 查詢預約也帶 LINE 身分 → 後端自動綁定 */
  if(method==='getBootstrap'&&window.EARLY_BOOTSTRAP){const pending=window.EARLY_BOOTSTRAP;window.EARLY_BOOTSTRAP=null;return await pending;}
  if(method==='getBootstrap'&&window.PUBLIC_BOOTSTRAP)return window.PUBLIC_BOOTSTRAP.refresh(true);
  const action={getBootstrap:'v2Bootstrap',getLegacyDateSlots:'v2Slots',createBooking:'v2Create',lookupBooking:'v2Lookup',cancelBooking:'v2Cancel'}[method];if(!action)return {ok:false,error:{code:'INVALID_INPUT',message:'請由原櫃檯入口操作此功能。'}};
