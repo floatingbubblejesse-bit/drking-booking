@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>金鶯診所｜綁定 LINE 通知</title>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--teal:#2f7a7e;--teal-d:#245f63;--teal-l:#e6f2f2;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--bg:#f4f7f7;--red:#b91c1c;--green:#065f46}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding:0 20px calc(28px + env(safe-area-inset-bottom))}
+  .top{width:calc(100% + 40px);background:var(--teal);color:#fff;margin:0 -20px;padding:calc(18px + env(safe-area-inset-top)) 20px 18px;text-align:center}
+  .top .logo{width:60px;height:60px;border-radius:50%;background:#fff;margin:0 auto 10px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+  .top .logo img{width:100%;height:100%;display:block;border-radius:50%}
+  .top h1{margin:0;font-size:19px;font-weight:700}
+  .wrap{width:100%;max-width:420px}
+  h2{margin:26px 0 6px;font-size:22px;font-weight:800;text-align:center}
+  .sub{margin:0 0 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6}
+  .card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:20px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}
+  input[type=text],input[type=tel]{width:100%;font-size:17px;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff}
+  input:focus{outline:none;border-color:var(--teal)}
+  .chk{display:flex;gap:10px;align-items:flex-start;margin:16px 0 6px;font-size:14px;line-height:1.6;color:#374151}
+  .chk input{width:20px;height:20px;margin-top:2px;flex:0 0 auto}
+  button.btn{width:100%;margin-top:14px;font-size:17px;font-weight:700;padding:14px;border:0;border-radius:12px;background:var(--teal);color:#fff}
+  button.btn:disabled{opacity:.55}
+  .msg{margin-top:12px;font-size:14px;line-height:1.6;padding:10px 12px;border-radius:10px;display:none}
+  .msg.err{display:block;background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+  .msg.ok{display:block;background:#ecfdf5;color:var(--green);border:1px solid #6ee7b7}
+  .bound{font-size:14px;color:#374151;line-height:1.8}
+  .bound b{color:var(--teal-d)}
+  .foot{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.7}
+  a.back{display:block;text-align:center;margin-top:16px;color:var(--teal-d);font-size:14px}
+</style>
+</head>
+<body>
+<div class="top"><div class="logo"><img src="drking-logo.svg" alt="金鶯診所"></div><h1>金鶯診所</h1></div>
+<div class="wrap">
+  <h2>🔔 綁定 LINE 通知</h2>
+  <p class="sub">綁定一次，之後所有預約通知與看診提醒<br>都會直接傳到這個 LINE</p>
+
+  <div class="card" id="status" style="display:none"><div class="bound" id="bound"></div></div>
+
+  <div class="card" id="form">
+    <label for="phone">手機號碼</label>
+    <input type="tel" id="phone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" autocomplete="tel">
+    <label for="name">姓名（與預約時填寫的相同）</label>
+    <input type="text" id="name" placeholder="請輸入姓名" autocomplete="name">
+    <label class="chk"><input type="checkbox" id="consent"><span>我同意金鶯診所以 LINE 傳送預約通知、看診提醒與診所活動訊息，並依個人資料保護法蒐集與使用我的手機號碼及姓名。</span></label>
+    <button class="btn" id="submit">綁定</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <a class="back" href="line.html">← 回預約首頁</a>
+  <div class="foot">綁定後可隨時洽櫃檯解除<br>如有疑問請洽各院區櫃檯</div>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  設定（與 index.html 相同）                                     ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+var LIFF_ID = '2007733363-o3Ux4wSa';
+var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec';
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = function (t, cls) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + cls; };
+
+  function post(action, payload) {
+    return fetch(BACKEND_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, payload: payload || {} }), credentials: 'omit', redirect: 'follow' })
+      .then(function (r) { return r.json(); });
+  }
+  function idToken() {
+    try { var d = liff.getDecodedIDToken(); if (!d || !d.exp || d.exp * 1000 < Date.now() + 60000) return ''; return liff.getIDToken() || ''; } catch (_) { return ''; }
+  }
+  function showBound(list) {
+    var box = $('status'), b = $('bound');
+    if (!list || !list.length) { box.style.display = 'none'; return; }
+    b.innerHTML = '<b>✅ 此 LINE 已綁定：</b><br>' + list.map(function (x) { return (x.name ? x.name + '　' : '') + x.phone; }).join('<br>');
+    box.style.display = '';
+  }
+
+  async function init() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    } catch (e) {
+      msg('請從 LINE 開啟這個頁面（圖文選單 → 減重預約 → 綁定 LINE 通知）。', 'err');
+      $('submit').disabled = true; return;
+    }
+    var tok = idToken();
+    if (!tok) { msg('無法取得 LINE 身分，請關閉後重新開啟。', 'err'); $('submit').disabled = true; return; }
+    try { var r = await post('lineBindStatus', { lineIdToken: tok }); if (r && r.ok) showBound(r.bound); } catch (_) {}
+  }
+
+  $('submit').addEventListener('click', async function () {
+    var phone = $('phone').value.replace(/\D/g, ''), name = $('name').value.trim(), consent = $('consent').checked;
+    if (!/^09\d{8}$/.test(phone)) return msg('請輸入正確的手機號碼（09 開頭共 10 碼）。', 'err');
+    if (!name) return msg('請輸入姓名。', 'err');
+    if (!consent) return msg('請先勾選同意。', 'err');
+    var tok = idToken(); if (!tok) return msg('無法取得 LINE 身分，請關閉後重新開啟。', 'err');
+    var btn = $('submit'); btn.disabled = true; btn.textContent = '綁定中…';
+    try {
+      var r = await post('lineBind', { lineIdToken: tok, phone: phone, name: name, consent: true });
+      if (r && r.ok) {
+        msg(r.already ? '這支手機已經綁定過了，不用再綁。' : '綁定成功！之後的預約通知與看診提醒都會傳到這個 LINE。', 'ok');
+        var s = await post('lineBindStatus', { lineIdToken: tok }); if (s && s.ok) showBound(s.bound);
+        $('phone').value = ''; $('name').value = ''; $('consent').checked = false;
+      } else msg((r && r.message) || '綁定失敗，請稍後再試。', 'err');
+    } catch (e) { msg('連線失敗，請稍後再試。', 'err'); }
+    btn.disabled = false; btn.textContent = '綁定';
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
