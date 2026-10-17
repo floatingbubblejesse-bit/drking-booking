@@ -2770,7 +2770,7 @@ async function loadCDayGrid() {
     const dst = _leave ? '停診' : dayStat(S.cClinic, S.cDate, dn);
     h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}${_leave ? '<br><span style="color:#dc2626;font-weight:700">醫師請假，當日無診次</span>' : ''}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-top:3px">
-        ${['','滿診','停診'].map(v => `<button data-act="ds-set" data-doc="${esc(dn)}" data-v="${v}" style="font-size:13px;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid ${dst===v?'#1e40af':'#cbd5e1'};background:${dst===v?'#1e40af':'#fff'};color:${dst===v?'#fff':'#64748b'}">${v||'正常'}</button>`).join('')}
+        ${/* ✨ v31.81 停診改由醫師請假系統決定，櫃檯不能再手動設停診（2026-10-17 chi：11/07 誤觸）；已標停診的仍顯示，可按「正常」解除 */ ['','滿診'].concat(dst === '停診' && !_leave ? ['停診'] : []).map(v => `<button data-act="ds-set" data-doc="${esc(dn)}" data-v="${v}" style="font-size:13px;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid ${dst===v?'#1e40af':'#cbd5e1'};background:${dst===v?'#1e40af':'#fff'};color:${dst===v?'#fff':'#64748b'}">${v||'正常'}</button>`).join('')}
       </div></th>`;
   });
   h += `</tr></thead><tbody>`;
@@ -5733,7 +5733,7 @@ document.addEventListener('click', async e => {
       break; }
     case 'ds-set': {
       const doc = el.dataset.doc, v = el.dataset.v;
-      if (v === '停診' && !confirm(`確定將 ${doc} 醫師 ${S.cDate} 設為停診？\n（當日已有的預約會列出通知清單）`)) break;
+      if (v === '停診') { toast('停診請走醫師請假系統，櫃檯不能手動設定', 'var(--amber)'); break; }   /* ✨ v31.81 */
       el.disabled = true;
       const res = await api.post('setDayStatus', { clinic: S.cClinic, date: S.cDate, doctor: doc, status: v, operator: (S.cUser && S.cUser.name) || '' }, true);
       el.disabled = false;
