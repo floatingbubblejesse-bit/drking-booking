@@ -433,6 +433,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="report">區間報表</div>
       <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
       <div class="mi" data-act="a-menu" data-v="linebind">LINE 綁定名單</div>
+      <div class="mi" data-act="a-menu" data-v="staffline">櫃檯 LINE 早報</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -4837,6 +4838,7 @@ function renderAdmin() {
   else if (S.aView === 'perm') { c.innerHTML = `<div class="card"><h3>權限設定</h3><div id="ap-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAPerm(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
+  else if (S.aView === 'staffline') { c.innerHTML = htmlAStaffLine(); loadAStaffLine(); }   /* ✨ v31.84 */
   else if (S.aView === 'linebind') { c.innerHTML = `<div class="card"><h3>LINE 綁定名單</h3><div id="lb-box" class="muted" style="padding:14px">載入中…</div></div>`; loadALineBind(); }
 }
 /* ✨ v31.82 LINE 綁定名單（系統管理）：病人在分流頁自助綁定或從 LINE 自助預約／查詢時自動綁定。
@@ -4857,6 +4859,55 @@ async function loadALineBind() {
     <p class="muted" style="margin:0 0 10px">綁定後，這支手機的所有預約通知（含櫃檯代約）都改走 LINE。行銷用途請只取「同意行銷 = Y」的名單。</p>
     <div style="overflow:auto"><table class="tbl"><thead><tr><th>姓名</th><th>手機</th><th>院區</th><th>看診醫師</th><th>看診次數</th><th>最近看診</th><th>下次預約</th><th>同意行銷</th><th>來源</th><th>綁定日</th></tr></thead><tbody>
     ${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.clinics)}</td><td>${esc(r.doctors)}</td><td style="text-align:center">${r.visits}</td><td>${esc(r.lastVisit)}</td><td>${esc(r.nextVisit)}</td><td style="text-align:center">${r.consent === 'Y' ? '<b style="color:var(--green)">Y</b>' : ''}</td><td>${esc(r.source)}</td><td>${esc(r.boundAt)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">目前沒有綁定資料</td></tr>'}</tbody></table></div>`;
+}
+/* ✨ v31.84 櫃檯 LINE 早報（系統管理）：綁定碼＋已綁定公務機＋預覽／立即推送。
+   公務機是院區共用、沒有個人員編，所以用一次性綁定碼（後端 v145，10 分鐘、用一次就失效）。 */
+const SL_CLINICS = ['三樹院區','土城院區','龍潭院區','平鎮院區','桃園院區','鶯歌院區'];
+function htmlAStaffLine() {
+  return `<div class="card"><h3>櫃檯 LINE 早報</h3>
+    <p class="muted" style="margin:6px 0 12px;line-height:1.7">每天 07:30 推「當日減重名單、抽血名單、拿藥待開單」給已綁定的櫃檯公務機（病人姓名遮中間字，不放電話與病歷號）。<br>
+    綁定方式：選院區 → 按「產生綁定碼」→ 公務機的 LINE 打開 <b>https://liff.line.me/2007733363-o3Ux4wSa/staffbind.html</b> → 輸入綁定碼（10 分鐘內有效、用一次就失效）。</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="sl-cli" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">${SL_CLINICS.map(c => '<option>' + c + '</option>').join('')}</select>
+      <button class="btn btn-p btn-sm" data-act="sl-code">產生綁定碼</button>
+      <button class="btn btn-o btn-sm" data-act="sl-preview">預覽今天早報</button>
+      <button class="btn btn-o btn-sm" data-act="sl-send">立即推送今天早報</button>
+    </div>
+    <div id="sl-out" style="margin:12px 0"></div>
+    <h4 style="margin:16px 0 6px">已綁定的公務機</h4>
+    <div id="sl-box" class="muted">載入中…</div></div>`;
+}
+async function loadAStaffLine() {
+  const el = $('#sl-box'); if (!el) return;
+  const r = await api.post('getStaffLineList', {}, true);
+  if (!$('#sl-box')) return;
+  if (!r.ok) { el.innerHTML = '讀取失敗：' + esc(r.error || ''); return; }
+  const rows = (r.data || []).filter(x => x.status === '啟用');
+  el.className = '';
+  el.innerHTML = rows.length ? `<table class="tbl"><thead><tr><th>院區</th><th>綁定方式</th><th>綁定日</th><th></th></tr></thead><tbody>${rows.map(x => `<tr><td>${esc(x.clinic)}</td><td>${esc(x.name || x.employeeId)}</td><td>${esc(String(x.created || '').slice(0, 10))}</td><td><button class="btn btn-o btn-sm" data-act="sl-unbind" data-row="${x.row}">解除</button></td></tr>`).join('')}</tbody></table>` : '<p class="muted">目前沒有綁定的公務機。</p>';
+}
+async function slAct(act, btn) {
+  const cli = ($('#sl-cli') || {}).value || '', out = $('#sl-out'); if (!out) return;
+  if (act === 'sl-code') {
+    out.innerHTML = '產生中…';
+    const r = await api.post('staffBindCodeCreate', { clinic: cli, by: (S.aUser && (S.aUser.name || S.aUser.employeeId)) || '' }, true);
+    out.innerHTML = r.ok ? `<div style="font-size:15px">${esc(cli)} 綁定碼：<b style="font-size:30px;letter-spacing:6px">${esc(r.code)}</b>　<span class="muted">10 分鐘內有效，用一次就失效</span></div>` : '產生失敗：' + esc(r.error || '');
+  } else if (act === 'sl-preview') {
+    out.innerHTML = '產生中…';
+    const r = await api.post('staffDigestPreview', { clinic: cli, date: fmtD(new Date()) }, true);
+    out.innerHTML = r.ok ? (r.text ? `<pre style="white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px;max-width:460px">${esc(r.text)}</pre>` : '<p class="muted">今天這個院區沒有名單（不會推送）。</p>') : '失敗：' + esc(r.error || '');
+  } else if (act === 'sl-send') {
+    if (!confirm('現在就推送「' + cli + '」今天的早報給已綁定的公務機？')) return;
+    out.innerHTML = '推送中…';
+    const r = await api.post('staffDigestSend', { clinic: cli, date: fmtD(new Date()) }, true);
+    const x = (r.result || [])[0];
+    out.innerHTML = r.ok ? (x ? (x.sent ? '已推送給 ' + x.sent + ' 支公務機。' : '今天沒有名單，未推送。') : '這個院區還沒有綁定的公務機。') : '失敗：' + esc(r.error || '');
+  } else if (act === 'sl-unbind') {
+    if (!confirm('解除這支公務機的綁定？解除後不會再收到早報。')) return;
+    const r = await api.post('staffLineUnbind', { row: Number(btn.dataset.row) }, true);
+    if (!r.ok) alert('解除失敗：' + (r.error || ''));
+    loadAStaffLine();
+  }
 }
 function lineBindExport() {
   const rows = S.lineBindRows || [];
@@ -5936,6 +5987,7 @@ document.addEventListener('click', async e => {
     /* ✨ v31.41 顧客來源報表：換區間 */
     case 'lb-export': lineBindExport(); break;   /* ✨ v31.82 */
     case 'lb-reload': loadALineBind(); break;
+    case 'sl-code': case 'sl-preview': case 'sl-send': case 'sl-unbind': slAct(act, el); break;   /* ✨ v31.84 */
     case 'src-go': { S.srcFrom = $('#src-from').value || S.srcFrom; S.srcTo = $('#src-to').value || S.srcTo; loadASource(); break; }
     case 'src-month': { S.srcFrom = srcMonthStart(); S.srcTo = fmtD(new Date()); renderAdmin(); break; }
     case 'cr-doc': { S.crDoc = el.dataset.n || '__all'; renderCReport(); break; }
