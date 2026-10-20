@@ -54,6 +54,7 @@
   .tx{flex:1;min-width:0}
   .tt{font-size:17px;font-weight:700;line-height:1.35}
   .dd{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .nw{white-space:nowrap}   /* 2026-10-21 院區名不從中間斷行，要換行就整個院區換 */
   .arrow{flex:0 0 auto;color:#9ca3af;font-size:20px}
   .tag{
     display:inline-block;background:var(--teal);color:#fff;
@@ -83,7 +84,7 @@
     <div class="ct">
       <div class="ico">📅</div>
       <div class="tx">
-        <div class="tt"><span id="new-clinics">三樹 ・ 土城 ・ 龍潭 ・ 平鎮 ・ 桃園</span><span class="tag">線上預約</span></div>
+        <div class="tt"><span id="new-clinics"><span class="nw">三樹 ・</span> <span class="nw">土城 ・</span> <span class="nw">龍潭 ・</span> <span class="nw">平鎮 ・</span> <span class="nw">桃園 ・</span> <span class="nw">鶯歌</span></span><span class="tag">線上預約</span></div>
         <div class="dd">即時查看空檔，直接選醫師與時段</div>
       </div>
       <div class="arrow">›</div>
@@ -96,7 +97,7 @@
       <div class="ico">🏥</div>
       <div class="tx">
         <div class="tt">其他院區</div>
-        <div class="dd">鶯歌・樹林・八德・大湳・埔心・大溪・大竹・龍岡</div>
+        <div class="dd"><span class="nw">樹林・</span><span class="nw">八德・</span><span class="nw">大湳・</span><span class="nw">埔心・</span><span class="nw">大溪・</span><span class="nw">大竹・</span><span class="nw">龍岡</span></div>
       </div>
       <div class="arrow">›</div>
     </div>
@@ -134,14 +135,23 @@ var CONFIG = {
   OLD_URL : 'https://elite.seeker.net.tw/book/services',
 
   /* ③ 新系統目前開放哪些院區。新院區開通就加進來（桃園、平鎮上線後加 '桃園', '平鎮'） */
-  NEW_CLINICS : ['三樹', '土城', '龍潭', '平鎮', '桃園']
+  NEW_CLINICS : ['三樹', '土城', '龍潭', '平鎮', '桃園', '鶯歌']   /* 2026-10-21 鶯歌上線 */
 };
 
 (function () {
   var $ = function (s) { return document.querySelector(s); };
 
   /* 院區名稱 */
-  $('#new-clinics').textContent = CONFIG.NEW_CLINICS.join(' ・ ');
+  /* 2026-10-21：每個院區名（含後面的 ・）包成不換行，手機上只會在院區之間換行 */
+  var names = CONFIG.NEW_CLINICS, box = $('#new-clinics');
+  box.textContent = '';
+  names.forEach(function (n, i) {
+    var sp = document.createElement('span');
+    sp.className = 'nw';
+    sp.textContent = n + (i < names.length - 1 ? ' ・' : '');
+    box.appendChild(sp);
+    if (i < names.length - 1) box.appendChild(document.createTextNode(' '));
+  });
 
   /* 綁連結；沒設定網址的就提示而不是連到空白頁 */
   function bind(el, url, label) {
