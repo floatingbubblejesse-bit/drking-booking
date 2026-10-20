@@ -3087,7 +3087,8 @@ function bkbRefresh(preferT) {
       const late = t + dur > LAST_END_MIN;
       const taken = blocks.some(([bs, be]) => t < be && bs < t + _dd);
       const full = _dst === '滿診';
-      if (!late && !taken && !full) { free.push(v2); continue; }
+      if (late) continue;   /* ✨ v31.83（2026-10-20 chi）超過 21:00 收診一律不列、不可超約（後端 v143 同步硬擋） */
+      if (!taken && !full) { free.push(v2); continue; }
       if (!cfg.overbook) continue;
       _why[v2] = late ? '超時' : (taken && full) ? '已有人滿診' : taken ? '已有人' : '滿診';
       over.push(v2);
