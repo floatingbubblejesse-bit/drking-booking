@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>金鶯診所｜櫃檯 LINE 通知綁定</title>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--teal:#2f7a7e;--teal-d:#245f63;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--bg:#f4f7f7;--red:#b91c1c;--green:#065f46}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding:0 20px calc(28px + env(safe-area-inset-bottom))}
+  .top{width:calc(100% + 40px);background:var(--teal);color:#fff;margin:0 -20px;padding:calc(18px + env(safe-area-inset-top)) 20px 18px;text-align:center}
+  .top .logo{width:60px;height:60px;border-radius:50%;background:#fff;margin:0 auto 10px}
+  .top .logo img{width:100%;height:100%;display:block;border-radius:50%}
+  .top h1{margin:0;font-size:19px;font-weight:700}
+  .wrap{width:100%;max-width:420px}
+  h2{margin:26px 0 6px;font-size:22px;font-weight:800;text-align:center}
+  .sub{margin:0 0 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6}
+  .card{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:20px 18px;margin-bottom:14px}
+  label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}
+  input,select{width:100%;font-size:17px;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--teal)}
+  button.btn{width:100%;margin-top:18px;font-size:17px;font-weight:700;padding:14px;border:0;border-radius:12px;background:var(--teal);color:#fff}
+  button.btn:disabled{opacity:.55}
+  .msg{margin-top:12px;font-size:14px;line-height:1.6;padding:10px 12px;border-radius:10px;display:none}
+  .msg.err{display:block;background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+  .msg.ok{display:block;background:#ecfdf5;color:var(--green);border:1px solid #6ee7b7}
+  .foot{margin-top:18px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="top"><div class="logo"><img src="drking-logo.svg" alt="金鶯診所"></div><h1>金鶯診所｜工作人員</h1></div>
+<div class="wrap">
+  <h2>🔔 櫃檯 LINE 通知綁定</h2>
+  <p class="sub">用櫃檯公務機綁定一次<br>每天早上 7:30 會收到當日減重名單、抽血名單與拿藥待開單</p>
+  <div class="card">
+    <label for="clinic">院區</label>
+    <select id="clinic">
+      <option value="">請選擇院區</option>
+      <option>三樹院區</option><option>土城院區</option><option>龍潭院區</option><option>平鎮院區</option><option>桃園院區</option><option>鶯歌院區</option>
+    </select>
+    <label for="eid">員工編號</label>
+    <input type="text" id="eid" inputmode="numeric" autocomplete="username" placeholder="員工入口網的員編">
+    <label for="pw">密碼</label>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="員工入口網的密碼">
+    <button class="btn" id="submit">綁定這支 LINE</button>
+    <div class="msg" id="msg"></div>
+  </div>
+  <div class="foot">只供櫃檯公務機使用，密碼不會存在手機裡<br>要解除綁定請洽系統管理員</div>
+</div>
+<script>
+var LIFF_ID = '2007733363-o3Ux4wSa';
+var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2KnXqbht-ZJIm1t4adIsyW9gUE0P_7SvvCcP3REJYbohFxfMBag/exec';
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = function (t, cls) { var m = $('msg'); m.textContent = t; m.className = 'msg ' + cls; };
+  function idToken() {
+    try { var d = liff.getDecodedIDToken(); if (!d || !d.exp || d.exp * 1000 < Date.now() + 60000) return ''; return liff.getIDToken() || ''; } catch (_) { return ''; }
+  }
+  async function init() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    } catch (e) { msg('請用櫃檯公務機的 LINE 開啟這個頁面。', 'err'); $('submit').disabled = true; }
+  }
+  $('submit').addEventListener('click', async function () {
+    var clinic = $('clinic').value, eid = $('eid').value.trim(), pw = $('pw').value;
+    if (!clinic) return msg('請選擇院區。', 'err');
+    if (!eid || !pw) return msg('請輸入員編和密碼。', 'err');
+    var tok = idToken(); if (!tok) return msg('無法取得 LINE 身分，請關閉後重新開啟。', 'err');
+    var btn = $('submit'); btn.disabled = true; btn.textContent = '綁定中…';
+    try {
+      var r = await fetch(BACKEND_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, credentials: 'omit', redirect: 'follow',
+        body: JSON.stringify({ action: 'staffLineBind', payload: { lineIdToken: tok, clinic: clinic, employeeId: eid, password: pw } }) }).then(function (x) { return x.json(); });
+      if (r && r.ok) { msg((r.already ? '這支 LINE 已經綁定過「' : '綁定成功！這支 LINE 之後每天早上 7:30 會收到「') + r.clinic + '」的當日名單。', 'ok'); $('pw').value = ''; }
+      else msg((r && r.message) || '綁定失敗，請稍後再試。', 'err');
+    } catch (e) { msg('連線失敗，請稍後再試。', 'err'); }
+    $('pw').value = ''; btn.disabled = false; btn.textContent = '綁定這支 LINE';
+  });
+  init();
+})();
+</script>
+</body>
+</html>
