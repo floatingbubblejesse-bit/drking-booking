@@ -33,21 +33,14 @@
 <div class="top"><div class="logo"><img src="drking-logo.svg" alt="金鶯診所"></div><h1>金鶯診所｜工作人員</h1></div>
 <div class="wrap">
   <h2>🔔 櫃檯 LINE 通知綁定</h2>
-  <p class="sub">用櫃檯公務機綁定一次<br>每天早上 7:30 會收到當日減重名單、抽血名單與拿藥待開單</p>
+  <p class="sub">櫃檯公務機輸入綁定碼，綁定一次就好<br>每天早上 7:30 會收到當日減重名單、抽血名單與拿藥待開單</p>
   <div class="card">
-    <label for="clinic">院區</label>
-    <select id="clinic">
-      <option value="">請選擇院區</option>
-      <option>三樹院區</option><option>土城院區</option><option>龍潭院區</option><option>平鎮院區</option><option>桃園院區</option><option>鶯歌院區</option>
-    </select>
-    <label for="eid">員工編號</label>
-    <input type="text" id="eid" inputmode="numeric" autocomplete="username" placeholder="員工入口網的員編">
-    <label for="pw">密碼</label>
-    <input type="password" id="pw" autocomplete="current-password" placeholder="員工入口網的密碼">
+    <label for="code">綁定碼（6 位數字，請向管理員索取）</label>
+    <input type="tel" id="code" inputmode="numeric" maxlength="6" placeholder="例：123456" style="font-size:26px;letter-spacing:8px;text-align:center">
     <button class="btn" id="submit">綁定這支 LINE</button>
     <div class="msg" id="msg"></div>
   </div>
-  <div class="foot">只供櫃檯公務機使用，密碼不會存在手機裡<br>要解除綁定請洽系統管理員</div>
+  <div class="foot">綁定碼 10 分鐘內有效、用一次就失效<br>要解除綁定請洽系統管理員</div>
 </div>
 <script>
 var LIFF_ID = '2007733363-o3Ux4wSa';
@@ -65,18 +58,17 @@ var BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzdTS8wcbpKNpXokQB2Kn
     } catch (e) { msg('請用櫃檯公務機的 LINE 開啟這個頁面。', 'err'); $('submit').disabled = true; }
   }
   $('submit').addEventListener('click', async function () {
-    var clinic = $('clinic').value, eid = $('eid').value.trim(), pw = $('pw').value;
-    if (!clinic) return msg('請選擇院區。', 'err');
-    if (!eid || !pw) return msg('請輸入員編和密碼。', 'err');
+    var code = $('code').value.replace(/\D/g, '');
+    if (code.length !== 6) return msg('請輸入 6 位數綁定碼。', 'err');
     var tok = idToken(); if (!tok) return msg('無法取得 LINE 身分，請關閉後重新開啟。', 'err');
     var btn = $('submit'); btn.disabled = true; btn.textContent = '綁定中…';
     try {
       var r = await fetch(BACKEND_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, credentials: 'omit', redirect: 'follow',
-        body: JSON.stringify({ action: 'staffLineBind', payload: { lineIdToken: tok, clinic: clinic, employeeId: eid, password: pw } }) }).then(function (x) { return x.json(); });
-      if (r && r.ok) { msg((r.already ? '這支 LINE 已經綁定過「' : '綁定成功！這支 LINE 之後每天早上 7:30 會收到「') + r.clinic + '」的當日名單。', 'ok'); $('pw').value = ''; }
+        body: JSON.stringify({ action: 'staffLineBind', payload: { lineIdToken: tok, code: code } }) }).then(function (x) { return x.json(); });
+      if (r && r.ok) { msg((r.already ? '這支 LINE 已經綁定過「' : '綁定成功！這支 LINE 之後每天早上 7:30 會收到「') + r.clinic + '」的當日名單。', 'ok'); $('code').value = ''; }
       else msg((r && r.message) || '綁定失敗，請稍後再試。', 'err');
     } catch (e) { msg('連線失敗，請稍後再試。', 'err'); }
-    $('pw').value = ''; btn.disabled = false; btn.textContent = '綁定這支 LINE';
+    btn.disabled = false; btn.textContent = '綁定這支 LINE';
   });
   init();
 })();
