@@ -4906,11 +4906,11 @@ function htmlAStopNow() {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-o btn-sm" data-act="sn-preview">預覽（不會發送）</button>
-      <button class="btn btn-sm" data-act="sn-go" disabled style="background:#dc2626;color:#fff;border:none">立即停診並通知</button>
+      <button class="btn btn-sm" data-act="sn-go" style="background:#dc2626;color:#fff;border:none">立即停診並通知</button>
     </div>
     <div id="sn-out" style="margin:14px 0"></div></div>`;
 }
-function snReset() { const b = $('[data-act="sn-go"]'); if (b) b.disabled = true; S.snKey = ''; }
+function snReset() { S.snKey = ''; }   /* ✨ v31.92 按鈕不再反灰；沒預覽就按會自動先跑預覽 */
 function snHtml(r, dry) {
   const sm = r.summary || [];
   let h = '';
@@ -4940,19 +4940,42 @@ async function snAct(act, el) {
     const r = await api.post('stopNow', { date, clinics, reason, dryRun: true }, true);
     if (!r.ok) { out.innerHTML = '失敗：' + esc(r.message || r.error || ''); return; }
     S.snKey = key; out.innerHTML = snHtml(r, true);
-    const b = $('[data-act="sn-go"]'); if (b) b.disabled = false;
     return;
   }
   if (act === 'sn-go') {
-    if (S.snKey !== key) { toast('日期／院區／原因改過了，請先重新預覽', 'var(--amber)'); snReset(); return; }
+    /* ✨ v31.92 沒預覽（或條件改過）就按：直接幫他跑預覽，請他看完再按一次 —— 不會再「按了沒反應」 */
+    if (S.snKey !== key) {
+      toast('先幫你跑預覽，請確認名單後再按一次「立即停診並通知」', 'var(--amber)');
+      return snAct('sn-preview', el);
+    }
     if (!confirm(`確定要把 ${date}（${clinics.join('、')}）的減重門診全部停診，並「立刻」通知已預約的客人嗎？\n\nLINE／簡訊會馬上發出，無法收回。`)) return;
-    el.disabled = true; snReset();
-    out.innerHTML = '⏳ 停診標記與發送中，請不要關閉或重新整理畫面…（人數多時約 1–2 分鐘）';
-    const r = await api.post('stopNow', { date, clinics, reason }, true);
-    if (r.ok) { out.innerHTML = snHtml(r, false); S.dayStatus && S.dayStatus.clear && S.dayStatus.clear(); return; }
-    out.innerHTML = /逾時/.test(String(r.error || ''))
-      ? '<b style="color:#d97706">畫面等太久先斷線了，但後端可能還在發送。</b>請 2 分鐘後按「預覽」——已發出的會顯示「已通知過」，剩下的再按一次「立即停診並通知」即可（不會重複發）。'
-      : '失敗：' + esc(r.message || r.error || '');
+    el.disabled = true; S.snKey = '';
+    /* ✨ v31.92 後端每批最多發 80 秒，沒發完回 partial；這裡自動一批接一批，直到全部發完。
+       逾時或排程佔用（busy）也自動再叫 —— 已通知過的後端會跳過，不會重複發。 */
+    const tot = { line: 0, sms: 0, failed: 0, badPhone: 0 };
+    let last = null, tries = 0;
+    const prog = (msg) => { out.innerHTML = `⏳ ${msg}<br><span class="muted">請不要關閉或重新整理畫面。</span>`; };
+    prog('停診標記與發送中…');
+    while (tries < 30) {
+      tries++;
+      const r = await api.post('stopNow', { date, clinics, reason }, true);
+      if (r && r.ok) {
+        last = r;
+        ['line', 'sms', 'failed', 'badPhone'].forEach(k => { tot[k] += (r.sent && r.sent[k]) || 0; });
+        if (!r.partial) break;
+        prog(`已發 LINE ${tot.line}、簡訊 ${tot.sms}，還有 ${r.remaining} 位，繼續發送中…`);
+        continue;
+      }
+      if (r && (r.busy || /逾時/.test(String(r.error || '')))) { prog('系統忙碌，10 秒後自動接著發…'); await new Promise(res => setTimeout(res, 10000)); continue; }
+      out.innerHTML = '失敗：' + esc((r && (r.message || r.error)) || '') + '<br>可以再按一次「預覽」看哪些人已通知過，再按「立即停診並通知」補發（不會重複發）。';
+      el.disabled = false; return;
+    }
+    el.disabled = false;
+    if (!last) { out.innerHTML = '發送沒有完成，請按「預覽」確認後再按一次。'; return; }
+    last.sent = Object.assign({}, tot, { already: 0 });
+    out.innerHTML = snHtml(last, false);
+    S.dayStatus && S.dayStatus.clear && S.dayStatus.clear();
+    try { loadPublicCfg(); } catch (_) {}
   }
 }
 /* ✨ v31.84 櫃檯 LINE 早報（系統管理）：綁定碼＋已綁定公務機＋預覽／立即推送。
