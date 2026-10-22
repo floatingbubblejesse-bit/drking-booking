@@ -2559,6 +2559,25 @@ async function ensureSrcSessions(clinic) {
   S.srcSess = { clinic: clinic, from: from, to: to, map: map, byDate: byDate, srcFrom: r.from, srcTo: r.to };
   return S.srcSess;
 }
+/* ✨ v31.90 減重休診週（醫師在院）：只給設定「休診週櫃檯照常＝Y」的醫師（目前只有闕壯理週三晚）。
+   隔週開診的醫師在休診週沒有減重診次，但人在院區，櫃檯照常幫客人約；
+   這天補一個虛擬診次（時段照基準班表），預約就排進看診表，不會掉到「待補登／待指派」。
+   判斷休診週：當天沒診次、但前一週或後一週有 —— 請假（開診週沒診次）不會被誤當休診週。 */
+function offWeekVirt(clinic, date) {
+  const c = S.srcSess, tc = S.timeCfg || {};
+  if (!c || !c.map) return [];
+  const wd = isoWd(date), out = [];
+  const sh = function (n) { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  sched.byClinic(clinic).filter(function (s) { return s.weekday === wd; }).forEach(function (s) {
+    const dn = normDoc(s.doctor);
+    const cfg = (tc.clinicOv || {})[dn + '|' + clinic] || (tc.overrides || {})[dn] || {};
+    if (!cfg.offWeekCounter) return;
+    if (c.map[dn + '|' + date]) return;
+    if (!c.map[dn + '|' + sh(-7)] && !c.map[dn + '|' + sh(7)]) return;
+    out.push({ doctor: dn, start: s.start, end: s.end, offWeek: true });
+  });
+  return out;
+}
 /* ✨ v31.65 某一天實際的診次。有診次資料且在涵蓋範圍內就以診次為準；
    回空陣列代表「那天真的沒診」，不可以因為空就退回班表，否則請假那天又會冒出來。
    只有「還沒載到」或「超出 120 天窗口」才退回班表。 */
@@ -2568,7 +2587,7 @@ function daySessions(clinic, date) {
     && (!c.srcFrom || date >= c.srcFrom) && (!c.srcTo || date <= c.srcTo)
     && date >= c.from && date <= c.to;
   if (inRange) return { src: '診次', ready: true,
-    list: (c.byDate[date] || []).slice().sort(function (a, b) { return t2m(a.start) - t2m(b.start); }) };
+    list: (c.byDate[date] || []).concat(offWeekVirt(clinic, date)).sort(function (a, b) { return t2m(a.start) - t2m(b.start); }) };
   const wd = isoWd(date);
   return { src: '班表', ready: false,
     list: sched.byClinic(clinic).filter(function (s) { return s.weekday === wd; })
@@ -2582,7 +2601,9 @@ function docOnLeave(dn, date) {
   if (c.srcFrom && date < c.srcFrom) return false;
   if (c.srcTo && date > c.srcTo) return false;
   if (date < c.from || date > c.to) return false;
-  return !c.map[normDoc(dn) + '|' + date];
+  if (c.map[normDoc(dn) + '|' + date]) return false;
+  /* ✨ v31.90 休診週醫師在院，不算請假 */
+  return !offWeekVirt(c.clinic, date).some(function (s) { return s.doctor === normDoc(dn); });
 }
 /* ✨ v31.74 待補登黃框原本是純表格、沒有任何按鈕 —— 櫃檯看得到卻按不到，
    不能報到也不能調整（2026-09-24 林玉珍 09:50 就是這樣）。
@@ -2770,7 +2791,7 @@ async function loadCDayGrid() {
     const rs = dayScheds.filter(s => s.doctor === dn).map(s => `${s.start}–${s.end}`).join('、');
     const _leave = docOnLeave(dn, date);   /* ✨ v31.58 */
     const dst = _leave ? '停診' : dayStat(S.cClinic, S.cDate, dn);
-    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}${_leave ? '<br><span style="color:#dc2626;font-weight:700">醫師請假，當日無診次</span>' : ''}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
+    h += `<th><div class="gd">${esc(dn)} 醫師${dst ? ` <span style="background:${dst==='停診'?'#dc2626':'#d97706'};color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;vertical-align:1px">${dst}</span>` : ''}</div><div class="gs">${esc(rs)}${dayScheds.some(s => s.doctor === dn && s.offWeek) ? '<br><span style="color:#0369a1;font-weight:700">🗓️減重休診週（醫師在院）</span>' : ''}${_leave ? '<br><span style="color:#dc2626;font-weight:700">醫師請假，當日無診次</span>' : ''}</div><div style="font-size:13.5px;margin-top:2px">${(() => { const c = docCnt[dn]; if (!c) return '<span style="color:#94a3b8">尚無預約</span>'; return '<b style="color:#7c3aed">初 ' + c.i + '</b> ／ <b style="color:#1e40af">複 ' + c.f + '</b> ＝ ' + (c.i + c.f) + ' 人'; })()}</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-top:3px">
         ${/* ✨ v31.81 停診改由醫師請假系統決定，櫃檯不能再手動設停診（2026-10-17 chi：11/07 誤觸）；已標停診的仍顯示，可按「正常」解除 */ ['','滿診'].concat(dst === '停診' && !_leave ? ['停診'] : []).map(v => `<button data-act="ds-set" data-doc="${esc(dn)}" data-v="${v}" style="font-size:13px;padding:2px 9px;border-radius:5px;cursor:pointer;border:1px solid ${dst===v?'#1e40af':'#cbd5e1'};background:${dst===v?'#1e40af':'#fff'};color:${dst===v?'#fff':'#64748b'}">${v||'正常'}</button>`).join('')}
       </div></th>`;
