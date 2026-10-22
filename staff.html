@@ -3148,8 +3148,10 @@ function bkbCourseStart() {
   if (!raw) { st.style.display = 'none'; st.innerHTML = ''; return; }
   const weeks = +(raw.split('|')[1]) || 0;
   const cur = Math.min(+st.value || 1, weeks || 1);
+  /* 2026-10-22 chi：前面加藥物代號，猛健樂 M1～M8、胰妥讚 O1～O6（O1～O4），櫃檯一眼對上針次 */
+  const pre = /^猛健樂/.test(raw) ? 'M' : /^胰妥讚/.test(raw) ? 'O' : '';
   st.innerHTML = Array.from({ length: weeks }, (_, i) =>
-    `<option value="${i+1}" ${i+1===cur?'selected':''}>從第 ${i+1} 週開始（建立 ${weeks-i} 次）</option>`).join('');
+    `<option value="${i+1}" ${i+1===cur?'selected':''}>${pre}${i+1}從第${i+1}週開始（建立${weeks-i}次）</option>`).join('');
   st.style.display = '';
 }
 
