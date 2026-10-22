@@ -434,6 +434,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="source">顧客來源</div>
       <div class="mi" data-act="a-menu" data-v="linebind">LINE 綁定名單</div>
       <div class="mi" data-act="a-menu" data-v="staffline">櫃檯 LINE 早報</div>
+      <div class="mi" data-act="a-menu" data-v="stopnow">🌀 一鍵停診（颱風）</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -493,7 +494,7 @@ const API_TIMEOUT = 30000;   // ✨ v19.1 逾時保護：請求不再無限卡�
    這些都是唯讀查詢，逾時不會造成重複送出，訊息也一併改掉。
    根本解法（在預約表存簡訊狀態，不再掃通知紀錄）另案處理。 */
 const API_TIMEOUT_SLOW = 120000;
-const SLOW_ACTIONS = { auditUnsentBookings: 1 };
+const SLOW_ACTIONS = { auditUnsentBookings: 1, stopNow: 1 };   /* ✨ v31.91 一鍵停診發送可能超過 30 秒 */
 function _friendlyErr(e, action) {
   if (!(e && e.name === 'AbortError')) return String(e);
   return SLOW_ACTIONS[action]
@@ -4862,6 +4863,7 @@ function renderAdmin() {
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
   else if (S.aView === 'staffline') { c.innerHTML = htmlAStaffLine(); loadAStaffLine(); }   /* ✨ v31.84 */
+  else if (S.aView === 'stopnow') { c.innerHTML = htmlAStopNow(); }   /* ✨ v31.91 */
   else if (S.aView === 'linebind') { c.innerHTML = `<div class="card"><h3>LINE 綁定名單</h3><div id="lb-box" class="muted" style="padding:14px">載入中…</div></div>`; loadALineBind(); }
 }
 /* ✨ v31.82 LINE 綁定名單（系統管理）：病人在分流頁自助綁定或從 LINE 自助預約／查詢時自動綁定。
@@ -4882,6 +4884,76 @@ async function loadALineBind() {
     <p class="muted" style="margin:0 0 10px">綁定後，這支手機的所有預約通知（含櫃檯代約）都改走 LINE。行銷用途請只取「同意行銷 = Y」的名單。</p>
     <div style="overflow:auto"><table class="tbl"><thead><tr><th>姓名</th><th>手機</th><th>院區</th><th>看診醫師</th><th>看診次數</th><th>最近看診</th><th>下次預約</th><th>同意行銷</th><th>來源</th><th>綁定日</th></tr></thead><tbody>
     ${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.clinics)}</td><td>${esc(r.doctors)}</td><td style="text-align:center">${r.visits}</td><td>${esc(r.lastVisit)}</td><td>${esc(r.nextVisit)}</td><td style="text-align:center">${r.consent === 'Y' ? '<b style="color:var(--green)">Y</b>' : ''}</td><td>${esc(r.source)}</td><td>${esc(r.boundAt)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">目前沒有綁定資料</td></tr>'}</tbody></table></div>`;
+}
+/* ✨ v31.91 一鍵停診（颱風假等，系統管理）：選日期＋院區（可複選／全選）→ 預覽 → 立即停診並通知。
+   後端 v148 stopNow：那天選到院區的減重醫師全部標「停診」（前台馬上約不到、前一日提醒不發），
+   已預約的客人立刻通知 —— 有綁 LINE 推停診字卡（線上改約／撥打院區），沒綁發簡訊；
+   不受晚上 8 點後不發的限制；已通知過的不重發。 */
+function htmlAStopNow() {
+  const d = fmtD(new Date(Date.now() + 864e5));
+  return `<div class="card"><h3>🌀 一鍵停診（颱風假等）</h3>
+    <p class="muted" style="margin:6px 0 12px;line-height:1.7">選日期與院區 →「預覽」看會通知哪些客人 → 確認後按「立即停診並通知」。<br>
+    會把那天選到院區的<b>所有減重醫師標成停診</b>（前台馬上約不到、前一日提醒自動不發），並<b>立刻通知已預約的客人</b>：有綁 LINE 的推 LINE 停診字卡，沒綁的發簡訊。
+    颱風假多半晚上才宣布，所以這裡<b>不受晚上 8 點後不發的限制</b>。已經通知過的客人不會重發。</p>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <label>日期 <input type="date" id="sn-date" value="${d}" data-act="sn-cli" style="font-size:16px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"></label>
+      <label>原因 <input id="sn-reason" value="颱風" maxlength="12" style="width:120px;font-size:16px;padding:5px 8px;border:1px solid var(--line);border-radius:8px"></label>
+      <span class="muted" style="font-size:13px">LINE 字卡會寫「您的預約因<b>原因</b>停診」</span>
+    </div>
+    <div style="display:flex;gap:6px 16px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:16px">
+      <label style="font-weight:700"><input type="checkbox" id="sn-all" data-act="sn-all"> 全選</label>
+      ${SL_CLINICS.map(c => `<label><input type="checkbox" class="sn-cli" data-act="sn-cli" value="${c}"> ${c}</label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-o btn-sm" data-act="sn-preview">預覽（不會發送）</button>
+      <button class="btn btn-sm" data-act="sn-go" disabled style="background:#dc2626;color:#fff;border:none">立即停診並通知</button>
+    </div>
+    <div id="sn-out" style="margin:14px 0"></div></div>`;
+}
+function snReset() { const b = $('[data-act="sn-go"]'); if (b) b.disabled = true; S.snKey = ''; }
+function snHtml(r, dry) {
+  const sm = r.summary || [];
+  let h = '';
+  if (!dry && r.sent) h += `<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:16px">✅ 已完成：標停診 <b>${r.marked}</b> 位醫師；LINE <b>${r.sent.line}</b>、簡訊 <b>${r.sent.sms}</b>${r.sent.already ? '、先前已通知 ' + r.sent.already : ''}${(r.sent.failed + r.sent.badPhone) ? `　<b style="color:#dc2626">失敗 ${r.sent.failed + r.sent.badPhone} 位，請櫃檯電話通知</b>` : ''}</div>`;
+  h += `<table class="tbl"><thead><tr><th>院區</th><th>標停診的醫師</th><th>已預約</th><th>LINE</th><th>簡訊</th><th>電話不完整</th><th>已通知過</th></tr></thead><tbody>${sm.map(x => `<tr><td>${esc(x.clinic)}</td><td>${esc(x.doctors.join('、') || '—')}</td><td>${x.total}</td><td>${x.line}</td><td>${x.sms}</td><td>${x.bad ? '<b style="color:#dc2626">' + x.bad + '</b>' : 0}</td><td>${x.already}</td></tr>`).join('')}</tbody></table>`;
+  const L = r.list || [];
+  if (L.length) h += `<details style="margin-top:10px" ${dry ? '' : 'open'}><summary style="cursor:pointer">客人名單（${L.length} 位）</summary><table class="tbl" style="margin-top:6px"><thead><tr><th>院區</th><th>時間</th><th>醫師</th><th>客人</th><th>${dry ? '預計通知方式' : '結果'}</th></tr></thead><tbody>${L.map(x => {
+    const v = dry ? (x.sent ? '已通知過' : x.via) : (x.result || '');
+    const bad = /失敗|不完整/.test(v);
+    return `<tr><td>${esc(x.clinic)}</td><td>${esc(x.time)}</td><td>${esc(x.doctor)}</td><td>${esc(x.name)}</td><td${bad ? ' style="color:#dc2626;font-weight:700"' : ''}>${esc(v)}</td></tr>`;
+  }).join('')}</tbody></table></details>`;
+  else h += '<p class="muted" style="margin-top:8px">這天選到的院區沒有已預約的客人（仍會把醫師標停診）。</p>';
+  return h;
+}
+async function snAct(act, el) {
+  const out = $('#sn-out'); if (!out) return;
+  const clis = [...document.querySelectorAll('.sn-cli')];
+  if (act === 'sn-all') { clis.forEach(x => { x.checked = el.checked; }); snReset(); return; }
+  if (act === 'sn-cli') { const a = $('#sn-all'); if (a) a.checked = clis.length && clis.every(x => x.checked); snReset(); return; }
+  const date = ($('#sn-date') || {}).value || '', reason = (($('#sn-reason') || {}).value || '').trim();
+  const clinics = clis.filter(x => x.checked).map(x => x.value);
+  if (!date) { toast('請選日期', 'var(--amber)'); return; }
+  if (!clinics.length) { toast('請至少勾一個院區', 'var(--amber)'); return; }
+  const key = JSON.stringify([date, clinics, reason]);
+  if (act === 'sn-preview') {
+    out.innerHTML = '計算中…（約 10–30 秒）';
+    const r = await api.post('stopNow', { date, clinics, reason, dryRun: true }, true);
+    if (!r.ok) { out.innerHTML = '失敗：' + esc(r.message || r.error || ''); return; }
+    S.snKey = key; out.innerHTML = snHtml(r, true);
+    const b = $('[data-act="sn-go"]'); if (b) b.disabled = false;
+    return;
+  }
+  if (act === 'sn-go') {
+    if (S.snKey !== key) { toast('日期／院區／原因改過了，請先重新預覽', 'var(--amber)'); snReset(); return; }
+    if (!confirm(`確定要把 ${date}（${clinics.join('、')}）的減重門診全部停診，並「立刻」通知已預約的客人嗎？\n\nLINE／簡訊會馬上發出，無法收回。`)) return;
+    el.disabled = true; snReset();
+    out.innerHTML = '⏳ 停診標記與發送中，請不要關閉或重新整理畫面…（人數多時約 1–2 分鐘）';
+    const r = await api.post('stopNow', { date, clinics, reason }, true);
+    if (r.ok) { out.innerHTML = snHtml(r, false); S.dayStatus && S.dayStatus.clear && S.dayStatus.clear(); return; }
+    out.innerHTML = /逾時/.test(String(r.error || ''))
+      ? '<b style="color:#d97706">畫面等太久先斷線了，但後端可能還在發送。</b>請 2 分鐘後按「預覽」——已發出的會顯示「已通知過」，剩下的再按一次「立即停診並通知」即可（不會重複發）。'
+      : '失敗：' + esc(r.message || r.error || '');
+  }
 }
 /* ✨ v31.84 櫃檯 LINE 早報（系統管理）：綁定碼＋已綁定公務機＋預覽／立即推送。
    公務機是院區共用、沒有個人員編，所以用一次性綁定碼（後端 v145，10 分鐘、用一次就失效）。 */
@@ -6011,6 +6083,7 @@ document.addEventListener('click', async e => {
     case 'lb-export': lineBindExport(); break;   /* ✨ v31.82 */
     case 'lb-reload': loadALineBind(); break;
     case 'sl-code': case 'sl-preview': case 'sl-send': case 'sl-unbind': slAct(act, el); break;   /* ✨ v31.84 */
+    case 'sn-all': case 'sn-cli': case 'sn-preview': case 'sn-go': snAct(act, el); break;   /* ✨ v31.91 一鍵停診 */
     case 'src-go': { S.srcFrom = $('#src-from').value || S.srcFrom; S.srcTo = $('#src-to').value || S.srcTo; loadASource(); break; }
     case 'src-month': { S.srcFrom = srcMonthStart(); S.srcTo = fmtD(new Date()); renderAdmin(); break; }
     case 'cr-doc': { S.crDoc = el.dataset.n || '__all'; renderCReport(); break; }
