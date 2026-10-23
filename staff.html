@@ -4948,7 +4948,17 @@ async function snAct(act, el) {
       toast('先幫你跑預覽，請確認名單後再按一次「立即停診並通知」', 'var(--amber)');
       return snAct('sn-preview', el);
     }
-    if (!confirm(`確定要把 ${date}（${clinics.join('、')}）的減重門診全部停診，並「立刻」通知已預約的客人嗎？\n\nLINE／簡訊會馬上發出，無法收回。`)) return;
+    /* ✨ v31.93 不用 confirm() 視窗：內建瀏覽器（及部分 App 內瀏覽器）會直接擋掉視窗、當成「取消」，
+       看起來就是「按了沒反應」（10/22、10/23 都發生）。改成頁面上的紅色警示＋再按一次確認。 */
+    if (!S.snArm || S.snArm.key !== key || Date.now() - S.snArm.at > 15000) {
+      S.snArm = { key, at: Date.now() };
+      el.textContent = '⚠️ 再按一次＝確認發送（15 秒內）';
+      const w0 = $('#sn-warn'); if (w0) w0.remove();
+      out.insertAdjacentHTML('afterbegin', `<div id="sn-warn" style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:16px;color:#991b1b"><b>確定要把 ${esc(date)}（${esc(clinics.join('、'))}）的減重門診全部停診，並立刻通知已預約的客人嗎？</b><br>LINE／簡訊會馬上發出，無法收回。確定的話請在 15 秒內<b>再按一次紅色按鈕</b>；不要的話不用理它。</div>`);
+      setTimeout(() => { if (S.snArm && S.snArm.key === key) { S.snArm = null; el.textContent = '立即停診並通知'; const w = $('#sn-warn'); if (w) w.remove(); } }, 15000);
+      return;
+    }
+    S.snArm = null; el.textContent = '立即停診並通知';
     el.disabled = true; S.snKey = '';
     /* ✨ v31.92 後端每批最多發 80 秒，沒發完回 partial；這裡自動一批接一批，直到全部發完。
        逾時或排程佔用（busy）也自動再叫 —— 已通知過的後端會跳過，不會重複發。 */
