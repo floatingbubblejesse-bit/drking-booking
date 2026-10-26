@@ -4862,7 +4862,7 @@ function renderAdmin() {
   else if (S.aView === 'perm') { c.innerHTML = `<div class="card"><h3>權限設定</h3><div id="ap-box" class="muted" style="padding:14px">載入中…</div></div>`; loadAPerm(); }
   else if (S.aView === 'report') c.innerHTML = htmlAReport();
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
-  else if (S.aView === 'staffline') { c.innerHTML = htmlAStaffLine(); loadAStaffLine(); }   /* ✨ v31.84 */
+  else if (S.aView === 'staffline') { c.innerHTML = htmlAStaffLine(); loadAStaffLine(); loadABalance(); }   /* ✨ v31.84 */
   else if (S.aView === 'stopnow') { c.innerHTML = htmlAStopNow(); }   /* ✨ v31.91 */
   else if (S.aView === 'linebind') { c.innerHTML = `<div class="card"><h3>LINE 綁定名單</h3><div id="lb-box" class="muted" style="padding:14px">載入中…</div></div>`; loadALineBind(); }
 }
@@ -4996,15 +4996,34 @@ function htmlAStaffLine() {
     <p class="muted" style="margin:6px 0 12px;line-height:1.7">每天 07:30 推「當日減重名單、抽血名單、拿藥待開單」給已綁定的櫃檯公務機（病人姓名遮中間字，不放電話與病歷號）。<br>
     綁定方式：選院區 → 按「產生綁定碼」→ 公務機的 LINE 打開 <b>https://liff.line.me/2007733363-o3Ux4wSa/staffbind.html</b> → 輸入綁定碼（10 分鐘內有效、用一次就失效）。</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <select id="sl-cli" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">${SL_CLINICS.map(c => '<option>' + c + '</option>').join('')}</select>
+      <select id="sl-cli" style="font-size:16px;padding:6px 9px;border:1px solid var(--line);border-radius:8px">${SL_CLINICS.concat(['管理者']).map(c => '<option>' + c + '</option>').join('')}</select>
       <button class="btn btn-p btn-sm" data-act="sl-code">產生綁定碼</button>
       <button class="btn btn-o btn-sm" data-act="sl-preview">預覽今天早報</button>
       <button class="btn btn-o btn-sm" data-act="sl-send">立即推送今天早報</button>
     </div>
     <div id="sl-out" style="margin:12px 0"></div>
     <h4 style="margin:16px 0 6px">已綁定的公務機</h4>
-    <div id="sl-box" class="muted">載入中…</div></div>`;
+    <div id="sl-box" class="muted">載入中…</div>
+    <h4 style="margin:20px 0 6px">💰 餘額提醒（管理者）</h4>
+    <p class="muted" style="margin:0 0 8px;line-height:1.7">上面院區選「<b>管理者</b>」→ 產生綁定碼 → 用<b>你自己的手機</b> LINE 打開同一個綁定網址輸入。綁好後，摩叮簡訊點數或 LINE 剩餘則數低於 1000，每天 09:00 會推 LINE 提醒你（不會收到櫃檯早報）。</p>
+    <div id="bal-box" class="muted">查詢中…</div>
+    <button class="btn btn-o btn-sm" data-act="bal-send" style="margin-top:8px">立即推送一次給管理者 LINE（測試）</button>
+    <div id="bal-out" class="muted" style="margin-top:6px"></div></div>`;
 }
+/* ✨ v31.94 餘額提醒（後端 v151）：摩叮簡訊點數、LINE 當月剩餘則數；任一低於 1000，每天 09:00 推 LINE 給綁「管理者」的手機 */
+async function loadABalance() {
+  const el = $('#bal-box'); if (!el) return;
+  const r = await api.post('getBalances', {}, true);
+  if (!$('#bal-box')) return;
+  if (!r.ok) { el.innerHTML = '讀取失敗：' + esc(r.error || ''); return; }
+  const s = r.sms || {}, l = r.line || {};
+  const row = (low, k, v) => `<div style="font-size:16px;margin:4px 0">${low ? '🔴' : '🟢'} <b>${k}</b>：${v}</div>`;
+  el.className = '';
+  el.innerHTML = row(s.low, '摩叮簡訊', s.ok ? '剩 <b>' + s.balance + '</b> 點' + (s.expire ? '<span class="muted">（點數到期 ' + esc(String(s.expire).split(' ')[0]) + '）</span>' : '') : '查詢失敗')
+    + row(l.low, 'LINE 訊息', l.ok ? (l.unlimited ? '不限則數（本月已用 ' + l.used + '）' : '本月剩 <b>' + l.remaining + '</b> 則<span class="muted">（額度 ' + l.limit + '、已用 ' + l.used + '；擇木良食官方帳號整體用量，含搜博）</span>') : '查詢失敗')
+    + `<div class="muted" style="font-size:13px;margin-top:4px">任一低於 ${r.min} 時，每天 09:00 推 LINE 給已綁定「管理者」的手機。</div>`;
+}
+
 async function loadAStaffLine() {
   const el = $('#sl-box'); if (!el) return;
   const r = await api.post('getStaffLineList', {}, true);
@@ -6115,7 +6134,8 @@ document.addEventListener('click', async e => {
     /* ✨ v31.41 顧客來源報表：換區間 */
     case 'lb-export': lineBindExport(); break;   /* ✨ v31.82 */
     case 'lb-reload': loadALineBind(); break;
-    case 'sl-code': case 'sl-preview': case 'sl-send': case 'sl-unbind': slAct(act, el); break;   /* ✨ v31.84 */
+    case 'sl-code': case 'sl-preview': case 'sl-send': case 'sl-unbind': slAct(act, el); break;
+    case 'bal-send': { const o = $('#bal-out'); if (o) o.textContent = '推送中…'; const r = await api.post('balanceAlertSend', {}, true); if (o) o.textContent = r.ok ? (r.admins ? '已推送給 ' + r.sent + ' 支管理者手機。' : '還沒有綁定「管理者」的手機，請先用上面的綁定碼綁定。') : '失敗：' + (r.error || ''); loadABalance(); break; }   /* ✨ v31.94 */   /* ✨ v31.84 */
     case 'sn-all': case 'sn-cli': case 'sn-preview': case 'sn-go': snAct(act, el); break;   /* ✨ v31.91 一鍵停診 */
     case 'src-go': { S.srcFrom = $('#src-from').value || S.srcFrom; S.srcTo = $('#src-to').value || S.srcTo; loadASource(); break; }
     case 'src-month': { S.srcFrom = srcMonthStart(); S.srcTo = fmtD(new Date()); renderAdmin(); break; }
