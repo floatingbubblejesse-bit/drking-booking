@@ -1,0 +1,46 @@
+name: Refresh public LINE timetable cache
+
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-schedule-cache.yml'
+      - 'scripts/publish_public_schedule.py'
+      - 'scripts/test_public_schedule_cache.py'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: public-schedule-cache
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate publisher
+        run: python -m unittest discover -s scripts -p test_public_schedule_cache.py -v
+      - name: Retrieve and validate public timetable
+        run: python scripts/publish_public_schedule.py
+      - name: Commit only the validated cache
+        shell: bash
+        run: |
+          git add -- public-schedule/latest.json
+          if git diff --cached --quiet -- public-schedule/latest.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh public four-week timetable cache" -- public-schedule/latest.json
+          git push origin HEAD:main
