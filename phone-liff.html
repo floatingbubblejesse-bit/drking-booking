@@ -36,12 +36,32 @@ body>#phone-page-card .phone-brand{box-sizing:border-box;flex:none;display:flex;
 body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 @media(max-height:420px){body>#phone-page-card .phone-brand{height:calc(48px + env(safe-area-inset-top));padding-top:calc(6px + env(safe-area-inset-top));padding-bottom:6px}body>#phone-page-card .phone-page-grid{padding:8px max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}}
 </style>
+<style id="phone-clinic-morandi">
+/* Same clinic colors and fine borders as the LINE physician timetable. */
+#phone-page-card a[data-clinic="A"]{--phone-clinic-bg:#E5DADB;--phone-clinic-border:#B09B9E}
+#phone-page-card a[data-clinic="B"]{--phone-clinic-bg:#DAE5E2;--phone-clinic-border:#9BB0AC}
+#phone-page-card a[data-clinic="C"]{--phone-clinic-bg:#DAE0E5;--phone-clinic-border:#9BA7B0}
+#phone-page-card a[data-clinic="D"]{--phone-clinic-bg:#E5E2DA;--phone-clinic-border:#B0AC9B}
+#phone-page-card a[data-clinic="E"]{--phone-clinic-bg:#E4DAE5;--phone-clinic-border:#AF9BB0}
+#phone-page-card a[data-clinic="F"]{--phone-clinic-bg:#E5DFDA;--phone-clinic-border:#B0A69B}
+#phone-page-card a[data-clinic="G"]{--phone-clinic-bg:#E0E5DA;--phone-clinic-border:#A8B09B}
+#phone-page-card a[data-clinic="H"]{--phone-clinic-bg:#DAE3E5;--phone-clinic-border:#9BAEB0}
+#phone-page-card a[data-clinic="I"]{--phone-clinic-bg:#E5DADF;--phone-clinic-border:#B09BA6}
+#phone-page-card a[data-clinic="J"]{--phone-clinic-bg:#E4E5DA;--phone-clinic-border:#B0B09B}
+#phone-page-card a[data-clinic="K"]{--phone-clinic-bg:#DADCE5;--phone-clinic-border:#9BA0B0}
+#phone-page-card a[data-clinic="L"]{--phone-clinic-bg:#E5DDDA;--phone-clinic-border:#B0A19B}
+#phone-page-card a[data-clinic="M"]{--phone-clinic-bg:#DAE5DE;--phone-clinic-border:#9BB0A4}
+#phone-page-card a[data-clinic="N"]{--phone-clinic-bg:#DFDAE5;--phone-clinic-border:#A59BB0}
+#phone-page-card a[data-clinic]{background:var(--phone-clinic-bg);border:1px solid var(--phone-clinic-border);color:#293e33;-webkit-tap-highlight-color:transparent}
+#phone-page-card a[data-clinic]:hover{background:var(--phone-clinic-bg);border-color:var(--phone-clinic-border);color:#293e33}
+#phone-page-card a[data-clinic]:active,#phone-page-card a[data-clinic]:focus-visible{background:var(--phone-clinic-bg);border-color:#7b2028;box-shadow:0 0 0 1px #7b2028;outline:none}
+</style>
 </head>
 <body>
 <section aria-label="電話掛號" id="phone-page-card">
 <header class="phone-brand"><div class="phone-brand-lockup" role="img" aria-label="金鶯診所"><span class="phone-brand-mark" aria-hidden="true"><img src="https://www.drking.com.tw/uploads/use/20250731111412d249.jpg" alt=""></span><span class="phone-brand-name" aria-hidden="true"><span class="phone-brand-glyph"><img src="https://www.drking.com.tw/uploads/use/20250731111412d249.jpg" alt="" style="left:-88.8px"></span><span class="phone-brand-glyph"><img src="https://www.drking.com.tw/uploads/use/20250731111412d249.jpg" alt="" style="left:-131.52px"></span><span class="phone-brand-glyph"><img src="https://www.drking.com.tw/uploads/use/20250731111412d249.jpg" alt="" style="left:-173.76px"></span><span class="phone-brand-glyph"><img src="https://www.drking.com.tw/uploads/use/20250731111412d249.jpg" alt="" style="left:-216px"></span></span></div></header>
 
-<div class="phone-page-grid"><a aria-label="鶯歌院區電話掛號" href="tel:0226702559">鶯歌</a><a aria-label="三樹院區電話掛號" href="tel:0226807101">三樹</a><a aria-label="樹林院區電話掛號" href="tel:0286850096">樹林</a><a aria-label="桃園院區電話掛號" href="tel:033668311">桃園</a><a aria-label="土城院區電話掛號" href="tel:0222625113">土城</a><a aria-label="八德院區電話掛號" href="tel:033655225">八德</a><a aria-label="龍潭院區電話掛號" href="tel:034990306">龍潭</a><a aria-label="大溪院區電話掛號" href="tel:033880868">大溪</a><a aria-label="大竹院區電話掛號" href="tel:033231266">大竹</a><a aria-label="大湳院區電話掛號" href="tel:033630811">大湳</a><a aria-label="平鎮院區電話掛號" href="tel:034690006">平鎮</a><a aria-label="埔心院區電話掛號" href="tel:034828666">埔心</a><a aria-label="觀音院區電話掛號" href="tel:034833366">觀音</a><a aria-label="龍岡院區電話掛號" href="tel:034665666">龍岡</a></div>
+<div class="phone-page-grid"><a data-clinic="A" aria-label="鶯歌院區電話掛號" href="tel:0226702559">鶯歌</a><a data-clinic="B" aria-label="三樹院區電話掛號" href="tel:0226807101">三樹</a><a data-clinic="C" aria-label="樹林院區電話掛號" href="tel:0286850096">樹林</a><a data-clinic="D" aria-label="桃園院區電話掛號" href="tel:033668311">桃園</a><a data-clinic="E" aria-label="土城院區電話掛號" href="tel:0222625113">土城</a><a data-clinic="F" aria-label="八德院區電話掛號" href="tel:033655225">八德</a><a data-clinic="G" aria-label="龍潭院區電話掛號" href="tel:034990306">龍潭</a><a data-clinic="H" aria-label="大溪院區電話掛號" href="tel:033880868">大溪</a><a data-clinic="I" aria-label="大竹院區電話掛號" href="tel:033231266">大竹</a><a data-clinic="J" aria-label="大湳院區電話掛號" href="tel:033630811">大湳</a><a data-clinic="K" aria-label="平鎮院區電話掛號" href="tel:034690006">平鎮</a><a data-clinic="L" aria-label="埔心院區電話掛號" href="tel:034828666">埔心</a><a data-clinic="M" aria-label="觀音院區電話掛號" href="tel:034833366">觀音</a><a data-clinic="N" aria-label="龍岡院區電話掛號" href="tel:034665666">龍岡</a></div>
 </section>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
