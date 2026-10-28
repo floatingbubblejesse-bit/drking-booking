@@ -7,9 +7,9 @@
 <title>金鶯診所院區資訊</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23557466'/%3E%3Cpath d='M27 15h10v12h12v10H37v12H27V37H15V27h12z' fill='%23fffdf5'/%3E%3C/svg%3E">
 <style>:root{color-scheme:light;--ink:#304b40;--muted:#7d8c80;--sage:#597566;--line:#cbd7c6;--paper:#fffef8;--bg:#fffaf0;--deep:#254a3b;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
-*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;min-height:100%;overflow:auto;background:var(--bg);color:var(--ink);overscroll-behavior:none}
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);overscroll-behavior:none}
 button,select,a{-webkit-tap-highlight-color:transparent}button,select{font:inherit}button{color:inherit;cursor:pointer;touch-action:manipulation}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #9a6653;outline-offset:3px}button svg{pointer-events:none}svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.app,.map-layout,.map-stage,.map-surface{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0}.app{position:relative;height:100vh;height:100svh;isolation:isolate;overflow:hidden;touch-action:pan-x pan-y pinch-zoom}.map-stage{overflow:hidden;background:#fffaf0}.map-surface{touch-action:pan-x pan-y pinch-zoom;overflow:hidden}.map-surface canvas{display:block;position:absolute;inset:0;width:100%;height:100%;outline:none}
+.app,.map-layout,.map-stage,.map-surface{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0}#page-viewport{position:relative;width:100%;height:100vh;height:100svh;overflow:hidden;touch-action:pan-x pan-y}.app{isolation:isolate;overflow:hidden;touch-action:inherit}.map-stage{overflow:hidden;background:#fffaf0}.map-surface{touch-action:pan-x pan-y pinch-zoom;overflow:hidden}.map-surface canvas{display:block;position:absolute;inset:0;width:100%;height:100%;outline:none}
 .clinic-window{position:absolute;z-index:8;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);width:calc(100% - 24px);max-width:560px;height:clamp(190px,28svh,230px);max-height:none;display:flex;flex-direction:column;overflow:auto;overscroll-behavior:contain;border:1px solid #acbca5;border-radius:22px;background:#fffef7f5;padding:12px 16px 9px;box-shadow:0 8px 32px #304b4030,0 1px 3px #304b401a;backdrop-filter:blur(16px);scrollbar-width:thin}
 .window-selector{display:flex;align-items:center;gap:9px}.window-selector>img{width:32px;height:32px;border-radius:50%;flex:none}.select-wrap{position:relative;flex:1;min-width:0}.select-wrap select{appearance:none;-webkit-appearance:none;background:transparent;border:0;border-radius:8px;color:var(--ink);font-size:23px;font-weight:750;letter-spacing:.6px;width:100%;height:40px;padding:0 28px 0 0;cursor:pointer;text-overflow:ellipsis}.select-wrap>svg{width:21px;position:absolute;right:0;top:10px;pointer-events:none}
 .clinic-panel{padding:3px 0 0;flex:1;display:flex;flex-direction:column;justify-content:center}.panel-kicker{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;color:var(--sage);margin:2px 0 6px}.panel-kicker b{font-weight:500;letter-spacing:0;background:#e8eee4;border-radius:9px;padding:2px 7px}.address{font-size:14px;line-height:1.45;color:#405a48;margin:0 0 3px}.hours{font-size:11px;line-height:1.45;margin:0;color:#6c7b67;font-variant-numeric:tabular-nums}.panel-actions{display:flex;gap:9px;margin-top:10px}.panel-actions a{display:flex;align-items:center;justify-content:center;gap:6px;min-height:39px;text-decoration:none;flex:1;background:#587764;color:#fffdf3;border-radius:11px;font-size:13px;font-weight:600;white-space:nowrap}.panel-actions a.secondary{background:#eef1e9;color:#44634f;border:1px solid #c7d4c0}.panel-actions svg{width:16px;height:16px}.intro-copy{font-size:12px;color:#65785f;line-height:1.6;margin:3px 0 5px}
@@ -21,6 +21,7 @@ footer{font-size:8px;line-height:1.6;padding-top:7px;color:#86917d;display:flex;
 </style>
 </head>
 <body>
+<div id="page-viewport">
 <main class="app">
 <div class="map-layout">
 <section id="map-stage" class="map-stage" aria-label="十四院區互動地圖">
@@ -36,5 +37,6 @@ footer{font-size:8px;line-height:1.6;padding-top:7px;color:#86917d;display:flex;
 </aside>
 <noscript><p>請開啟 JavaScript 以使用互動地圖。<a href="https://www.drking.com.tw/info_all.html">查看14院區地址與電話</a></p></noscript>
 </main>
-<script type="module" src="./clinic-map-main-JTSD4JIL.js"></script>
+</div>
+<script type="module" src="./clinic-map-main-RDGA4SDK.js"></script>
 </body></html>
