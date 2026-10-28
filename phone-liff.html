@@ -146,7 +146,7 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
       if(permission==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();host.dataset.locationState=location?'remembered':'unavailable';return;}
       if(permission==='granted'){granted=true;denied=false;save(deniedKey,'0');}
       if(denied||watch!==null)return;
-      const first=initialPending&&!location&&read(requestedKey)!=='1';initialPending=false;
+      const first=initialPending&&!location&&!attempted;initialPending=false;
       if(granted&&startWatch())return;
       if(!granted&&!first&&(attempted||!location))return;
       locate();

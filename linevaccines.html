@@ -66,11 +66,23 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
       script.src=url.href;script.async=true;script.referrerPolicy='no-referrer';timer=env.setTimeout(()=>finish(Error('timeout')),12000);env.document.head.append(script);
     });
   }
+  function initializeVaccineLiff(liffId,env){
+    if(!liffId||liffId==='LIFF_ID')return Promise.resolve();
+    return new Promise(resolve=>{
+      function initialize(){
+        if(!env.liff){resolve();return;}
+        Promise.resolve().then(()=>env.liff.init({liffId,withLoginOnExternalBrowser:false})).then(resolve,resolve);
+      }
+      if(env.liff){initialize();return;}
+      const sdk=env.document.createElement('script');sdk.src='https://static.line-scdn.net/liff/edge/2/sdk.js';sdk.async=true;
+      sdk.onload=initialize;sdk.onerror=()=>resolve();env.document.head.append(sdk);
+    });
+  }
   function createVaccineLocation(options){
     const nav=options.navigator,doc=options.document,storage=options.storage;
     const key='line_vaccine_location_v1',requestedKey='line_vaccine_geo_requested_v1',deniedKey='line_vaccine_geo_denied_v1';
     const now=options.now||Date.now;
-    let position=options.position||null,pending=false,locating=false,granted=false,attempted=false,watch=null,version=0,lastAttempt=0;
+    let position=options.position||null,pending=false,locating=false,granted=false,attempted=false,watch=null,version=0,lastAttempt=0,ready=!options.ready,initialPending=true;
     function read(name){try{return storage.getItem(name);}catch(error){return null;}}
     function write(name,value){try{storage.setItem(name,value);}catch(error){}}
     let denied=read(deniedKey)==='1';
@@ -92,7 +104,7 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
       catch(error){watch=null;return false;}
     }
     async function refresh(initial=false){
-      if(doc.hidden||pending||locating||!nav.geolocation)return;
+      if(!ready||doc.hidden||pending||locating||!nav.geolocation)return;
       pending=true;
       try{
         let permission='unknown';
@@ -101,7 +113,7 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
         if(permission==='denied'){granted=false;setDenied(true);stop();return;}
         if(permission==='granted'){granted=true;setDenied(false);}
         if(denied||watch!==null)return;
-        const first=initial&&!position&&read(requestedKey)!=='1';
+        const first=initialPending&&!position&&!attempted;initialPending=false;
         if(!granted&&!first&&(attempted||!position))return;
         if(granted&&startWatch())return;
         if(!initial&&lastAttempt&&now()-lastAttempt<30000)return;
@@ -111,6 +123,7 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
         catch(error){fail(error);}
       }finally{pending=false;}
     }
+    if(options.ready)Promise.resolve(options.ready).catch(()=>{}).then(()=>{ready=true;refresh(true);});
     return {refresh,stop,getPosition:()=>position};
   }
   function mountVaccinePage(config){
@@ -131,7 +144,8 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
     const refresh=button('','refresh',()=>{refreshData();locationControl.refresh();});refresh.setAttribute('aria-label','重新整理疫苗庫存');refresh.title='重新整理';refresh.append(icon('refresh'));brand.append(refresh);
     const grid=el('section','clinic-grid');grid.setAttribute('aria-label','各院區疫苗庫存');main.append(grid);
     const foot=el('footer','foot','庫存依各院區回報時間顯示，請先來電確認。');main.append(foot,status);page.append(main);root.append(page);
-    const locationControl=createVaccineLocation({navigator,document,storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},position,onPosition:coords=>{
+    const liffReady=initializeVaccineLiff(config.liffId,window);
+    const locationControl=createVaccineLocation({navigator,document,ready:liffReady,storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},position,onPosition:coords=>{
       const before=model.ordered(state.data,'',position).map(c=>c.name).join('|');position=coords;host.dataset.locationState='located';
       const after=model.ordered(state.data,'',position).map(c=>c.name).join('|');if(before!==after)render();
     }});
@@ -162,12 +176,9 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshData();locationControl.refresh();}else locationControl.stop();});
     window.addEventListener('pagehide',()=>{clearInterval(interval);interval=0;locationControl.stop();});
     window.addEventListener('pageshow',e=>{if(e.persisted){startRefreshing();refreshData();locationControl.refresh();}});
-    if(config.liffId&&config.liffId!=='LIFF_ID'){
-      const sdk=document.createElement('script');sdk.src='https://static.line-scdn.net/liff/edge/2/sdk.js';sdk.async=true;sdk.onload=()=>{if(window.liff)window.liff.init({liffId:config.liffId,withLoginOnExternalBrowser:false}).catch(()=>{});};document.head.append(sdk);
-    }
     return {refresh:refreshData,getState:()=>state,root};
   }
-  if(typeof module!=='undefined'&&module.exports)module.exports={createVaccineModel,requestVaccineStock,createVaccineLocation,mountVaccinePage};
+  if(typeof module!=='undefined'&&module.exports)module.exports={createVaccineModel,requestVaccineStock,initializeVaccineLiff,createVaccineLocation,mountVaccinePage};
   if(typeof window!=='undefined'&&window.LINE_VACCINE_CONFIG)mountVaccinePage(window.LINE_VACCINE_CONFIG);
 })();
 
