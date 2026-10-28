@@ -16,7 +16,7 @@ try{window.STAFF_SESSION=sessionStorage.getItem('drking-staff-session')||'';}cat
 // A public directory snapshot can be displayed for 30 days. Its availability validity
 // is NEVER extended: live slots and final booking still require the backend.
 if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SESSION){
- const key='drking-public-bootstrap-v2',oldKey='drking-public-bootstrap-v1';
+ const key='drking-public-bootstrap-v3',oldKey='drking-public-bootstrap-v1';try{localStorage.removeItem('drking-public-bootstrap-v2');}catch(_){}/* 2026-10-28 v3：舊快照沒有醫師 bio，換 key 讓回訪客人重抓一次 */
  const taipeiToday=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
  /* 2026-09-21 分院區試點：後端決定開放哪些院區，前端只負責顯示。
     這裡只收已知欄位，網址限 https，避免快取被塞進奇怪的東西。 */
