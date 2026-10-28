@@ -66,14 +66,101 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 (function(){
-  if(!window.liff)return;
-  liff.init({liffId:"2009326025-hlJtvLlr",withLoginOnExternalBrowser:false}).then(function(){
+  if(!window.liff){window.phoneLiffReady=Promise.resolve();return;}
+  window.phoneLiffReady=liff.init({liffId:"2009326025-hlJtvLlr",withLoginOnExternalBrowser:false}).then(function(){
     document.documentElement.dataset.phoneLiff="ready";
   }).catch(function(){
     document.documentElement.dataset.phoneLiff="unavailable";
   });
 })();
 </script>
+<script id="phone-live-location-20261028">
+(function(){
+  'use strict';
+  const host=document.getElementById('phone-page-card'),grid=host&&host.querySelector('.phone-page-grid');
+  if(!grid)return;
+  const coordinates={A:[24.9529837,121.3513375],B:[24.9458761,121.3818186],C:[24.9806516,121.4176074],D:[24.9820308,121.3193793],E:[24.976515,121.442198],F:[24.9304146,121.2911793],G:[24.8664383,121.2147782],H:[24.8840177,121.2894696],I:[25.0217492,121.2632595],J:[24.9641796,121.2997468],K:[24.9008497,121.2110723],L:[24.9099334,121.1822147],M:[25.0468336,121.1422956],N:[24.9328648,121.2557877]};
+  const links=Array.from(grid.querySelectorAll('a[data-clinic]'));
+  const cacheKey='line_clinic_location_v1',deniedKey='line_clinic_geo_denied_v1',requestedKey='line_clinic_geo_requested_v1';
+  function read(key){try{return localStorage.getItem(key);}catch(error){return null;}}
+  function save(key,value){try{localStorage.setItem(key,value);}catch(error){}}
+  function valid(point){return point&&Number.isFinite(point.lat)&&Number.isFinite(point.lng)&&Math.abs(point.lat)<=90&&Math.abs(point.lng)<=180;}
+  let location=null,denied=read(deniedKey)==='1',granted=false,pending=false,checking=false,attempted=false,watch=null,version=0,permissionStatus=null,liffReady=false,initialPending=true;
+  try{const saved=JSON.parse(read(cacheKey)||'null');if(valid(saved))location=saved;}catch(error){}
+  function distance(point){
+    if(!point)return Infinity;
+    const rad=Math.PI/180,a=location.lat*rad,b=point[0]*rad,lat=(point[0]-location.lat)*rad,lng=(point[1]-location.lng)*rad;
+    const h=Math.sin(lat/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(lng/2)**2;
+    return 2*6371*Math.asin(Math.min(1,Math.sqrt(h)));
+  }
+  function sort(){
+    if(!location)return;
+    const ordered=links.map((link,index)=>({link,index,distance:distance(coordinates[link.dataset.clinic])})).sort((a,b)=>a.distance-b.distance||a.index-b.index);
+    const current=Array.from(grid.querySelectorAll('a[data-clinic]'));
+    if(ordered.some((item,index)=>current[index]!==item.link))ordered.forEach(item=>grid.append(item.link));
+    host.dataset.locationState='remembered';
+  }
+  function stop(){
+    version++;pending=false;
+    if(watch!==null){navigator.geolocation?.clearWatch?.(watch);watch=null;}
+  }
+  function received(position){
+    const point={lat:position?.coords?.latitude,lng:position?.coords?.longitude,at:Date.now()};
+    pending=false;if(!valid(point))return;
+    location=point;granted=true;denied=false;save(deniedKey,'0');save(cacheKey,JSON.stringify(point));sort();host.dataset.locationState='located';
+  }
+  function failed(error){
+    pending=false;
+    if(error?.code===1){granted=false;denied=true;save(deniedKey,'1');stop();}
+    host.dataset.locationState=location?'remembered':'unavailable';
+  }
+  function startWatch(){
+    if(document.hidden||denied||!granted||!navigator.geolocation?.watchPosition)return false;
+    if(watch!==null)return true;
+    const current=++version;
+    try{
+      watch=navigator.geolocation.watchPosition(position=>{if(current===version&&!document.hidden)received(position);},error=>{if(current===version)failed(error);},{enableHighAccuracy:false,maximumAge:0,timeout:10000});
+      return true;
+    }catch(error){watch=null;return false;}
+  }
+  function locate(){
+    if(pending||document.hidden)return;
+    pending=true;attempted=true;save(requestedKey,'1');
+    const current=++version;
+    try{navigator.geolocation.getCurrentPosition(position=>{if(current!==version||document.hidden)return;received(position);startWatch();},error=>{if(current===version)failed(error);},{enableHighAccuracy:false,maximumAge:0,timeout:10000});}catch(error){failed(error);}
+  }
+  async function refresh(initial=false){
+    if(!liffReady||document.hidden||pending||checking||!navigator.geolocation)return;
+    checking=true;
+    try{
+      let permission='unknown';
+      if(navigator.permissions?.query){try{
+        const status=await navigator.permissions.query({name:'geolocation'});permission=status.state;
+        if(status!==permissionStatus){
+          if(permissionStatus?.removeEventListener)permissionStatus.removeEventListener('change',permissionChanged);
+          permissionStatus=status;status.addEventListener?.('change',permissionChanged);
+        }
+      }catch(error){}}
+      if(document.hidden||pending)return;
+      host.dataset.locationPermission=permission;
+      if(permission==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();host.dataset.locationState=location?'remembered':'unavailable';return;}
+      if(permission==='granted'){granted=true;denied=false;save(deniedKey,'0');}
+      if(denied||watch!==null)return;
+      const first=initialPending&&!location&&read(requestedKey)!=='1';initialPending=false;
+      if(granted&&startWatch())return;
+      if(!granted&&!first&&(attempted||!location))return;
+      locate();
+    }finally{checking=false;}
+  }
+  function permissionChanged(){if(permissionStatus?.state==='granted'){attempted=false;refresh();}else if(permissionStatus?.state==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();}}
+  sort();
+  const ready=window.phoneLiffReady||Promise.resolve();
+  ready.then(()=>{liffReady=true;refresh(true);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else refresh();});
+  window.addEventListener('pagehide',stop);
+  window.addEventListener('pageshow',()=>refresh());
+  setInterval(()=>refresh(),60000);
+})();
+</script>
 </body>
 </html>
-
