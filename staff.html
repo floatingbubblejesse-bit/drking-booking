@@ -5477,6 +5477,10 @@ async function openProfileEdit(shortName) {
     <div class="mb">
       <div class="frow"><label>一句話（顯示在名字下方，如座右銘）</label><input id="ap-tag" placeholder="載入中…" disabled></div>
       <div class="frow"><label>介紹文字（學經歷、專長、減重理念，可多行）</label><textarea id="ap-bio" rows="8" placeholder="載入中…" disabled></textarea></div>
+      <div class="frow"><label>經歷（前台「醫師完整介紹」，一行一項）</label><textarea id="ap-exp" rows="6" placeholder="載入中…" disabled></textarea></div>
+      <div class="frow"><label>專長（一行一項）</label><textarea id="ap-spec" rows="3" placeholder="載入中…" disabled></textarea></div>
+      <div class="frow"><label>學歷（一行一項）</label><textarea id="ap-edu" rows="2" placeholder="載入中…" disabled></textarea></div>
+      <p class="muted" style="font-size:13px;margin:-4px 0 10px">有填經歷或學歷，前台醫師視窗才會出現「醫師完整介紹」按鈕；全部清空就不出現。</p>
       <div class="frow"><label>BA 作品集 Drive 資料夾 ID（選填）</label><input id="ap-folder" placeholder="載入中…" disabled></div>
     </div>
     <div class="mf"><button class="btn btn-o" data-act="close-modal">取消</button>
@@ -5486,6 +5490,7 @@ async function openProfileEdit(shortName) {
   const tagEl = m.querySelector('#ap-tag'), bioEl = m.querySelector('#ap-bio'), folEl = m.querySelector('#ap-folder');
   if (tagEl) { tagEl.disabled = false; tagEl.placeholder = '例：減重不該懲罰自己'; tagEl.value = d.tagline || ''; }
   if (bioEl) { bioEl.disabled = false; bioEl.placeholder = '學經歷、專長…'; bioEl.value = d.bio || ''; }
+  [['#ap-exp','exp','例：中華民國肥胖研究學會會員'],['#ap-spec','spec','例：糖尿病、三高'],['#ap-edu','edu','例：國立陽明大學醫學系']].forEach(([sel,k,ph]) => { const e = m.querySelector(sel); if (e) { e.disabled = false; e.placeholder = ph; e.value = d[k] || ''; } });   // 2026-10-28 醫師完整介紹
   if (folEl) { folEl.disabled = false; folEl.placeholder = '1AbCd…（Drive 資料夾網址最後那串）'; folEl.value = d.folderId || d['Drive資料夾ID'] || ''; }
 }
 
@@ -6267,7 +6272,10 @@ document.addEventListener('click', async e => {
         '醫師短名': el.dataset.d,
         '一句話': $('#ap-tag').value.trim(),
         '介紹文字': $('#ap-bio').value.trim(),
-        'Drive資料夾ID': $('#ap-folder').value.trim()
+        'Drive資料夾ID': $('#ap-folder').value.trim(),
+        '經歷': ($('#ap-exp') || {}).value || '',
+        '減重專長': ($('#ap-spec') || {}).value || '',
+        '學歷': ($('#ap-edu') || {}).value || ''
       }, true);
       if (res.ok) { toast('✓ 介紹已更新，前台立即生效'); closeModals(); }
       else { toast('儲存失敗：' + (res.message || res.error || ''), 'var(--red)'); el.disabled = false; }
