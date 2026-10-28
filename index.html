@@ -25,7 +25,7 @@ if(new URLSearchParams(location.search).get('view')!=='staff'&&!window.STAFF_SES
   const d=r&&r.ok&&r.data,c=d&&d.publicCatalog,now=Date.now();
   if(!d||d.backend!=='LEGACY'||d.protocol!=='DIRECT_V2'||d.mode!=='LIVE'||d.canStaff!==false||!c||c.schema!==2||!Number.isFinite(c.at)||!Number.isFinite(c.expiresAt)||c.at>now||now-c.at>86400000||c.expiresAt-c.at>60000||c.expiresAt<c.at||!Array.isArray(d.clinics)||!Array.isArray(d.doctors)||!Array.isArray(c.sessions)||!Array.isArray(c.blocks)||!c.times)return null;
   const clinics=d.clinics.map(x=>({id:x.id,name:x.name,sourceCode:x.sourceCode}));
-  const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank,specialties:Array.isArray(x.specialties)?x.specialties.filter(s=>typeof s==='string'&&s.length<=30).slice(0,8):undefined}));
+  const doctors=d.doctors.map(x=>({id:x.id,name:x.name,clinicIds:x.clinicIds,rank:x.rank,specialties:Array.isArray(x.specialties)?x.specialties.filter(s=>typeof s==='string'&&s.length<=30).slice(0,8):undefined,bio:(x.bio&&typeof x.bio==='object')?((bioArr)=>({edu:bioArr(x.bio.edu),exp:bioArr(x.bio.exp),spec:bioArr(x.bio.spec)}))(v=>Array.isArray(v)?v.filter(t=>typeof t==='string'&&t.length<=120).slice(0,30):[]):undefined/* 2026-10-28 醫師完整介紹 */}));
   const sessions=c.sessions.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   const blocks=c.blocks.map(x=>({date:x.date,clinicId:x.clinicId,doctorId:x.doctorId,start:x.start,end:x.end}));
   /* 2026-09-21 v87：後端隨班表附上滿診／停診的日子；只收合法欄位，沒有就不加（舊後端） */
