@@ -10,9 +10,12 @@ on:
       - '.github/workflows/public-schedule-cache.yml'
       - 'scripts/publish_public_schedule.py'
       - 'scripts/test_public_schedule_cache.py'
+      - 'scripts/publish_public_vaccine.py'
+      - 'scripts/test_public_vaccine_cache.py'
 
 permissions:
   contents: write
+  pages: write
 
 concurrency:
   group: public-schedule-cache
@@ -32,15 +35,47 @@ jobs:
       - name: Validate publisher
         run: python -m unittest discover -s scripts -p test_public_schedule_cache.py -v
       - name: Retrieve and validate public timetable
+        id: schedule_update
         run: python scripts/publish_public_schedule.py
+      - name: Validate vaccine publisher
+        id: vaccine_test
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python -m unittest discover -s scripts -p test_public_vaccine_cache.py -v
+      - name: Retrieve and validate public vaccine stock
+        id: vaccine_update
+        if: ${{ !cancelled() && steps.vaccine_test.outcome == 'success' }}
+        continue-on-error: true
+        run: python scripts/publish_public_vaccine.py
       - name: Commit only the validated cache
+        id: cache_commit
+        if: ${{ !cancelled() && (steps.schedule_update.outcome == 'success' || steps.vaccine_update.outcome == 'success') }}
         shell: bash
+        env:
+          SCHEDULE_UPDATE: ${{ steps.schedule_update.outcome }}
+          VACCINE_UPDATE: ${{ steps.vaccine_update.outcome }}
         run: |
-          git add -- public-schedule/latest.json
-          if git diff --cached --quiet -- public-schedule/latest.json; then
+          paths=()
+          if [[ "$SCHEDULE_UPDATE" == "success" ]]; then
+            paths+=(public-schedule/latest.json)
+          fi
+          if [[ "$VACCINE_UPDATE" == "success" ]]; then
+            paths+=(public-vaccine/latest.json linevaccines.html)
+          fi
+          git add -- "${paths[@]}"
+          if git diff --cached --quiet -- "${paths[@]}"; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Refresh public four-week timetable cache" -- public-schedule/latest.json
+          git commit -m "Refresh validated public timetable and vaccine caches" -- "${paths[@]}"
           git push origin HEAD:main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+      - name: Publish updated cache to GitHub Pages
+        if: ${{ !cancelled() && steps.cache_commit.outputs.published == 'true' && steps.vaccine_update.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent
+      - name: Report vaccine cache retention
+        if: ${{ !cancelled() && (steps.vaccine_test.outcome == 'failure' || steps.vaccine_update.outcome == 'failure') }}
+        run: echo "::warning::Vaccine refresh failed; the last valid public vaccine cache and HTML snapshot were preserved."
