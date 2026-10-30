@@ -6,6 +6,16 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>點選院區撥打電話</title>
+<script id="phone-embed-mode">
+(function(){
+  if(new URLSearchParams(window.location.search).get('embed')==='official'){
+    document.documentElement.classList.add('phone-official-embed');
+  }
+})();
+</script>
+<style id="phone-official-embed">
+html.phone-official-embed body>#phone-page-card .phone-brand{display:none!important}
+</style>
 <style type="text/css">.contitle1{display:none!important}
 .newsdetail{padding:0!important}
 #phone-page-card{box-sizing:border-box;width:calc(100% - 24px);max-width:620px;margin:24px auto 32px;padding:24px;background:#f4f4f0;border:1px solid #dfdfd8;border-radius:20px;color:#60635b}
@@ -63,14 +73,31 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
 
 <div class="phone-page-grid"><a data-clinic="A" aria-label="鶯歌院區電話掛號" href="tel:0226702559">鶯歌</a><a data-clinic="B" aria-label="三樹院區電話掛號" href="tel:0226807101">三樹</a><a data-clinic="C" aria-label="樹林院區電話掛號" href="tel:0286850096">樹林</a><a data-clinic="D" aria-label="桃園院區電話掛號" href="tel:033668311">桃園</a><a data-clinic="E" aria-label="土城院區電話掛號" href="tel:0222625113">土城</a><a data-clinic="F" aria-label="八德院區電話掛號" href="tel:033655225">八德</a><a data-clinic="G" aria-label="龍潭院區電話掛號" href="tel:034990306">龍潭</a><a data-clinic="H" aria-label="大溪院區電話掛號" href="tel:033880868">大溪</a><a data-clinic="I" aria-label="大竹院區電話掛號" href="tel:033231266">大竹</a><a data-clinic="J" aria-label="大湳院區電話掛號" href="tel:033630811">大湳</a><a data-clinic="K" aria-label="平鎮院區電話掛號" href="tel:034690006">平鎮</a><a data-clinic="L" aria-label="埔心院區電話掛號" href="tel:034828666">埔心</a><a data-clinic="M" aria-label="觀音院區電話掛號" href="tel:034833366">觀音</a><a data-clinic="N" aria-label="龍岡院區電話掛號" href="tel:034665666">龍岡</a></div>
 </section>
-<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script>
+<script id="phone-liff-loader">
 (function(){
-  if(!window.liff){window.phoneLiffReady=Promise.resolve();return;}
-  window.phoneLiffReady=liff.init({liffId:"2009326025-hlJtvLlr",withLoginOnExternalBrowser:false}).then(function(){
-    document.documentElement.dataset.phoneLiff="ready";
-  }).catch(function(){
-    document.documentElement.dataset.phoneLiff="unavailable";
+  if(document.documentElement.classList.contains('phone-official-embed')){
+    window.phoneLiffReady=Promise.resolve();
+    return;
+  }
+  window.phoneLiffReady=new Promise(function(resolve){
+    var sdk=document.createElement('script');
+    sdk.charset='utf-8';
+    sdk.src='https://static.line-scdn.net/liff/edge/2/sdk.js';
+    sdk.onload=function(){
+      if(!window.liff){resolve();return;}
+      Promise.resolve().then(function(){
+        return liff.init({liffId:"2009326025-hlJtvLlr",withLoginOnExternalBrowser:false});
+      }).then(function(){
+        document.documentElement.dataset.phoneLiff="ready";
+      }).catch(function(){
+        document.documentElement.dataset.phoneLiff="unavailable";
+      }).then(resolve);
+    };
+    sdk.onerror=function(){
+      document.documentElement.dataset.phoneLiff="unavailable";
+      resolve();
+    };
+    document.head.appendChild(sdk);
   });
 })();
 </script>
@@ -154,6 +181,15 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
   }
   function permissionChanged(){if(permissionStatus?.state==='granted'){attempted=false;refresh();}else if(permissionStatus?.state==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();}}
   sort();
+  if(document.documentElement.classList.contains('phone-official-embed')){
+    window.addEventListener('message',function(event){
+      if(event.source!==window.parent||(event.origin!=='https://www.drking.com.tw'&&event.origin!=='https://drking.com.tw'))return;
+      const data=event.data;
+      if(!data||data.type!=='drking-official-location'||!valid(data))return;
+      received({coords:{latitude:data.lat,longitude:data.lng}});
+    });
+    return;
+  }
   const ready=window.phoneLiffReady||Promise.resolve();
   ready.then(()=>{liffReady=true;refresh(true);});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else refresh();});
