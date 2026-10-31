@@ -167,7 +167,7 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
     const mark=el('span','brand-mark'),logo=el('img');logo.src=config.logo;logo.alt='';mark.append(logo);lockup.append(mark);
     const word=el('span','brand-name');[-88.8,-131.52,-173.76,-216].forEach(left=>{const crop=el('span','brand-glyph'),img=el('img');img.src=config.logo;img.alt='';img.style.left=left+'px';crop.append(img);word.append(crop);});lockup.append(word);brand.append(lockup);page.append(brand);
     const main=el('main'),status=el('p','status visually-hidden');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-    const refresh=button('','refresh',()=>{refreshData(true);locationControl.refresh();});refresh.setAttribute('aria-label','重新整理疫苗庫存');refresh.title='重新整理';refresh.append(icon('refresh'));brand.append(refresh);
+    const refresh=button('','refresh',()=>{refreshData(true);locationControl.refresh();});refresh.setAttribute('aria-label','重新整理疫苗庫存');refresh.title='重新整理';refresh.append(icon('refresh'));
     const grid=el('section','clinic-grid');grid.setAttribute('aria-label','各院區疫苗庫存');main.append(grid);
     const foot=el('footer','foot','庫存依各院區回報時間顯示，請先來電確認。');main.append(foot,status);page.append(main);root.append(page);
     const paintReady=afterVaccinePaint(window);
@@ -216,3 +216,4 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
 
 </script>
 </body></html>
+
