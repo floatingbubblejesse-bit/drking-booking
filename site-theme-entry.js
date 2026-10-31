@@ -328,3 +328,13 @@ s.textContent='#ec-search-esc{position:relative!important;flex:none!important;wi
 +'#ec-search-esc:hover,#ec-search-esc:active{background:#eef3f1!important}';
 document.head.appendChild(s);
 })();
+/* Doctor page schedule title 20261101: 門診表 → 醫師班表 with a 點圖可放大 hint, no tab bar under it */
+(function(){
+if(!/^\/product-[\d-]+\.html$/.test(location.pathname))return;
+var s=document.createElement('style');s.id='dk-doc-subtb-css-20261101';
+s.textContent='.subtb.dk-subtb::after{content:none!important;display:none!important}'
++'.subtb.dk-subtb .dk-zoomhint{margin-left:8px;font-size:13px;font-weight:400;letter-spacing:.05em;color:#7a8a85;vertical-align:middle}';
+document.head.appendChild(s);
+function fix(){Array.prototype.forEach.call(document.querySelectorAll('.subtb:not(.dk-subtb)'),function(t){if(t.textContent.trim()!=='門診表')return;t.classList.add('dk-subtb');t.innerHTML='醫師班表<small class="dk-zoomhint">點圖可放大</small>';});}
+fix();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fix);
+})();
