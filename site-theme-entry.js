@@ -319,3 +319,12 @@ var s=document.createElement('style');s.id='dk-ellink-css-20261031';
 s.textContent='.el_link ul li b::before{content:none!important;display:none!important}.el_link ul li b{padding-top:5px!important}@media (max-width:767px){.el_link ul{margin:0 0 16px!important}}';
 document.head.appendChild(s);
 })();
+/* Search overlay close 20261031: show an ✕ instead of the 關閉 ESC text button (button comes from GTM; Esc key still works) */
+(function(){
+var s=document.createElement('style');s.id='dk-search-close-css-20261031';
+s.textContent='#ec-search-esc{position:relative!important;flex:none!important;width:40px!important;height:40px!important;margin-right:-6px!important;padding:0!important;border:0!important;border-radius:50%!important;background:transparent!important;font-size:0!important;line-height:0!important;color:transparent!important;cursor:pointer}'
++'#ec-search-esc::before,#ec-search-esc::after{content:"";position:absolute;left:50%;top:50%;width:22px;height:2px;border-radius:2px;background:#304639;transform:translate(-50%,-50%) rotate(45deg)}'
++'#ec-search-esc::after{transform:translate(-50%,-50%) rotate(-45deg)}'
++'#ec-search-esc:hover,#ec-search-esc:active{background:#eef3f1!important}';
+document.head.appendChild(s);
+})();
