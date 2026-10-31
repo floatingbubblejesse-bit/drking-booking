@@ -80,41 +80,96 @@ var ROLES='總院長|副院長|執行長|院長|減重名醫|名醫|主任醫師
 var PRE=new RegExp('^('+ROLES+')\\s*'),SUF=new RegExp('\\s*('+ROLES+')$');
 function bare(s){s=String(s||'').replace(/\s+/g,' ').trim();var m;while((m=s.match(SUF))&&s.length>m[0].length)s=s.slice(0,-m[0].length);while((m=s.match(PRE))&&s.length>m[0].length)s=s.slice(m[0].length);return s.trim();}
 var css=document.createElement('style');css.id='dk-doctor-week-20261031';
-css.textContent='.dk-dr-week{width:100%;max-width:560px;margin:4px auto 0;background:transparent}.dk-dr-week iframe{display:block;width:100%;height:200px;border:0;background:transparent}#ec-team .ec-name{word-break:keep-all}#ec-team .ec-sch.dk-week-on h3 small{display:none}';
+css.textContent='.dk-dr-week{position:relative;width:100%;max-width:560px;margin:4px auto 0;background:transparent;cursor:zoom-in;-webkit-tap-highlight-color:transparent}'
++'.dk-dr-week iframe{display:block;width:100%;height:260px;border:0;background:transparent;pointer-events:none}'
++'.dk-dr-week:focus-visible{outline:2px solid #2a9189;outline-offset:2px;border-radius:8px}'
++'#ec-team .ec-name{word-break:keep-all}'
++'#dkDocLb{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:64px 12px 16px;background:rgba(10,20,18,.82);box-sizing:border-box}'
++'#dkDocLb[hidden]{display:none}'
++'#dkDocLb>.dkLbClose{position:absolute;top:12px;right:12px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#fff;color:#1e2b28;font-size:24px;line-height:1;cursor:pointer}'
++'#dkDocLb>.dkLbCard{display:flex;flex-direction:column;width:100%;max-width:560px;height:100%;max-height:900px;overflow:hidden;border-radius:10px;background:#fff}'
++'#dkDocLb .dkLbHead{flex:none;padding:12px 16px 10px;border-bottom:1px dashed #cfd9d5;font-size:18px;font-weight:700;line-height:1.3;color:#1f3b33;letter-spacing:.04em}'
++'#dkDocLb .dkLbHead small{margin-left:8px;font-size:14px;font-weight:500;color:#1f6f69}'
++'#dkDocLb iframe{display:block;flex:1;width:100%;min-height:0;border:0}';
 document.head.appendChild(css);
-var FRAME_CSS='.brand,.portal-picker,.doctor-header{display:none!important}.portal-content{padding:0!important}.portal-team.doctor-focus{--doctor-menu-height:0px!important}.doctor-card{margin:0!important;border:0!important;box-shadow:none!important;background:transparent!important}.doctor-cards,.doctor-card,.doctor-live-schedule,.doctor-live-schedule>.sw-board{height:auto!important;max-height:none!important;min-height:0!important;flex:none!important}.doctor-live-schedule>.sw-board{overflow:visible!important}.doctor-live-schedule .sw-week{overflow:visible!important;max-height:none!important;height:auto!important}';
-var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.unobserve(e.target);load(e.target);}});},{rootMargin:'800px 0px'}):null;
-function mount(img,name,hide,fig){
+var HIDE='.brand,.portal-picker,.doctor-header{display:none!important}.portal-content{padding:0!important}.portal-team.doctor-focus{--doctor-menu-height:0px!important}.portal-team,.doctor-cards{height:100%!important}.doctor-card{margin:0!important;border:0!important;box-shadow:none!important;background:transparent!important;height:100%!important;max-height:none!important}.viewport{background:transparent!important}';
+function src(name){return '/linedoctorschedule.html?embed=official#doctor-'+encodeURIComponent(name);}
+function parts(f){try{var d=f.contentDocument,app=d&&d.getElementById('line-clinic-app'),sr=app&&app.shadowRoot;return sr?{d:d,sr:sr,h:sr.querySelector('.doctor-header h2'),sch:sr.querySelector('.doctor-live-schedule .sw-board'),vp:sr.querySelector('.viewport')}:null;}catch(e){return null;}}
+function addCss(x,id,text){if(!x.sr.getElementById(id)){var s=x.d.createElement('style');s.id=id;s.textContent=text;x.sr.appendChild(s);var bg=x.d.createElement('style');bg.textContent='html,body{background:transparent!important}';x.d.head.appendChild(bg);}}
+var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.unobserve(e.target);load(e.target);}});},{rootMargin:'1200px 0px'}):null;
+function mount(img,name,full,hide,fig){
   if(!img||!name||img.getAttribute('data-dk-week'))return;img.setAttribute('data-dk-week','1');
-  var box=document.createElement('div');box.className='dk-dr-week';box.dkName=name;box.dkHide=hide;box.dkFig=fig;
-  var f=document.createElement('iframe');f.title=name+' 四週醫師班表';f.setAttribute('scrolling','no');box.appendChild(f);
+  var box=document.createElement('div');box.className='dk-dr-week';box.dkName=name;box.dkFull=full||name;box.dkHide=hide;box.dkFig=fig;
+  box.setAttribute('role','button');box.setAttribute('tabindex','0');box.setAttribute('aria-label',(full||name)+' 個人班表，點擊放大');
+  var f=document.createElement('iframe');f.title=name+' 四週醫師班表';f.setAttribute('scrolling','no');f.setAttribute('tabindex','-1');f.setAttribute('aria-hidden','true');box.appendChild(f);
   hide.parentNode.insertBefore(box,hide);hide.style.display='none';if(fig)fig.classList.add('dk-week-on');
+  box.addEventListener('click',function(){openLb(box);});
+  box.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openLb(box);}});
   if(io)io.observe(box);else load(box);
 }
 function revert(box){if(box.dkMO)box.dkMO.disconnect();box.dkHide.style.display='';if(box.dkFig)box.dkFig.classList.remove('dk-week-on');box.remove();}
-function load(box){var f=box.firstChild;f.addEventListener('load',function(){prep(box,0);});f.src='/linedoctorschedule.html?embed=official#doctor-'+encodeURIComponent(box.dkName);}
+function load(box){var f=box.firstChild;f.addEventListener('load',function(){prep(box,0);});f.src=src(box.dkName);}
+function setH(box,f,h){
+  var cur=f.offsetHeight;if(Math.abs(h-cur)<3)return;
+  var top=box.getBoundingClientRect().top;f.style.height=h+'px';
+  if(top<0)window.scrollBy(0,h-cur);
+}
 function prep(box,n){
-  if(!box.isConnected)return;var f=box.firstChild;
-  try{
-    var d=f.contentDocument,app=d&&d.getElementById('line-clinic-app'),sr=app&&app.shadowRoot,h=sr&&sr.querySelector('.doctor-header h2'),sch=sr&&sr.querySelector('.doctor-live-schedule .sw-board');
-    if(h&&sch){
-      if(h.textContent.replace(/\s+/g,'').indexOf(box.dkName)!==0){revert(box);return;}
-      if(!sr.getElementById('dk-week-only')){var s=d.createElement('style');s.id='dk-week-only';s.textContent=FRAME_CSS;sr.appendChild(s);var bg=d.createElement('style');bg.textContent='html,body{background:transparent!important}';d.head.appendChild(bg);}
-      var queued=false,fit=function(){queued=false;var vp=sr.querySelector('.viewport');if(!vp)return;var over=vp.scrollHeight-vp.clientHeight;if(over>1)f.style.height=(f.offsetHeight+over+4)+'px';};
-      var later=function(){if(!queued){queued=true;f.contentWindow.requestAnimationFrame(fit);}};
-      box.dkMO=new f.contentWindow.MutationObserver(later);box.dkMO.observe(sr,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','style']});
-      later();return;
-    }
-  }catch(e){}
+  if(!box.isConnected)return;var f=box.firstChild,x=parts(f);
+  if(x&&x.h&&x.sch&&x.vp){
+    if(x.h.textContent.replace(/\s+/g,'').indexOf(box.dkName)!==0){revert(box);return;}
+    addCss(x,'dk-week-only',HIDE);
+    /* the board fills the frame; only grow (never shrink) while its rows overflow, so the size cannot oscillate */
+    var steps=0,queued=false,grow=function(){queued=false;if(steps>=6)return;var b=x.sr.querySelector('.doctor-live-schedule .sw-board'),wk=b&&b.querySelector('.sw-week');if(!b||!wk)return;
+      var over=wk.scrollHeight-wk.clientHeight;if(over<2&&!b.classList.contains('dlw-overflow'))return;
+      var cur=f.offsetHeight,h=Math.min(640,cur+Math.max(over+4,20));if(h<=cur)return;steps++;setH(box,f,h);};
+    var later=function(){if(!queued){queued=true;setTimeout(grow,120);}};
+    box.dkMO=new f.contentWindow.MutationObserver(later);box.dkMO.observe(x.sr,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
+    later();return;
+  }
   if(n<100)setTimeout(function(){prep(box,n+1);},150);else revert(box);
 }
+var lb,lbFrame,lbHead,lbState=null,KEY='dkDocLb';
+function makeLb(){
+  if(lb)return;
+  lb=document.createElement('div');lb.id='dkDocLb';lb.hidden=true;lb.setAttribute('role','dialog');lb.setAttribute('aria-modal','true');lb.setAttribute('aria-label','個人班表');
+  lb.innerHTML='<button type="button" class="dkLbClose" aria-label="關閉">&times;</button><div class="dkLbCard"><div class="dkLbHead"></div><iframe title="個人班表"></iframe></div>';
+  document.body.appendChild(lb);lbHead=lb.querySelector('.dkLbHead');lbFrame=lb.querySelector('iframe');
+  lb.querySelector('.dkLbClose').addEventListener('click',hideLb);
+  lb.addEventListener('click',function(e){if(e.target===lb)hideLb();});
+  document.addEventListener('keydown',function(e){if(!lb.hidden&&e.key==='Escape'){e.preventDefault();hideLb();}});
+  lbFrame.addEventListener('load',function(){styleLb(0);});
+  window.addEventListener('popstate',function(e){if(!lb.hidden&&!(e.state&&e.state[KEY]))closeLb();});
+}
+function styleLb(n){
+  if(!lb||lb.hidden)return;var x=parts(lbFrame);
+  if(x&&x.sr.querySelector('.portal-team')){addCss(x,'dk-week-pop',HIDE);
+    if(!x.d.documentElement.hasAttribute('data-dk-esc')){x.d.documentElement.setAttribute('data-dk-esc','');x.d.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();hideLb();}});}
+    return;}
+  if(n<80)setTimeout(function(){styleLb(n+1);},125);
+}
+function openLb(box){
+  makeLb();
+  var full=box.dkFull,name=box.dkName,rest=full.indexOf(name)===0?full.slice(name.length).trim():'';
+  lbHead.textContent=name;if(rest){var s=document.createElement('small');s.textContent=rest;lbHead.appendChild(s);}
+  var s2=document.createElement('small');s2.textContent='個人班表';lbHead.appendChild(s2);
+  lbState={x:window.scrollX,y:window.scrollY,body:document.body.style.cssText,root:document.documentElement.style.overflow,opener:box};
+  document.body.style.position='fixed';document.body.style.top=(-lbState.y)+'px';document.body.style.left=(-lbState.x)+'px';document.body.style.width='100%';document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';
+  var st=Object.assign({},history.state||{});st[KEY]=1;history.pushState(st,'',location.href);
+  lb.hidden=false;
+  var url=location.origin+src(name);
+  if(lbFrame.dkName!==name){lbFrame.dkName=name;if(!lbFrame.getAttribute('src'))lbFrame.src=url;else lbFrame.contentWindow.location.replace(url);}
+  styleLb(0);lb.querySelector('.dkLbClose').focus({preventScroll:true});
+}
+function hideLb(){if(!lb||lb.hidden)return;var own=!!(history.state&&history.state[KEY]);closeLb();if(own)history.back();}
+function closeLb(){if(!lb||lb.hidden)return;lb.hidden=true;var s=lbState;if(!s)return;document.body.style.cssText=s.body;document.documentElement.style.overflow=s.root;window.scrollTo(s.x,s.y);if(s.opener&&s.opener.isConnected)s.opener.focus({preventScroll:true});lbState=null;}
 function apply(){
   if(team)document.querySelectorAll('#ec-team article.ec-doc').forEach(function(a){
     var fig=a.querySelector('figure.ec-sch'),img=fig&&fig.querySelector('img'),h=a.querySelector('.ec-name');if(!img||!h)return;
     var name='';h.childNodes.forEach(function(c){if(c.nodeType===3)name+=c.textContent;});
-    mount(img,bare(name),img,fig);
+    mount(img,bare(name),h.textContent.replace(/\s+/g,' ').trim(),img,fig);
   });
-  if(detail){var img=document.querySelector('#myTabContent img'),t=document.querySelector('.producttitle');if(img&&t){var wrap=img.parentElement&&img.parentElement.children.length===1&&img.parentElement.closest('#myTabContent')?img.parentElement:img;mount(img,bare(t.textContent),wrap,null);}}
+  if(detail){var img=document.querySelector('#myTabContent img'),t=document.querySelector('.producttitle');if(img&&t){var wrap=img.parentElement&&img.parentElement.children.length===1&&img.parentElement.closest('#myTabContent')?img.parentElement:img;mount(img,bare(t.textContent),t.textContent.replace(/\s+/g,' ').trim(),wrap,null);}}
 }
 function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply();});}).observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
