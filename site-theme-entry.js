@@ -68,7 +68,7 @@ if(!team&&!detail&&p!='/about.html'&&p.indexOf('/content')!==0)return;
 var css=document.createElement('style');css.id='dk-team-cleanup-20261031';css.textContent='.subtitle1::before,.subtitle2::before,.subtitle3::before,.contitle1::before{content:none!important;display:none!important}.subtitle1>ul,.subtitle2>ul,.subtitle3>ul{display:none!important}.news_listsy:has(a[href="content-23.html"]){display:none!important}#ec-team .ec-name .dk-role-below{display:block!important;margin:10px 0 0!important}.dk-branch-hours{margin-top:24px!important}.dk-branch-hours .info_box_t{padding:20px!important}.dk-branch-hours p{margin:8px 0!important}';document.head.appendChild(css);
 var branches={2:'鶯歌',3:'三樹',4:'樹林',5:'桃園',6:'土城',7:'八德',8:'龍潭',9:'大溪',10:'大竹',11:'大湳',12:'平鎮',13:'埔心',14:'觀音',15:'龍岡'};
 function apply(){document.querySelectorAll('#ec-team .ec-name span').forEach(function(s){if(/^(督導|特助|倉管)$/.test(s.textContent.trim()))s.classList.add('dk-role-below')});
-if(team){var m=p.match(/products-([0-9]+)/),name=branches[m&&m[1]],h=document.querySelector('.info_area');if(m&&m[1]==='1'&&h){h.style.display='none';}else if(name&&h&&!h.dataset.dkBranchHours){h.dataset.dkBranchHours='1';h.classList.add('dk-branch-hours');var split=['大竹','平鎮','埔心','觀音','龍岡'].indexOf(name)>=0;h.innerHTML='<div class="info_box_t"><h2 class="qfootlabel">全年無休</h2><p style="text-align:center">營業時間</p><p style="text-align:center" class="qtime">'+(split?'7:30～12:00、14:00～18:00<br>18:30～21:30':'7:30～21:30 中午不休息')+'</p></div>';}}}
+if(team){var m=p.match(/products-([0-9]+)/),name=branches[m&&m[1]],h=document.querySelector('.info_area');if(m&&m[1]==='1'&&h){h.style.display='none';}else if(name&&h&&!h.dataset.dkBranchHours){h.dataset.dkBranchHours='1';h.classList.add('dk-branch-hours');var split=['大竹','平鎮','埔心','觀音','龍岡'].indexOf(name)>=0;h.innerHTML='<div class="info_box_t"><h2 class="qfootlabel">全年無休</h2><p style="text-align:center" class="dk-hl">營業時間</p><p style="text-align:center" class="dk-ht">'+(split?'<span class="qtime dk-hrs"><time>7:30</time>～<time>12:00</time><time>14:00</time>～<time>18:00</time><time>18:30</time>～<time>21:30</time></span>':'<span class="qtime dk-nw">7:30～21:30 中午不休息</span>')+'</p></div>';}}}
 function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply()})}).observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
@@ -278,4 +278,32 @@ function apply(){
 }
 function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply();});}).observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+/* Hours card layout 20261031: one range per line, ranges lined up on the ～, single ranges never wrap */
+(function(){
+var css=document.createElement('style');css.id='dk-hours-css-20261031';
+css.textContent='html body .info_area .info_box_t p .qtime.dk-hrs{display:inline-grid!important;grid-template-columns:auto auto auto;column-gap:1px;text-align:left;vertical-align:top;font-variant-numeric:tabular-nums;white-space:nowrap}'
++'html body .info_area .info_box_t .qtime.dk-hrs time{text-align:right}'
++'html body .info_area .info_box_t .qtime.dk-hrs time:nth-of-type(even){text-align:left}'
++'html body .info_area .info_box_t p .qtime.dk-nw{white-space:nowrap!important}'
++'html body .info_area .info_box_t p.dk-hl.dk-hl{margin-bottom:0!important}'
++'html body .info_area .info_box_t p.dk-ht.dk-ht{margin-top:0!important}';
+document.head.appendChild(css);
+var RE=/^(\d{1,2}:\d{2})\s*[～~〜–-]\s*(\d{1,2}:\d{2})$/;
+function fmt(){
+  Array.prototype.forEach.call(document.querySelectorAll('.info_area .info_box_t p>.qtime:not(.dk-hrs):not(.dk-nw)'),function(q){
+    var p=q.parentNode,txt=q.innerHTML.replace(/<br\s*\/?>/gi,'、').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    var segs=txt.split(/\s*[、，,]\s*/).filter(Boolean);
+    if(segs.length>1&&segs.every(function(s){return RE.test(s);})){
+      q.innerHTML=segs.map(function(s){var m=s.match(RE);return '<time>'+m[1]+'</time>～<time>'+m[2]+'</time>';}).join('');q.classList.add('dk-hrs');
+    }else q.classList.add('dk-nw');
+    var lab='';Array.prototype.slice.call(p.childNodes).forEach(function(n){if(n!==q&&n.nodeType===3){lab+=n.textContent;p.removeChild(n);}});
+    lab=lab.replace(/[：:\s]+$/,'').trim();
+    if(lab){var l=document.createElement('p');l.className='dk-hl';l.setAttribute('style',p.getAttribute('style')||'text-align:center');l.textContent=lab;p.parentNode.insertBefore(l,p);p.classList.add('dk-ht');}
+  });
+}
+/* run after the page's own DOMContentLoaded handlers (trackall wraps the card only while it still has 4 children) */
+function start(){setTimeout(function(){fmt();var queued=false,mo=new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;fmt();});});mo.observe(document.body,{childList:true,subtree:true});setTimeout(function(){mo.disconnect();},15000);},0);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+window.addEventListener('load',fmt);
 })();
