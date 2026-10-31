@@ -521,7 +521,7 @@ function authLost() {
 
 /* ✨ v31.71 前端唯讀闘門（後端 v127 才是真正的那道）。
    清單跟後端 STAFF_WRITE_ACTIONS_ 一致，兩邊要一起改。 */
-const RO_BLOCK_ACTIONS = ['createCounterBooking','updateAppointmentStatus','updateAppointmentFields',
+const RO_BLOCK_ACTIONS = ['courseCancelRest','courseMove','createCounterBooking','updateAppointmentStatus','updateAppointmentFields',
   'rescheduleAppointment','batchUpdateStatus','savePatientMaster','savePatientMemory','importEmployees',
   'sendSMS','cancelScheduledSMS','saveService','deleteService','saveNotifyTemplate','deleteNotifyTemplate',
   'saveDoctorPhoto','restoreDoctorPhotos','deleteDoctorPhoto','saveEmployee','deleteEmployee',
@@ -3728,12 +3728,106 @@ function openApptDetailFromObj(a, dateStr) {
       <button class="btn btn-o" data-act="c-retime">調整時段</button>
       <button class="btn btn-a" data-act="c-resch">取消重約</button>
       <button class="btn btn-r" data-act="c-cancel">取消</button>
+      ${/💊\s*[^\s(（]*?\s*[(（]\s*第\s*\d+\s*\/\s*\d+\s*週/.test(String(a.note||a['備註']||'')) ? '<button class="btn" style="background:#6b4fa0;color:#fff" data-act="c-course">💊 後續療程</button>' : ''}
       <button class="btn btn-g" data-act="c-checkin">報到</button></div>`);
   m.dataset.appt = JSON.stringify({ apptId:a.apptId||a.id||a['預約編號']||'', clinic:S.cClinic, date:a.date||dateStr,
     t, doctor:normDoc(a.doctor||a['醫師']||''), name:a.name||a['病人姓名']||'', phone:a.phone||a['電話']||'', type:a.type||a['類型']||'複診',
     note:String(a.note||a['備註']||'') });
   window.__cdCurAppt = a;
 }
+/* ✨ v31.95（2026-10-31）💊 後續療程：一鍵取消後續／整組改期（全部不發簡訊；前一日提醒照常） */
+const CF_WD = ['日','一','二','三','四','五','六'];
+function cfMD(ds) { const d = new Date(ds + 'T00:00'); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + CF_WD[d.getDay()] + '）'; }
+function cfAddDays(ds, n) { const d = new Date(ds + 'T00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+async function openCoursePanel(apptId) {
+  const m = modal(`<div class="mh">💊 後續療程 <button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div><div class="mb"><p class="muted">載入中…</p></div>`);
+  const r = await api.post('getCourseFollow', { apptId }, true);
+  if (!r.ok) { m.querySelector('.mb').innerHTML = `<p style="color:var(--red);font-weight:700">${esc(r.message || r.error || '讀取失敗')}</p>`; return; }
+  S.cf = { apptId, data: r, tab: 'cancel', pv: null };
+  renderCoursePanel(m);
+}
+function cfStTag(x) {
+  const c = x.status === '已預約' ? (x.movable ? 'background:#dcfce7;color:#166534' : 'background:#e5e7eb;color:#4b5563') : x.status === '已報到' ? 'background:#e5e7eb;color:#4b5563' : 'background:#fee2e2;color:#991b1b';
+  return `<span style="font-size:13px;font-weight:700;border-radius:6px;padding:1px 8px;${c}">${esc(x.status)}${x.inject ? '・只打針' : ''}</span>`;
+}
+function renderCoursePanel(m) {
+  const cf = S.cf, d = cf.data, mov = d.list.filter(x => x.movable);
+  const last = d.list[d.list.length - 1] || {};
+  const tabBtn = (k, t) => `<button class="btn ${cf.tab === k ? '' : 'btn-o'} btn-sm" data-act="cf-tab" data-k="${k}" style="${cf.tab === k ? 'background:#6b4fa0;color:#fff' : ''}">${t}</button>`;
+  let body = `<div style="background:#f7faf9;border-radius:9px;padding:8px 12px;margin-bottom:10px;font-size:15px">
+      <b>${esc(d.patient || '(未填)')}</b>　💊 ${esc(d.name)}　共 ${d.total} 次｜${esc(last.clinic || '')}・${esc(last.doctor || '')}</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">${tabBtn('cancel', '一鍵取消後續')}${tabBtn('move', '整組改期')}</div>`;
+  if (!mov.length) body += `<p class="muted">這組療程今天以後沒有「已預約」的週次，不需要調整。</p>`;
+  if (cf.tab === 'cancel') {
+    body += `<table class="tbl"><thead><tr><th></th><th>次數</th><th>日期</th><th>時段</th><th>狀態</th></tr></thead><tbody>
+      ${d.list.map(x => `<tr style="${x.movable ? '' : 'color:#9aa9a6'}"><td>${x.movable ? `<input type="checkbox" class="cf-ck" value="${esc(x.id)}" checked style="width:20px;height:20px">` : ''}</td>
+        <td>第 ${x.week} 次</td><td>${cfMD(x.date)}</td><td>${esc(x.time)}</td><td>${cfStTag(x)}</td></tr>`).join('')}</tbody></table>
+      <p class="muted" style="font-size:14px;margin-top:8px">取消原因自動寫「療程調整」，<b>不發簡訊</b>。已報到、已取消的不會動。</p>`;
+  } else {
+    const firstMov = mov[0] || {};
+    const fw = cf.fromWeek || firstMov.week || d.total, fr = d.list.find(x => x.week === fw && x.movable) || firstMov;
+    const nd = cf.date || (fr.date ? cfAddDays(fr.date, 7) : ''), nt = cf.time || fr.time || '';
+    body += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-o btn-sm" data-act="cf-shift" style="border-color:#c4b5fd;color:#6b4fa0">全部順延一週</button>
+        <span class="muted" style="align-self:center;font-size:14px">或自己選日期、時段 ↓</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="frow" style="flex:1;min-width:110px"><label>從第幾次開始</label><select id="cf-from">${mov.map(x => `<option value="${x.week}"${x.week === fw ? ' selected' : ''}>第 ${x.week} 次（${cfMD(x.date)}）</option>`).join('')}</select></div>
+        <div class="frow" style="flex:1;min-width:130px"><label>新的第一天</label><input id="cf-date" type="date" value="${esc(nd)}"></div>
+        <div class="frow" style="flex:1;min-width:100px"><label>時段</label><input id="cf-time" type="time" value="${esc(nt)}"></div></div>
+      <button class="btn btn-p btn-sm" data-act="cf-pv" style="margin-bottom:10px">試算各週</button>
+      <div id="cf-pv-out">${cf.pv ? cfPvHtml(cf.pv) : '<p class="muted" style="font-size:14px">按「試算各週」看每一週約不約得到。規則跟建療程一樣（滿診可超約、醫師休息週只打針、停診不能約）。</p>'}</div>`;
+  }
+  let foot = `<button class="btn btn-o" data-act="close-modal">關閉</button>`;
+  if (mov.length && cf.tab === 'cancel') foot += `<button class="btn btn-r" data-act="cf-cancel">取消勾選的週次</button>`;
+  if (mov.length && cf.tab === 'move' && cf.pv) foot += `<button class="btn btn-g" data-act="cf-move">${cf.pv.needOverbook ? '放行超約，' : ''}確認改期</button>`;
+  m.querySelector('.modal').innerHTML = `<div class="mh">💊 後續療程 <button class="btn btn-o btn-sm" data-act="close-modal">✕</button></div>
+    <div class="mb">${body}</div><div class="mf">${foot}</div>`;
+}
+function cfPvHtml(pv) {
+  const tag = { ok: ['可約', '#dcfce7', '#166534'], inject: ['只打針', '#e0f2fe', '#075985'], overbook: ['超約', '#fef3c7', '#92400e'], blocked: ['約不到', '#fee2e2', '#991b1b'] };
+  const old = {}; (pv.old || []).forEach(o => old[o.week] = o);
+  return `<table class="tbl"><thead><tr><th>次數</th><th>原本</th><th></th><th>改成</th><th>試算</th></tr></thead><tbody>
+    ${pv.list.map(x => { const t = tag[x.status] || tag.blocked, o = old[x.week];
+      return `<tr style="${x.status === 'blocked' ? 'background:#fef2f2' : ''}"><td>第 ${x.week} 次</td><td>${o ? cfMD(o.date) : '<span class="muted">（沒有）</span>'}</td><td>→</td>
+      <td>${cfMD(x.date)} ${esc(pv.time)}</td><td><span style="font-size:13px;font-weight:700;border-radius:6px;padding:1px 8px;background:${t[1]};color:${t[2]}">${t[0]}</span>${x.status === 'blocked' && x.why ? `<div class="muted" style="font-size:12px">${esc(x.why)}</div>` : ''}</td></tr>`; }).join('')}
+    </tbody></table>
+    <p class="muted" style="font-size:14px;margin-top:8px">${esc(pv.clinic)}・${esc(pv.doctor)}。確認後舊的 ${(pv.old || []).length} 筆標成「已改約」、新建 ${pv.times - pv.blocked} 筆，<b>不發簡訊</b>，前一日提醒照常。${pv.blocked ? `<br><b style="color:var(--red)">有 ${pv.blocked} 週約不到，不會建立，請另外手動補掛。</b>` : ''}</p>`;
+}
+async function cfAction(el, m) {
+  const cf = S.cf; if (!cf || !m) return;
+  const act = el.dataset.act;
+  const grab = () => { const f = m.querySelector('#cf-from'), d = m.querySelector('#cf-date'), t = m.querySelector('#cf-time');
+    if (f) cf.fromWeek = +f.value; if (d) cf.date = d.value; if (t) cf.time = t.value; };
+  if (act === 'cf-tab') { grab(); cf.tab = el.dataset.k; cf.pv = null; renderCoursePanel(m); return; }
+  if (act === 'cf-shift') {
+    grab(); const x = cf.data.list.find(y => y.week === cf.fromWeek && y.movable) || cf.data.list.find(y => y.movable);
+    if (x) { cf.date = cfAddDays(x.date, 7); cf.time = x.time; }
+    cf.pv = null; renderCoursePanel(m); m.querySelector('[data-act="cf-pv"]')?.click(); return; }
+  if (act === 'cf-pv') {
+    grab(); if (!cf.date || !cf.time) { toast('請選新的第一天和時段', 'var(--red)'); return; }
+    el.disabled = true; el.textContent = '試算中…';
+    const r = await api.post('courseMovePreview', { apptId: cf.apptId, fromWeek: cf.fromWeek, date: cf.date, startTime: cf.time, employeeId: S.cUser.employeeId }, true);
+    if (!r.ok) { el.disabled = false; el.textContent = '試算各週'; toast('試算失敗：' + (r.message || r.error || ''), 'var(--red)'); return; }
+    cf.pv = r; renderCoursePanel(m); return; }
+  /* 不用 confirm()：內建瀏覽器會擋（v31.93 同樣做法），改成同一顆按鈕按第二次才執行 */
+  if (!el.dataset.armed) { el.dataset.armed = '1'; el.dataset.txt = el.textContent; el.textContent = '再按一次確認'; setTimeout(() => { if (el.isConnected && el.dataset.armed) { delete el.dataset.armed; el.textContent = el.dataset.txt; } }, 4000); return; }
+  delete el.dataset.armed; el.disabled = true; el.textContent = '處理中…';
+  const who = { employeeId: S.cUser.employeeId, employeeName: S.cUser.name, employeeRole: 'counter' };
+  let r;
+  if (act === 'cf-cancel') {
+    const ids = [...m.querySelectorAll('.cf-ck:checked')].map(c => c.value);
+    if (!ids.length) { el.disabled = false; el.textContent = el.dataset.txt; toast('沒有勾選任何週次', 'var(--red)'); return; }
+    r = await api.post('courseCancelRest', { apptId: cf.apptId, ids, ...who }, true);
+    if (r.ok) toast('✓ 已取消 ' + r.cancelled.length + ' 筆（未發簡訊）' + (r.skipped.length ? '，跳過 ' + r.skipped.length + ' 筆' : ''));
+  } else {
+    r = await api.post('courseMove', { apptId: cf.apptId, fromWeek: cf.fromWeek, date: cf.date, startTime: cf.time, allowOverbook: !!(cf.pv && cf.pv.needOverbook), ...who }, true);
+    if (r.ok) { const ok = (r.course && r.course.results || []).filter(x => x.ok).length, all = (r.course && r.course.results || []).length;
+      toast('✓ 改期完成：新建 ' + ok + '/' + all + ' 筆，舊的 ' + r.moved + ' 筆已改約（未發簡訊）', ok < all ? 'var(--amber)' : undefined); }
+  }
+  if (!r.ok) { el.disabled = false; el.textContent = el.dataset.txt; toast('失敗：' + (r.message || r.error || ''), 'var(--red)'); return; }
+  S.apptCache.clear(); closeModals(); renderCounter();
+}
+
 /* ✨ v31.62 預約詳情原本完全唯讀，只有櫃檯備註能打字。
    「每日必查 → 待補登」那條路只列出「欄位是空的」的單子（isIncomplete），
    所以像「病例號被 key 成姓名」「初診被掛成複診」這種 key 錯但不是空值的資料，
@@ -6254,6 +6348,8 @@ document.addEventListener('click', async e => {
     case 'c-cancel': cAction(m, 'cancel'); break;
     case 'c-resch': cAction(m, 'resch'); break;
     case 'c-retime': cAction(m, 'retime'); break;
+    case 'c-course': openCoursePanel(JSON.parse(m.dataset.appt).apptId); break;   /* ✨ v31.95 */
+    case 'cf-tab': case 'cf-shift': case 'cf-pv': case 'cf-cancel': case 'cf-move': cfAction(el, m); break;
     case 'c-edit': openEditAppt(window.__cdCurAppt, JSON.parse(m.dataset.appt).date); break;
     case 'q-book': quickBook(); break;
     case 'cf-go': counterFind(); break;
