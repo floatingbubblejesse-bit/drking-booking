@@ -254,22 +254,22 @@ function norm(s){return String(s||'').replace(/\s+/g,'');}
 var css=document.createElement('style');css.id='dk-specialty-20261031';
 css.textContent='ul>li.dk-specialty{list-style:none!important;margin:8px 0 2px -1.1em!important;padding:0!important;font-weight:700!important;color:#3f6b5e!important;letter-spacing:.06em}';
 document.head.appendChild(css);
-function mark(ul,name){
-  if(!ul||ul.querySelector('li.dk-specialty'))return;var start=STARTS[name];if(!start)return;
-  var key=norm(start),lis=Array.prototype.filter.call(ul.children,function(li){return li.tagName==='LI';}),hit=null;
+function mark(box,name){
+  if(!box||box.querySelector('li.dk-specialty'))return;var start=STARTS[name];if(!start)return;
+  var key=norm(start),lis=box.querySelectorAll('li'),hit=null;
   for(var i=0;i<lis.length&&!hit;i++)if(norm(lis[i].textContent)===key)hit=lis[i];
   for(var j=0;j<lis.length&&!hit;j++)if(norm(lis[j].textContent).indexOf(key)===0)hit=lis[j];
   if(!hit)return;
-  if(name==='楊大緯')ul.appendChild(hit);
+  var ul=hit.parentNode;if(name==='楊大緯')ul.appendChild(hit);
   var lab=document.createElement('li');lab.className='dk-specialty';lab.textContent='專長';ul.insertBefore(lab,hit);
 }
 function apply(){
   if(team)document.querySelectorAll('#ec-team article.ec-doc').forEach(function(a){
     var h=a.querySelector('.ec-name'),sec=a.querySelector('.ec-txt section');if(!h||!sec)return;
     var name='';h.childNodes.forEach(function(c){if(c.nodeType===3)name+=c.textContent;});
-    mark(sec.querySelector('ul'),bare(name));
+    mark(sec,bare(name));
   });
-  if(detail){var t=document.querySelector('.producttitle'),ul=document.querySelector('.baseprod ul');if(t&&ul)mark(ul,bare(t.textContent));}
+  if(detail){var t=document.querySelector('.producttitle'),b=document.querySelector('.baseprod');if(t&&b)mark(b,bare(t.textContent));}
 }
 function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply();});}).observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
