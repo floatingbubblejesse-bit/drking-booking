@@ -91,9 +91,9 @@ css.textContent='.dk-dr-week{position:relative;width:100%;max-width:560px;margin
 +'#dkDocLb[hidden]{display:none}'
 +'#dkDocLb>.dkLbClose{position:absolute;top:12px;right:12px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#fff;color:#1e2b28;font-size:24px;line-height:1;cursor:pointer}'
 +'#dkDocLb>.dkLbCard{position:relative;display:flex;flex-direction:column;width:100%;max-width:560px;height:100%;max-height:900px;overflow:hidden;border-radius:10px;background:#fff}'
-+'#dkDocLb .dkLbHead{flex:none;padding:12px 16px 10px;border-bottom:1px dashed #cfd9d5;font-size:18px;font-weight:700;line-height:1.3;color:#1f3b33;letter-spacing:.04em}'
++'#dkDocLb .dkLbHead{flex:none;padding:16px 20px 10px;border-bottom:0;font-size:18px;font-weight:700;line-height:1.3;color:#1f3b33;letter-spacing:.04em}'
 +'#dkDocLb .dkLbHead small{margin-left:8px;font-size:14px;font-weight:500;color:#1f6f69}'
-+'#dkDocLb iframe{display:block;flex:1;width:100%;min-height:0;border:0;visibility:hidden}'
++'#dkDocLb iframe{display:block;flex:1;width:calc(100% - 28px);margin:0 14px 14px;border-radius:12px;min-height:0;border:0;visibility:hidden}'
 +'#dkDocLb.dk-ready iframe{visibility:visible}'
 +'#dkDocLb .dkLbLoad{position:absolute;left:0;right:0;top:45%;text-align:center;color:#61736e;font-size:15px;letter-spacing:.1em}'
 +'#dkDocLb.dk-ready .dkLbLoad{display:none}';
@@ -246,22 +246,27 @@ Promise.all(items.map(fetchDoc)).then(function(r){if(done)return;r=r.filter(Bool
 (function(){
 var p=location.pathname,team=/^\/products-\d+\.html$/.test(p),detail=/^\/product-[\w-]+\.html$/.test(p);
 if(!team&&!detail)return;
-var STARTS={"林永昌": "成人及小兒耳鼻喉、皮膚、感冒過敏、腸胃炎、慢性病", "陳珠": "兒童疾病、小兒胃腸、成人感冒、久咳不癒、過敏氣喘、皮膚疾病", "蕭捷存": "成人及小兒耳鼻喉、呼吸道感染", "陳富玫": "專治久咳氣喘鼻過敏皮膚過敏", "闕壯理": "常 見 急 性 症 狀", "黃允玫": "耳痛、中耳炎、耳鳴、耳悶塞、眩量", "何中誠": "呼吸道感染、過敏性鼻炎", "陳永仁": "各式心臟疾病", "蕭宇伯": "高血壓、高血脂、糖尿病", "李豪權": "兒童發展評估及疫苗注射", "曾㨗聖": "呼吸道疾病（感染、氣喘、鼻過敏）", "陳佳舜": "小兒及成人感冒、耳鼻喉疾病，呼吸道疾病", "高國峯": "成人與小兒感冒、發燒、咳嗽", "陳昭銘": "感冒、急性腸胃炎、久咳不癒、", "張簡千郁": "一般內科疾病(慢性病、三高)、", "黃濰": "兒童及成人感冒", "何金蔚": "上呼吸道感染、過敏、氣喘", "廖崑竹": "失眠、焦慮、憂鬱、躁鬱", "李彥輝": "咽喉疾病：感冒、喉嚨痛、", "王志冉": "韓文門診", "曾韋綸": "急診醫學", "何冠達": "小兒及成人感染症", "何中庸": "慢性疾病:糖尿病、高血壓、高血脂(瞻固醇/三酸甘油脂)、甲狀腺疾病、痛風(高尿酸血症)、胃食道逆流、氣喘、慢性肺病。", "華志倫": "小兒發燒及不明熱、中耳炎及鼻竇炎、", "林鼎盛": "一般兒科、成人慢性疾病", "林昆澤": "小兒及成人呼吸道、腸胃道疾病", "巫清隆": "耳科：眩暈、耳鳴、中耳積水、聽力障礙等", "呂瑩純": "一般兒科疾病", "謝騰緯": "兒童一般內科", "李逸瑋": "一般兒科、兒童感染症", "沈士強": "呼吸道過敏感染、減重", "洪岱熙": "呼吸道感染(感冒)、尿道感染", "甘家銘": "慢性病（高血壓、高血脂、糖尿病）", "梁培毅": "兒科", "徐翊庭": "成人內外科疑難雜症", "侯進坤": "呼吸道疾病、腸胃道疾病、過敏", "林君瀚": "兒科、耳鼻喉科", "楊大緯": "急診醫學"};
+var STARTS={"林永昌": "成人及小兒耳鼻喉、皮膚、感冒過敏、腸胃炎、慢性病", "陳珠": "兒童疾病、小兒胃腸、成人感冒、久咳不癒、過敏氣喘、皮膚疾病", "蕭捷存": "成人及小兒耳鼻喉、呼吸道感染", "陳富玫": "專治久咳氣喘鼻過敏皮膚過敏", "闕壯理": "常 見 急 性 症 狀", "黃允玫": "耳痛、中耳炎、耳鳴、耳悶塞、眩量", "何中誠": "呼吸道感染、過敏性鼻炎", "陳永仁": "各式心臟疾病", "蕭宇伯": "高血壓、高血脂、糖尿病", "李豪權": "兒童發展評估及疫苗注射", "曾㨗聖": "呼吸道疾病（感染、氣喘、鼻過敏）", "陳佳舜": "小兒及成人感冒、耳鼻喉疾病，呼吸道疾病", "高國峯": "成人與小兒感冒、發燒、咳嗽", "陳昭銘": "感冒、急性腸胃炎、久咳不癒、", "張簡千郁": "一般內科疾病(慢性病、三高)、", "黃濰": "兒童及成人感冒", "何金蔚": "上呼吸道感染、過敏、氣喘", "廖崑竹": "失眠、焦慮、憂鬱、躁鬱", "李彥輝": "咽喉疾病：感冒、喉嚨痛、", "王志冉": "韓文門診", "曾韋綸": "急診醫學", "何冠達": "小兒及成人感染症", "何中庸": "慢性疾病:糖尿病、高血壓、高血脂(瞻固醇/三酸甘油脂)、甲狀腺疾病、痛風(高尿酸血症)、胃食道逆流、氣喘、慢性肺病。", "華志倫": "小兒發燒及不明熱、中耳炎及鼻竇炎、", "林鼎盛": "一般兒科、成人慢性疾病", "林昆澤": "小兒及成人呼吸道、腸胃道疾病", "巫清隆": "耳科：眩暈、耳鳴、中耳積水、聽力障礙等", "呂瑩純": "一般兒科疾病", "謝騰緯": "兒童一般內科", "李逸瑋": "一般兒科、兒童感染症", "沈士強": "呼吸道過敏感染、減重", "洪岱熙": "呼吸道感染(感冒)、尿道感染", "甘家銘": "慢性病（高血壓、高血脂、糖尿病）", "梁培毅": "兒科", "徐翊庭": "成人內外科疑難雜症", "侯進坤": "呼吸道疾病、腸胃道疾病、過敏", "林君瀚": "兒科、耳鼻喉科", "楊大緯": "急診醫學", "黃錦崧": "小兒科、耳鼻喉、皮膚病、減重"};
 var ROLES='總院長|副院長|執行長|院長|減重名醫|名醫|主任醫師|主任|醫師|總藥師|藥師|營養師|護理師|顧問|秘書長|副總經理|總經理|策略長|督導|特助|倉管|經理|組長|專員';
 var PRE=new RegExp('^('+ROLES+')\\s*'),SUF=new RegExp('\\s*('+ROLES+')$');
 function bare(s){s=String(s||'').replace(/\s+/g,' ').trim();var m;while((m=s.match(SUF))&&s.length>m[0].length)s=s.slice(0,-m[0].length);while((m=s.match(PRE))&&s.length>m[0].length)s=s.slice(m[0].length);return s.trim();}
 function norm(s){return String(s||'').replace(/\s+/g,'');}
 var css=document.createElement('style');css.id='dk-specialty-20261031';
-css.textContent='ul>li.dk-specialty{list-style:none!important;margin:8px 0 2px -1.1em!important;padding:0!important;font-weight:700!important;color:#3f6b5e!important;letter-spacing:.06em}';
+css.textContent='#ec-team ul>li.dk-specialty{list-style:none!important;margin:12px 0 6px -1.1em!important;padding:0 0 0 6px!important;border-left:3px solid #2a9189;font-size:15px!important;font-weight:700!important;color:#3f6b5e!important;letter-spacing:.08em;line-height:1.3!important}'
++'.baseprod li.dk-specialty{list-style:none!important;margin-top:18px!important;margin-bottom:12px!important;padding:0!important}.baseprod li.dk-specialty strong{display:inline-block}';
 document.head.appendChild(css);
-function mark(box,name){
+function mark(box,name,pill){
   if(!box||box.querySelector('li.dk-specialty'))return;var start=STARTS[name];if(!start)return;
   var key=norm(start),lis=box.querySelectorAll('li'),hit=null;
   for(var i=0;i<lis.length&&!hit;i++)if(norm(lis[i].textContent)===key)hit=lis[i];
   for(var j=0;j<lis.length&&!hit;j++)if(norm(lis[j].textContent).indexOf(key)===0)hit=lis[j];
   if(!hit)return;
   var ul=hit.parentNode;if(name==='楊大緯')ul.appendChild(hit);
-  var lab=document.createElement('li');lab.className='dk-specialty';lab.textContent='專長';ul.insertBefore(lab,hit);
+  var lab=document.createElement('li');lab.className='dk-specialty';
+  if(pill){var s=document.createElement('strong');s.textContent='專長';lab.appendChild(s);}else lab.textContent='專長';
+  ul.insertBefore(lab,hit);
+  /* doctor pages: line the 專長 pill up with the 學經歷 pill */
+  var ref=pill&&box.querySelector('strong');if(ref&&lab.firstChild){var dx=lab.firstChild.getBoundingClientRect().left-ref.getBoundingClientRect().left;if(Math.abs(dx)>1)lab.style.marginLeft=(-dx)+'px';}
 }
 function apply(){
   if(team)document.querySelectorAll('#ec-team article.ec-doc').forEach(function(a){
@@ -269,7 +274,7 @@ function apply(){
     var name='';h.childNodes.forEach(function(c){if(c.nodeType===3)name+=c.textContent;});
     mark(sec,bare(name));
   });
-  if(detail){var t=document.querySelector('.producttitle'),b=document.querySelector('.baseprod');if(t&&b)mark(b,bare(t.textContent));}
+  if(detail){var t=document.querySelector('.producttitle'),b=document.querySelector('.baseprod');if(t&&b)mark(b,bare(t.textContent),true);}
 }
 function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply();});}).observe(document.body,{childList:true,subtree:true});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
