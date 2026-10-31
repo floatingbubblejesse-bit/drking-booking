@@ -60,3 +60,15 @@ html.qOfficialFloat body .qQt[hidden]{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
+
+/* Team page cleanup 20261031 */
+(function(){
+var p=location.pathname, team=p.indexOf('/products-')===0, detail=p.indexOf('/product-')===0;
+if(!team&&!detail&&p!='/about.html'&&p.indexOf('/content')!==0)return;
+var css=document.createElement('style');css.id='dk-team-cleanup-20261031';css.textContent='.subtitle1::before,.subtitle2::before,.subtitle3::before,.contitle1::before{content:none!important;display:none!important}.subtitle1>ul,.subtitle2>ul,.subtitle3>ul{display:none!important}.news_listsy:has(a[href="content-23.html"]){display:none!important}#ec-team .ec-name .dk-role-below{display:block!important;margin:10px 0 0!important}.dk-branch-hours{margin-top:24px!important}.dk-branch-hours .info_box_t{padding:20px!important}.dk-branch-hours p{margin:8px 0!important}';document.head.appendChild(css);
+var branches={2:'鶯歌',3:'三樹',4:'樹林',5:'桃園',6:'土城',7:'八德',8:'龍潭',9:'大溪',10:'大竹',11:'大湳',12:'平鎮',13:'埔心',14:'觀音',15:'龍岡'};
+function apply(){document.querySelectorAll('#ec-team .ec-name span').forEach(function(s){if(/^(督導|特助|倉管)$/.test(s.textContent.trim()))s.classList.add('dk-role-below')});
+if(team){var m=p.match(/products-([0-9]+)/),name=branches[m&&m[1]],h=document.querySelector('.info_area');if(name&&h&&!h.dataset.dkBranchHours){h.dataset.dkBranchHours='1';h.classList.add('dk-branch-hours');var split=['大竹','平鎮','埔心','觀音','龍岡'].indexOf(name)>=0;h.innerHTML='<div class="info_box_t"><h2 class="qfootlabel">'+name+'院區營業時間</h2><p style="text-align:center">全年無休</p><p style="text-align:center" class="qtime">'+(split?'7:30～12:00、14:00～18:00<br>18:30～21:30':'7:30～21:30 中午不休息')+'</p></div>';}}}
+function start(){apply();var queued=false;new MutationObserver(function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;apply()})}).observe(document.body,{childList:true,subtree:true});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
