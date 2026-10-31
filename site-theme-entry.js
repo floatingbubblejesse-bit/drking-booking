@@ -78,6 +78,7 @@ var p=location.pathname,team=/^\/products-\d+\.html$/.test(p),detail=/^\/product
 if(!team&&!detail)return;
 var ROLES='總院長|副院長|執行長|院長|減重名醫|名醫|主任醫師|主任|醫師|總藥師|藥師|營養師|護理師|顧問|秘書長|副總經理|總經理|策略長|督導|特助|倉管|經理|組長|專員';
 var PRE=new RegExp('^('+ROLES+')\\s*'),SUF=new RegExp('\\s*('+ROLES+')$');
+function roles(s){s=String(s||'').replace(/\s+/g,' ').trim();var pre=[],post=[],m;while((m=s.match(SUF))&&s.length>m[0].length){post.unshift(m[1]);s=s.slice(0,-m[0].length);}while((m=s.match(PRE))&&s.length>m[0].length){pre.push(m[1]);s=s.slice(m[0].length);}return pre.concat(post).join(' ');}
 function bare(s){s=String(s||'').replace(/\s+/g,' ').trim();var m;while((m=s.match(SUF))&&s.length>m[0].length)s=s.slice(0,-m[0].length);while((m=s.match(PRE))&&s.length>m[0].length)s=s.slice(m[0].length);return s.trim();}
 var css=document.createElement('style');css.id='dk-doctor-week-20261031';
 css.textContent='.dk-dr-week{position:relative;width:100%;max-width:560px;margin:4px auto 0;background:transparent;cursor:zoom-in;-webkit-tap-highlight-color:transparent}'
@@ -98,6 +99,7 @@ css.textContent='.dk-dr-week{position:relative;width:100%;max-width:560px;margin
 +'#dkDocLb.dk-ready .dkLbLoad{display:none}';
 document.head.appendChild(css);
 var HIDE='.brand,.portal-picker,.doctor-header{display:none!important}.portal-content{padding:0!important}.portal-team.doctor-focus{--doctor-menu-height:0px!important}.portal-team,.doctor-cards{height:100%!important}.doctor-card{margin:0!important;border:0!important;box-shadow:none!important;background:transparent!important;height:100%!important;max-height:none!important}.viewport{background:transparent!important}';
+var BIG='.dlw-board .sw-columns,.dlw-board .sw-day{grid-template-columns:56px repeat(3,minmax(0,1fr))!important;column-gap:10px!important}.sw-board .sw-day-label time{font-size:18px!important;line-height:1.15!important;white-space:nowrap!important}.sw-board .sw-day-label b{font-size:13px!important;line-height:1.35!important;padding:0 4px!important;white-space:nowrap!important}';
 function src(name){return '/linedoctorschedule.html?embed=official#doctor-'+encodeURIComponent(name);}
 function parts(f){try{var d=f.contentDocument,app=d&&d.getElementById('line-clinic-app'),sr=app&&app.shadowRoot;return sr?{d:d,sr:sr,h:sr.querySelector('.doctor-header h2'),sch:sr.querySelector('.doctor-live-schedule .sw-board'),vp:sr.querySelector('.viewport')}:null;}catch(e){return null;}}
 function addCss(x,id,text){if(!x.sr.getElementById(id)){var s=x.d.createElement('style');s.id=id;s.textContent=text;x.sr.appendChild(s);var bg=x.d.createElement('style');bg.textContent='html,body{background:transparent!important}';x.d.head.appendChild(bg);}}
@@ -139,37 +141,38 @@ var lb,lbFrame,lbHead,lbState=null,KEY='dkDocLb';
 function makeLb(){
   if(lb)return;
   lb=document.createElement('div');lb.id='dkDocLb';lb.hidden=true;lb.setAttribute('role','dialog');lb.setAttribute('aria-modal','true');lb.setAttribute('aria-label','個人班表');
-  lb.innerHTML='<button type="button" class="dkLbClose" aria-label="關閉">&times;</button><div class="dkLbCard"><div class="dkLbHead"></div><iframe title="個人班表"></iframe><div class="dkLbLoad">班表載入中…</div></div>';
-  document.body.appendChild(lb);lbHead=lb.querySelector('.dkLbHead');lbFrame=lb.querySelector('iframe');
+  lb.innerHTML='<button type="button" class="dkLbClose" aria-label="關閉">&times;</button><div class="dkLbCard"><div class="dkLbHead"></div><div class="dkLbLoad">班表載入中…</div></div>';
+  document.body.appendChild(lb);lbHead=lb.querySelector('.dkLbHead');
   lb.querySelector('.dkLbClose').addEventListener('click',hideLb);
   lb.addEventListener('click',function(e){if(e.target===lb)hideLb();});
   document.addEventListener('keydown',function(e){if(!lb.hidden&&e.key==='Escape'){e.preventDefault();hideLb();}});
-  lbFrame.addEventListener('load',function(){styleLb(0);});
   window.addEventListener('popstate',function(e){if(!lb.hidden&&!(e.state&&e.state[KEY]))closeLb();});
 }
-function styleLb(n){
-  if(!lb||lb.hidden)return;var x=parts(lbFrame);
-  if(x&&x.h&&x.sch&&x.h.textContent.replace(/\s+/g,'').indexOf(lbFrame.dkName)===0){addCss(x,'dk-week-pop',HIDE);
+function styleLb(n,fr){
+  if(!lb||lb.hidden||!fr||fr!==lbFrame)return;var x=parts(fr);
+  if(x&&x.h&&x.sch&&x.h.textContent.replace(/\s+/g,'').indexOf(fr.dkName)===0){addCss(x,'dk-week-pop',HIDE+BIG);
     if(!x.d.documentElement.hasAttribute('data-dk-esc')){x.d.documentElement.setAttribute('data-dk-esc','');x.d.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();hideLb();}});}
-    requestAnimationFrame(function(){requestAnimationFrame(function(){lb.classList.add('dk-ready');});});
+    requestAnimationFrame(function(){requestAnimationFrame(function(){if(fr===lbFrame)lb.classList.add('dk-ready');});});
     return;}
-  if(n<80)setTimeout(function(){styleLb(n+1);},125);else lb.classList.add('dk-ready');
+  if(n<80)setTimeout(function(){styleLb(n+1,fr);},125);else lb.classList.add('dk-ready');
 }
 function openLb(box){
   makeLb();
-  var full=box.dkFull,name=box.dkName,rest=full.indexOf(name)===0?full.slice(name.length).trim():'';
+  var name=box.dkName,rest=roles(box.dkFull);
   lbHead.textContent=name;if(rest){var s=document.createElement('small');s.textContent=rest;lbHead.appendChild(s);}
-  var s2=document.createElement('small');s2.textContent='個人班表';lbHead.appendChild(s2);
   lbState={x:window.scrollX,y:window.scrollY,body:document.body.style.cssText,root:document.documentElement.style.overflow,opener:box};
   document.body.style.position='fixed';document.body.style.top=(-lbState.y)+'px';document.body.style.left=(-lbState.x)+'px';document.body.style.width='100%';document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';
   var st=Object.assign({},history.state||{});st[KEY]=1;history.pushState(st,'',location.href);
   lb.hidden=false;
-  var url=location.origin+src(name);
-  if(lbFrame.dkName!==name){lb.classList.remove('dk-ready');lbFrame.dkName=name;if(!lbFrame.getAttribute('src'))lbFrame.src=url;else lbFrame.contentWindow.location.replace(url);}
-  styleLb(0);lb.querySelector('.dkLbClose').focus({preventScroll:true});
+  /* a fresh frame on every open: iOS Safari can leave a re-shown iframe blank */
+  lb.classList.remove('dk-ready');if(lbFrame)lbFrame.remove();
+  var fr=document.createElement('iframe');fr.title=name+' 個人班表';fr.dkName=name;lbFrame=fr;
+  fr.addEventListener('load',function(){styleLb(0,fr);});
+  fr.src=location.origin+src(name);lbHead.parentNode.insertBefore(fr,lbHead.nextSibling);
+  styleLb(0,fr);lb.querySelector('.dkLbClose').focus({preventScroll:true});
 }
 function hideLb(){if(!lb||lb.hidden)return;var own=!!(history.state&&history.state[KEY]);closeLb();if(own)history.back();}
-function closeLb(){if(!lb||lb.hidden)return;lb.hidden=true;var s=lbState;if(!s)return;document.body.style.cssText=s.body;document.documentElement.style.overflow=s.root;window.scrollTo(s.x,s.y);if(s.opener&&s.opener.isConnected)s.opener.focus({preventScroll:true});lbState=null;}
+function closeLb(){if(!lb||lb.hidden)return;lb.hidden=true;lb.classList.remove('dk-ready');if(lbFrame){lbFrame.remove();lbFrame=null;}var s=lbState;if(!s)return;document.body.style.cssText=s.body;document.documentElement.style.overflow=s.root;window.scrollTo(s.x,s.y);if(s.opener&&s.opener.isConnected)s.opener.focus({preventScroll:true});lbState=null;}
 function apply(){
   if(team)document.querySelectorAll('#ec-team article.ec-doc').forEach(function(a){
     var fig=a.querySelector('figure.ec-sch'),img=fig&&fig.querySelector('img'),h=a.querySelector('.ec-name');if(!img||!h)return;
