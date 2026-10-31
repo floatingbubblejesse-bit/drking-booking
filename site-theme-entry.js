@@ -313,3 +313,9 @@ function start(){setTimeout(function(){fmt();var queued=false,mo=new MutationObs
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 window.addEventListener('load',fmt);
 })();
+/* Info page region tabs 20261031: drop the theme's ▼ marker over the active tab and the space it needed */
+(function(){
+var s=document.createElement('style');s.id='dk-ellink-css-20261031';
+s.textContent='.el_link ul li b::before{content:none!important;display:none!important}.el_link ul li b{padding-top:5px!important}@media (max-width:767px){.el_link ul{margin:0 0 16px!important}}';
+document.head.appendChild(s);
+})();
