@@ -81,16 +81,21 @@ var PRE=new RegExp('^('+ROLES+')\\s*'),SUF=new RegExp('\\s*('+ROLES+')$');
 function bare(s){s=String(s||'').replace(/\s+/g,' ').trim();var m;while((m=s.match(SUF))&&s.length>m[0].length)s=s.slice(0,-m[0].length);while((m=s.match(PRE))&&s.length>m[0].length)s=s.slice(m[0].length);return s.trim();}
 var css=document.createElement('style');css.id='dk-doctor-week-20261031';
 css.textContent='.dk-dr-week{position:relative;width:100%;max-width:560px;margin:4px auto 0;background:transparent;cursor:zoom-in;-webkit-tap-highlight-color:transparent}'
-+'.dk-dr-week iframe{display:block;width:100%;height:260px;border:0;background:transparent;pointer-events:none}'
++'.dk-dr-week iframe{display:block;width:100%;height:260px;border:0;background:transparent;pointer-events:none;visibility:hidden}'
++'.dk-dr-week.dk-ready iframe{visibility:visible}'
++'.dk-dr-week:not(.dk-ready)::before{content:"班表載入中…";position:absolute;left:0;right:0;top:110px;text-align:center;color:#61736e;font-size:14px;letter-spacing:.1em}'
 +'.dk-dr-week:focus-visible{outline:2px solid #2a9189;outline-offset:2px;border-radius:8px}'
 +'#ec-team .ec-name{word-break:keep-all}'
 +'#dkDocLb{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:64px 12px 16px;background:rgba(10,20,18,.82);box-sizing:border-box}'
 +'#dkDocLb[hidden]{display:none}'
 +'#dkDocLb>.dkLbClose{position:absolute;top:12px;right:12px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#fff;color:#1e2b28;font-size:24px;line-height:1;cursor:pointer}'
-+'#dkDocLb>.dkLbCard{display:flex;flex-direction:column;width:100%;max-width:560px;height:100%;max-height:900px;overflow:hidden;border-radius:10px;background:#fff}'
++'#dkDocLb>.dkLbCard{position:relative;display:flex;flex-direction:column;width:100%;max-width:560px;height:100%;max-height:900px;overflow:hidden;border-radius:10px;background:#fff}'
 +'#dkDocLb .dkLbHead{flex:none;padding:12px 16px 10px;border-bottom:1px dashed #cfd9d5;font-size:18px;font-weight:700;line-height:1.3;color:#1f3b33;letter-spacing:.04em}'
 +'#dkDocLb .dkLbHead small{margin-left:8px;font-size:14px;font-weight:500;color:#1f6f69}'
-+'#dkDocLb iframe{display:block;flex:1;width:100%;min-height:0;border:0}';
++'#dkDocLb iframe{display:block;flex:1;width:100%;min-height:0;border:0;visibility:hidden}'
++'#dkDocLb.dk-ready iframe{visibility:visible}'
++'#dkDocLb .dkLbLoad{position:absolute;left:0;right:0;top:45%;text-align:center;color:#61736e;font-size:15px;letter-spacing:.1em}'
++'#dkDocLb.dk-ready .dkLbLoad{display:none}';
 document.head.appendChild(css);
 var HIDE='.brand,.portal-picker,.doctor-header{display:none!important}.portal-content{padding:0!important}.portal-team.doctor-focus{--doctor-menu-height:0px!important}.portal-team,.doctor-cards{height:100%!important}.doctor-card{margin:0!important;border:0!important;box-shadow:none!important;background:transparent!important;height:100%!important;max-height:none!important}.viewport{background:transparent!important}';
 function src(name){return '/linedoctorschedule.html?embed=official#doctor-'+encodeURIComponent(name);}
@@ -119,6 +124,7 @@ function prep(box,n){
   if(x&&x.h&&x.sch&&x.vp){
     if(x.h.textContent.replace(/\s+/g,'').indexOf(box.dkName)!==0){revert(box);return;}
     addCss(x,'dk-week-only',HIDE);
+    requestAnimationFrame(function(){requestAnimationFrame(function(){box.classList.add('dk-ready');});});
     /* the board fills the frame; only grow (never shrink) while its rows overflow, so the size cannot oscillate */
     var steps=0,queued=false,grow=function(){queued=false;if(steps>=6)return;var b=x.sr.querySelector('.doctor-live-schedule .sw-board'),wk=b&&b.querySelector('.sw-week');if(!b||!wk)return;
       var over=wk.scrollHeight-wk.clientHeight;if(over<2&&!b.classList.contains('dlw-overflow'))return;
@@ -133,7 +139,7 @@ var lb,lbFrame,lbHead,lbState=null,KEY='dkDocLb';
 function makeLb(){
   if(lb)return;
   lb=document.createElement('div');lb.id='dkDocLb';lb.hidden=true;lb.setAttribute('role','dialog');lb.setAttribute('aria-modal','true');lb.setAttribute('aria-label','個人班表');
-  lb.innerHTML='<button type="button" class="dkLbClose" aria-label="關閉">&times;</button><div class="dkLbCard"><div class="dkLbHead"></div><iframe title="個人班表"></iframe></div>';
+  lb.innerHTML='<button type="button" class="dkLbClose" aria-label="關閉">&times;</button><div class="dkLbCard"><div class="dkLbHead"></div><iframe title="個人班表"></iframe><div class="dkLbLoad">班表載入中…</div></div>';
   document.body.appendChild(lb);lbHead=lb.querySelector('.dkLbHead');lbFrame=lb.querySelector('iframe');
   lb.querySelector('.dkLbClose').addEventListener('click',hideLb);
   lb.addEventListener('click',function(e){if(e.target===lb)hideLb();});
@@ -143,10 +149,11 @@ function makeLb(){
 }
 function styleLb(n){
   if(!lb||lb.hidden)return;var x=parts(lbFrame);
-  if(x&&x.sr.querySelector('.portal-team')){addCss(x,'dk-week-pop',HIDE);
+  if(x&&x.h&&x.sch&&x.h.textContent.replace(/\s+/g,'').indexOf(lbFrame.dkName)===0){addCss(x,'dk-week-pop',HIDE);
     if(!x.d.documentElement.hasAttribute('data-dk-esc')){x.d.documentElement.setAttribute('data-dk-esc','');x.d.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();hideLb();}});}
+    requestAnimationFrame(function(){requestAnimationFrame(function(){lb.classList.add('dk-ready');});});
     return;}
-  if(n<80)setTimeout(function(){styleLb(n+1);},125);
+  if(n<80)setTimeout(function(){styleLb(n+1);},125);else lb.classList.add('dk-ready');
 }
 function openLb(box){
   makeLb();
@@ -158,7 +165,7 @@ function openLb(box){
   var st=Object.assign({},history.state||{});st[KEY]=1;history.pushState(st,'',location.href);
   lb.hidden=false;
   var url=location.origin+src(name);
-  if(lbFrame.dkName!==name){lbFrame.dkName=name;if(!lbFrame.getAttribute('src'))lbFrame.src=url;else lbFrame.contentWindow.location.replace(url);}
+  if(lbFrame.dkName!==name){lb.classList.remove('dk-ready');lbFrame.dkName=name;if(!lbFrame.getAttribute('src'))lbFrame.src=url;else lbFrame.contentWindow.location.replace(url);}
   styleLb(0);lb.querySelector('.dkLbClose').focus({preventScroll:true});
 }
 function hideLb(){if(!lb||lb.hidden)return;var own=!!(history.state&&history.state[KEY]);closeLb();if(own)history.back();}
