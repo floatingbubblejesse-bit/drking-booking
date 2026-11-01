@@ -435,6 +435,7 @@ input,select,textarea{font-size:17.5px;padding:11px 13px}
       <div class="mi" data-act="a-menu" data-v="linebind">LINE 綁定名單</div>
       <div class="mi" data-act="a-menu" data-v="staffline">櫃檯 LINE 早報</div>
       <div class="mi" data-act="a-menu" data-v="stopnow">🌀 一鍵停診（颱風）</div>
+      <div class="mi" data-act="a-menu" data-v="sblock">⛔ 時段封鎖</div>
     </div>
     <div id="a-content"></div>
   </div>
@@ -521,7 +522,7 @@ function authLost() {
 
 /* ✨ v31.71 前端唯讀闘門（後端 v127 才是真正的那道）。
    清單跟後端 STAFF_WRITE_ACTIONS_ 一致，兩邊要一起改。 */
-const RO_BLOCK_ACTIONS = ['courseCancelRest','courseMove','createCounterBooking','updateAppointmentStatus','updateAppointmentFields',
+const RO_BLOCK_ACTIONS = ['saveSlotBlock','deleteSlotBlock','courseCancelRest','courseMove','createCounterBooking','updateAppointmentStatus','updateAppointmentFields',
   'rescheduleAppointment','batchUpdateStatus','savePatientMaster','savePatientMemory','importEmployees',
   'sendSMS','cancelScheduledSMS','saveService','deleteService','saveNotifyTemplate','deleteNotifyTemplate',
   'saveDoctorPhoto','restoreDoctorPhotos','deleteDoctorPhoto','saveEmployee','deleteEmployee',
@@ -4958,6 +4959,7 @@ function renderAdmin() {
   else if (S.aView === 'source') { c.innerHTML = htmlASource(); loadASource(); }
   else if (S.aView === 'staffline') { c.innerHTML = htmlAStaffLine(); loadAStaffLine(); loadABalance(); }   /* ✨ v31.84 */
   else if (S.aView === 'stopnow') { c.innerHTML = htmlAStopNow(); }   /* ✨ v31.91 */
+  else if (S.aView === 'sblock') { c.innerHTML = htmlASlotBlock(); loadASlotBlock(); }   /* ✨ v31.96 */
   else if (S.aView === 'linebind') { c.innerHTML = `<div class="card"><h3>LINE 綁定名單</h3><div id="lb-box" class="muted" style="padding:14px">載入中…</div></div>`; loadALineBind(); }
 }
 /* ✨ v31.82 LINE 綁定名單（系統管理）：病人在分流頁自助綁定或從 LINE 自助預約／查詢時自動綁定。
@@ -5556,6 +5558,56 @@ async function loadADash() {
     ${(!S.adClinic && !S.adDoctor) ? `<div class="stat-grid" style="margin-top:10px">${stat(S.schedules.length,'班表總筆數')}${stat(S.doctors.length,'醫師數')}</div>` : ''}
     <p class="muted" style="margin-top:10px">今日快照，切換院區／醫師即時重算；未選院區時數字為跨院加總，上表為院區拆分。歷史趨勢請至「📊 區間報表」。</p>`;
 }
+/* ✨ v31.96（2026-11-01）時段封鎖：請假系統寫的減重診時間比醫師實際長時，在本系統封掉那一段 */
+const SB_WD = '一二三四五六日';
+function htmlASlotBlock() {
+  return `<div class="card"><h3>時段封鎖</h3>
+    <p class="muted" style="margin:6px 0 12px">請假系統的減重診時間跟醫師實際不一樣時用。例：請假系統寫 14:00–18:00，但醫師 17:00 後不看 → 封鎖 17:00～18:00。<br>
+    封鎖的時段：客人線上約不到、櫃檯也掛不進去（不能超約）。新增或停用後約 7 分鐘生效。</p>
+    <div id="asb-box" class="muted">載入中…</div></div>`;
+}
+async function loadASlotBlock() {
+  const box = $('#asb-box'); if (!box) return;
+  const r = await api.post('getSlotBlocks', {}, true);
+  if (!r.ok) { box.innerHTML = '<span style="color:var(--red)">讀取失敗：' + esc(r.error || '') + '</span>'; return; }
+  const wdTxt = w => w ? '每週' + w.split('').map(n => SB_WD[+n - 1]).join('、') : '每天';
+  const docs = [...new Set((S.doctors || []).map(d => d.shortName))];
+  const clis = [...new Set((S.doctors || []).flatMap(d => d.clinics || []))].sort();
+  box.classList.remove('muted');
+  box.innerHTML = `<table class="tbl"><thead><tr><th>院區</th><th>醫師</th><th>星期</th><th>封鎖時段</th><th>期間</th><th>備註</th><th></th></tr></thead><tbody>
+    ${r.data.length ? r.data.map(x => `<tr><td>${esc(x.clinic)}</td><td>${esc(x.doctor)}</td><td>${wdTxt(x.wd)}</td><td><b>${esc(x.start)}～${esc(x.end)}</b></td>
+      <td>${x.from || x.to ? esc((x.from || '不限') + ' ～ ' + (x.to || '不限')) : '長期'}</td><td>${esc(x.note)}</td>
+      <td><button class="btn btn-r btn-sm" data-act="sb-del" data-row="${x.row}">停用</button></td></tr>`).join('') : '<tr><td colspan="7" class="muted">目前沒有封鎖</td></tr>'}</tbody></table>
+    <h4 style="margin:18px 0 8px">新增封鎖</h4>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="frow"><label>院區</label><select id="sb-cli">${clis.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
+      <div class="frow"><label>醫師</label><select id="sb-doc">${docs.map(d => `<option>${esc(d)}</option>`).join('')}</select></div>
+      <div class="frow"><label>星期（都不勾＝每天）</label><div style="padding:6px 0">${[1,2,3,4,5,6,7].map(n => `<label style="margin-right:8px;font-size:15px;white-space:nowrap"><input type="checkbox" class="sb-wd" value="${n}"> ${SB_WD[n - 1]}</label>`).join('')}</div></div>
+      <div class="frow"><label>開始</label><input id="sb-s" type="time" value="17:00"></div>
+      <div class="frow"><label>結束</label><input id="sb-e" type="time" value="18:00"></div>
+      <div class="frow"><label>起日（可空白）</label><input id="sb-f" type="date"></div>
+      <div class="frow"><label>迄日（可空白）</label><input id="sb-t" type="date"></div>
+      <div class="frow" style="flex:1;min-width:180px"><label>備註</label><input id="sb-n" placeholder="例：醫師 17:00 後不看"></div>
+      <button class="btn btn-g" data-act="sb-add">＋ 新增封鎖</button></div>`;
+}
+async function sbAction(el) {
+  if (el.dataset.act === 'sb-add') {
+    const p = { clinic: $('#sb-cli').value, doctor: $('#sb-doc').value, start: $('#sb-s').value, end: $('#sb-e').value,
+      wd: [...document.querySelectorAll('.sb-wd:checked')].map(c => c.value).join(''), from: $('#sb-f').value, to: $('#sb-t').value,
+      note: $('#sb-n').value.trim(), employeeName: (S.aUser && S.aUser.name) || '' };
+    el.disabled = true;
+    const r = await api.post('saveSlotBlock', p, true);
+    el.disabled = false;
+    if (!r.ok) { toast('新增失敗：' + (r.message || r.error || ''), 'var(--red)'); return; }
+    toast('✓ 已新增封鎖，約 7 分鐘生效'); loadASlotBlock(); return;
+  }
+  if (!el.dataset.armed) { el.dataset.armed = '1'; el.textContent = '再按一次確認'; setTimeout(() => { if (el.isConnected && el.dataset.armed) { delete el.dataset.armed; el.textContent = '停用'; } }, 4000); return; }
+  el.disabled = true;
+  const r = await api.post('deleteSlotBlock', { row: +el.dataset.row }, true);
+  if (!r.ok) { el.disabled = false; toast('停用失敗：' + (r.message || r.error || ''), 'var(--red)'); return; }
+  toast('✓ 已停用，約 7 分鐘生效'); loadASlotBlock();
+}
+
 /* ── 醫師介紹編輯 ── */
 function htmlAProfile() {
   const rows = S.doctors.map(d => `<tr>
@@ -6362,6 +6414,7 @@ document.addEventListener('click', async e => {
     case 'a-menu': S.aView = el.dataset.v; renderAdmin(); break;
     case 'a-sync': aSync(el); break;
     case 'ap-edit': openProfileEdit(el.dataset.d); break;
+    case 'sb-add': case 'sb-del': sbAction(el); break;   /* ✨ v31.96 時段封鎖 */
     case 'ap-save': {
       el.disabled = true;
       const res = await api.post('saveDoctorProfile', {
