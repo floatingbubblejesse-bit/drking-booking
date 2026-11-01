@@ -438,3 +438,75 @@ s.textContent=B+'.jv-logo{display:none!important}'
 +B+'.jv-qty.txt{padding:4px 7px!important;font-size:13px!important}';
 (document.head||document.documentElement).appendChild(s);
 })();
+
+/* Hidden articles + search shortcuts 20261101: content-22/23 stay hidden everywhere (home 最新消息 slider, lists, search),
+   the 所有院區電話 result opens the colour phone page, vaccine searches offer the vaccine page, and the grey speaker placeholder never shows */
+(function(){
+var HIDE=[22,23],PHONE='https://floatingbubblejesse-bit.github.io/drking-booking/phone-liff.html',VAX='https://floatingbubblejesse-bit.github.io/drking-booking/linevaccines.html';
+var css=document.createElement('style');css.id='dk-hidden-news-20261101';
+css.textContent=HIDE.map(function(n){var h='[href$="content-'+n+'.html"]';return '#ec_nc a.ec_nc_card'+h+',.news_listsy:has(a'+h+'),.news_lists:has(a'+h+')';}).join(',')+'{display:none!important}'
++'img[src*="speaker_img"]{display:none!important}'
++'#ec_nc a.ec_nc_card:has(img[src*="speaker_img"]) .ec_nc_img{display:none!important}'
++'#ec_nc a.ec_nc_card:has(img[src*="speaker_img"]) .ec_nc_body{flex:1 1 auto;justify-content:center;padding:28px 22px;background:linear-gradient(160deg,#eef6f4,#fbfdfc)}'
++'#ec_nc a.ec_nc_card:has(img[src*="speaker_img"]) .ec_nc_title{font-size:19px;line-height:1.75;-webkit-line-clamp:6;line-clamp:6}';
+(document.head||document.documentElement).appendChild(css);
+var ICON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>';
+function item(t,s,u,ic){var a=document.createElement('a');a.className='ec-sr dk-sr';a.href=u;
+  a.innerHTML='<span class="ec-sr-ic">'+ic+'</span><span class="ec-sr-tx"><span class="ec-sr-t"></span><span class="ec-sr-s"></span></span><span class="ec-sr-go">›</span>';
+  a.querySelector('.ec-sr-t').textContent=t;a.querySelector('.ec-sr-s').textContent=s;return a;}
+function fix(body){
+  [].slice.call(body.querySelectorAll('.dk-sr')).forEach(function(x){x.parentNode.removeChild(x);});
+  [].slice.call(body.querySelectorAll('a.ec-sr')).forEach(function(a){var h=a.getAttribute('href')||'',m=h.match(/content-(\d+)\.html$/);
+    if(m&&+m[1]===23){a.setAttribute('href',PHONE);a.removeAttribute('target');a.removeAttribute('rel');var s=a.querySelector('.ec-sr-s');if(s)s.textContent='點選院區直接撥打電話';}
+    else if(m&&HIDE.indexOf(+m[1])>=0)a.parentNode.removeChild(a);});
+  [].slice.call(body.querySelectorAll('.ec-sr-group')).forEach(function(g){var n=g.nextElementSibling;if(!n||!n.matches('a.ec-sr'))g.parentNode.removeChild(g);});
+  [].forEach.call(body.querySelectorAll('.ec-sr-s'),function(s){if(s.textContent.indexOf('八德／平鎮')>=0)s.textContent=s.textContent.replace('八德／平鎮','新北／桃園');});
+  var inp=document.getElementById('ec-search-in'),v=inp?inp.value.trim():'',quick=[];
+  if(/疫苗|流感|庫存|預防針|打針/.test(v))quick.push(['流感疫苗即時庫存','各院區自費／公費流感疫苗即時庫存',VAX]);
+  if(/電話|撥打|聯絡|聯繫/.test(v)&&!body.querySelector('a.ec-sr[href="'+PHONE+'"]'))quick.push(['所有院區電話','點選院區直接撥打電話',PHONE]);
+  if(!quick.length)return;
+  var sv=body.querySelector('.ec-sr-ic svg'),ic=sv?sv.outerHTML:ICON,frag=document.createDocumentFragment(),head=document.createElement('div');
+  head.className='ec-sr-group dk-sr';head.textContent='快速前往';frag.appendChild(head);
+  quick.forEach(function(q){frag.appendChild(item(q[0],q[1],q[2],ic));});
+  var empty=body.querySelector('.ec-sr-empty');if(empty)empty.parentNode.removeChild(empty);
+  body.insertBefore(frag,body.firstChild);}
+function hook(body){if(body.dkHooked)return;body.dkHooked=1;
+  var mo=new MutationObserver(function(){mo.disconnect();try{fix(body);}catch(e){}mo.observe(body,{childList:true});});
+  try{fix(body);}catch(e){}mo.observe(body,{childList:true});}
+function look(){var b=document.getElementById('ec-search-body');if(b)hook(b);}
+function start(){look();new MutationObserver(look).observe(document.body,{childList:true});}
+if(document.body)start();else document.addEventListener('DOMContentLoaded',start);
+})();
+
+/* Service pages 20261101 (jiayi / pifu / jianzhong): 新北／桃園 instead of the old town list, shorter paragraphs and roomier type;
+   the footer links to these pages get the same names on every page */
+(function(){
+var REP=[['在平鎮院區、土城院區、八德院區及北大周邊地區設點，不論是平鎮小兒科門診、土城兒科看診、八德兒童健康檢查、北大家庭醫學科兒童服務','在新北、桃園共 14 個院區設點，不論是小兒科門診、兒科看診、兒童健康檢查或家庭醫學科兒童服務'],
+  ['平鎮/土城/八德/北大','新北/桃園'],['平鎮、土城、八德、北大','新北、桃園'],['在桃園八德與平鎮地區','在新北與桃園地區'],['八德/平鎮','新北/桃園'],['八德、平鎮','新北、桃園']];
+function rep(s){REP.forEach(function(r){s=s.split(r[0]).join(r[1]);});return s;}
+var svc=/^\/(jiayi|pifu|jianzhong)\.html$/.test(location.pathname);
+if(svc){document.documentElement.classList.add('dk-svc');var S='html.dk-svc .subcon ',css=document.createElement('style');css.id='dk-svc-20261101';
+  css.textContent=S+'.allon_nr h2{font-size:22px;line-height:1.5;font-weight:700;letter-spacing:.5px;color:#304639;margin:16px 0 14px}'
+  +S+'h2.title_h2{font-size:21px;line-height:1.5;font-weight:700;letter-spacing:.5px;color:#304639;margin:8px 0 16px;padding-left:12px;border-left:4px solid #2e8f87}'
+  +S+'p{font-size:16px;line-height:1.95;letter-spacing:.5px;color:#3d4b45;margin:0 0 16px}'
+  +S+'.allon_imgs img{display:block;width:100%;height:auto;border-radius:14px}'
+  +S+'hr.jiange{margin:26px 0;border:0;border-top:1px dashed #d6e0da}'
+  +S+'table th,'+S+'table td{line-height:1.8;padding:10px 12px;vertical-align:top}'
+  +S+'table td:first-child{font-weight:700;color:#2b6f67;white-space:nowrap}'
+  +'@media (min-width:768px){'+S+'.allon_nr h2{font-size:26px}'+S+'h2.title_h2{font-size:24px}'+S+'p{font-size:17px}}'
+  +'@media (max-width:767px){'+S+'.allon_imgs{margin-bottom:16px}'+S+'table thead{display:none}'
+  +S+'table,'+S+'table tbody,'+S+'table tr,'+S+'table td{display:block;width:100%}'
+  +S+'table tr{background:#f6faf8;border:1px solid #dfe8e3;border-radius:12px;padding:12px 14px;margin:0 0 10px}'
+  +S+'table td,'+S+'table>tbody>tr>td{padding:0;border:0;line-height:1.85}'
+  +S+'table td:first-child{font-size:16.5px;margin-bottom:4px;white-space:normal}}';
+  (document.head||document.documentElement).appendChild(css);}
+function texts(root){var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),n,list=[];while((n=w.nextNode()))list.push(n);
+  list.forEach(function(t){var v=rep(t.nodeValue);if(v!==t.nodeValue)t.nodeValue=v;});}
+function split(p){if(p.dkSplit||p.children.length)return;p.dkSplit=1;var t=p.textContent.trim();if(t.length<110)return;
+  var out=[];t.split(/\n\s*\n/).forEach(function(seg){var buf='';(seg.match(/[^。！？]+[。！？]?/g)||[seg]).forEach(function(s){buf+=s.trim();if(buf.length>=70){out.push(buf);buf='';}});if(buf){if(out.length&&buf.length<30)out[out.length-1]+=buf;else out.push(buf);}});
+  if(out.length<2)return;var prev=p;out.forEach(function(s,i){if(!i){p.textContent=s;return;}var q=document.createElement('p');q.className=p.className;q.dkSplit=1;q.textContent=s;prev.parentNode.insertBefore(q,prev.nextSibling);prev=q;});}
+function run(){[].forEach.call(document.querySelectorAll('a[href$="jiayi.html"],a[href$="pifu.html"],a[href$="jianzhong.html"]'),function(a){if(a.children.length)return;var v=rep(a.textContent);if(v!==a.textContent)a.textContent=v;});
+  if(!svc)return;var t=rep(document.title);if(t!==document.title)document.title=t;
+  var root=document.querySelector('.bannercon');if(!root)return;texts(root);[].forEach.call(root.querySelectorAll('.subcon p'),split);}
+run();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);
+})();
