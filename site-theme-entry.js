@@ -76,7 +76,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 /* Doctor four-week schedule embeds 20261031: team pages (/products-N) and doctor pages (/product-*) */
 (function(){
 var p=location.pathname,team=/^\/products-\d+\.html$/.test(p),detail=/^\/product-[\w-]+\.html$/.test(p);
-if(!team&&!detail)return;
+var home=p==='/'||p==='/index.html';
+if(!team&&!detail&&!home)return;
 var ROLES='總院長|副院長|執行長|院長|減重名醫|名醫|主任醫師|主任|醫師|總藥師|藥師|營養師|護理師|顧問|秘書長|副總經理|總經理|策略長|督導|特助|倉管|經理|組長|專員';
 var PRE=new RegExp('^('+ROLES+')\\s*'),SUF=new RegExp('\\s*('+ROLES+')$');
 function roles(s){s=String(s||'').replace(/\s+/g,' ').trim();var pre=[],post=[],m;while((m=s.match(SUF))&&s.length>m[0].length){post.unshift(m[1]);s=s.slice(0,-m[0].length);}while((m=s.match(PRE))&&s.length>m[0].length){pre.push(m[1]);s=s.slice(m[0].length);}return pre.concat(post).join(' ');}
@@ -103,7 +104,14 @@ var HIDE='.brand,.portal-picker,.doctor-header{display:none!important}.portal-co
 var BIG='.dlw-board .sw-columns,.dlw-board .sw-day{grid-template-columns:56px repeat(3,minmax(0,1fr))!important;column-gap:10px!important}.sw-board .sw-day-label time{font-size:18px!important;line-height:1.15!important;white-space:nowrap!important}.sw-board .sw-day-label b{font-size:13px!important;line-height:1.35!important;padding:0 4px!important;white-space:nowrap!important}';
 function src(name){return '/linedoctorschedule.html?embed=official#doctor-'+encodeURIComponent(name);}
 function parts(f){try{var d=f.contentDocument,app=d&&d.getElementById('line-clinic-app'),sr=app&&app.shadowRoot;return sr?{d:d,sr:sr,h:sr.querySelector('.doctor-header h2'),sch:sr.querySelector('.doctor-live-schedule .sw-board'),vp:sr.querySelector('.viewport')}:null;}catch(e){return null;}}
-function addCss(x,id,text){if(!x.sr.getElementById(id)){var s=x.d.createElement('style');s.id=id;s.textContent=text;x.sr.appendChild(s);var bg=x.d.createElement('style');bg.textContent='html,body{background:transparent!important}';x.d.head.appendChild(bg);}}
+/* a doctor with no clinic hours in the current week (e.g. a new doctor who starts later) opens on the first week that has hours */
+function firstWorkWeek(x){var t0=Date.now(),tries=0;(function step(){var sr=x.sr,wk=sr.querySelector('.doctor-live-schedule .sw-week'),st=sr.querySelector('.dlw-status'),nx=sr.querySelector('.sw-week-arrow.sw-next');
+  if(!wk||!nx){if(Date.now()-t0<8000)setTimeout(step,300);return;}
+  if(/\d{1,2}:\d{2}/.test(wk.textContent))return;
+  if(!(st&&/已核對/.test(st.getAttribute('aria-label')||''))){if(Date.now()-t0<8000)setTimeout(step,300);return;}
+  if(tries<3){tries++;nx.click();setTimeout(step,250);return;}
+  var td=sr.querySelector('.sw-today-button');if(td)td.click();})();}
+function addCss(x,id,text){if(!x.sr.getElementById(id)){var s=x.d.createElement('style');s.id=id;s.textContent=text;x.sr.appendChild(s);var bg=x.d.createElement('style');bg.textContent='html,body{background:transparent!important}';x.d.head.appendChild(bg);firstWorkWeek(x);}}
 var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){io.unobserve(e.target);load(e.target);}});},{rootMargin:'1200px 0px'}):null;
 function mount(img,name,full,hide,fig){
   if(!img||!name||img.getAttribute('data-dk-week'))return;img.setAttribute('data-dk-week','1');
@@ -179,6 +187,10 @@ function apply(){
     var fig=a.querySelector('figure.ec-sch'),img=fig&&fig.querySelector('img'),h=a.querySelector('.ec-name');if(!img||!h)return;
     var name='';h.childNodes.forEach(function(c){if(c.nodeType===3)name+=c.textContent;});
     mount(img,bare(name),h.textContent.replace(/\s+/g,' ').trim(),img,fig);
+  });
+  if(home)document.querySelectorAll('#ec_nd .ec_nd_slide').forEach(function(s){
+    var img=s.querySelector('.ec_nd_sch img'),nm=s.querySelector('.ec_nd_name');if(!img||!nm)return;
+    var b=nm.querySelector('b');mount(img,bare(b?b.textContent:nm.textContent),nm.textContent.replace(/\s+/g,' ').trim(),img,null);
   });
   if(detail){var img=document.querySelector('#myTabContent img'),t=document.querySelector('.producttitle');if(img&&t){var wrap=img.parentElement&&img.parentElement.children.length===1&&img.parentElement.closest('#myTabContent')?img.parentElement:img;mount(img,bare(t.textContent),t.textContent.replace(/\s+/g,' ').trim(),wrap,null);}}
 }
@@ -338,4 +350,91 @@ s.textContent='.subtb.dk-subtb::after{content:none!important;display:none!import
 document.head.appendChild(s);
 function fix(){Array.prototype.forEach.call(document.querySelectorAll('.subtb:not(.dk-subtb)'),function(t){if(t.textContent.trim()!=='門診表')return;t.classList.add('dk-subtb');t.innerHTML='醫師班表<small class="dk-zoomhint">點圖可放大</small>';});}
 fix();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fix);
+})();
+
+/* New doctors 60 days 20261101: the home page New Doctors slider (built by GTM with a 30-day window) also keeps doctors who joined 31-60 days ago */
+(function(){
+var p=location.pathname;if(p!=='/'&&p!=='/index.html')return;
+var DAYS=60,KEY='dk_newdoc60_v1',TTL=216e5,BULK=5;
+var CL={2:'鶯歌',3:'三樹',4:'樹林',5:'桃園',6:'土城',7:'八德',8:'龍潭',9:'大溪',10:'大竹',11:'大湳',12:'平鎮',13:'埔心',14:'觀音',15:'龍岡'};
+var ROLE='總院長|副院長|執行長|院長|減重名醫|名醫|主任醫師|主任|醫師|藥師|營養師|護理師|顧問';
+var PRE=new RegExp('^('+ROLE+')\\s*'),SUF=new RegExp('\\s*('+ROLE+')$');
+/* copy of the GTM join-date table (0 = never list as new); the live GTM table is read first when present */
+var FALLBACK={"謝騰緯":"2026-09-29","林君瀚":"2026-10-02","陳郁凡":0,"李軍逸":0,"鍾偉瑋":0,"陳珠":0,"林永昌":0,"蕭捷健":0,"黃錦崧":0,"蕭捷存":0,"黃允玫":0,"闕壯理":0,"陳富玫":0,"張慧馨":0,"陳永仁":0,"何中誠":0,"尤騰":0,"廖崇淵":0,"林秉承":0,"曾㨗聖":0,"高國峯":0,"李豪權":0,"蕭宇伯":0,"何金蔚":0,"陳麒中":0,"張簡千郁":0,"梁培毅":0,"李彥輝":0,"廖崑竹":0,"華志倫":0,"何中庸":0,"陳昭銘":0,"何冠達":0,"李逸瑋":0,"林鼎盛":0,"沈士強":0,"陳秉峰":0,"黃炯達":0,"彭榆真":0,"黃濰":0,"甘家銘":0,"洪岱熙":0,"楊大緯":0,"王志冉":0,"呂瑩純":0,"巫清隆":0,"曾韋綸":0,"侯進坤":0,"林昆澤":0,"徐翊庭":0,"陳佳舜":0};
+var CROWN='<svg viewBox="0 0 64 50" aria-hidden="true"><path d="M4 14l14 12L32 4l14 22 14-12-6 30H10z" fill="#FFC928" stroke="#B57A00" stroke-width="3" stroke-linejoin="round"/><rect x="10" y="40" width="44" height="7" rx="2" fill="#E8A80C" stroke="#B57A00" stroke-width="2.5"/><circle cx="4" cy="13" r="4" fill="#E0362B"/><circle cx="32" cy="4" r="4" fill="#E0362B"/><circle cx="60" cy="13" r="4" fill="#E0362B"/><circle cx="32" cy="30" r="4" fill="#fff"/></svg>';
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function split(s){s=String(s||'').replace(/\s+/g,' ').trim();var pre='',suf='',m;if((m=s.match(PRE))&&s.length>m[0].length){pre=m[1];s=s.slice(m[0].length);}if((m=s.match(SUF))&&s.length>m[0].length){suf=m[1];s=s.slice(0,-m[0].length);}return {pre:pre,name:s.trim(),suf:suf};}
+function key(s){return split(s).name.replace(/\s/g,'');}
+function gtmDates(){var W=null;[].some.call(document.getElementsByTagName('script'),function(s){var t=s.text||'';if(t.indexOf('__ecNewDoc')<0)return false;var m=t.match(/[,;\s]w=(\{[^{}]*\})/);if(m){try{W=JSON.parse(m[1]);}catch(e){W=null;}}return !!W;});return W||FALLBACK;}
+/* no query string: about/info pages get cut short by the server for some query lengths */
+function get(u,n){n=n==null?1:n;return fetch(u,{cache:'no-cache',credentials:'same-origin'}).then(function(r){if(!r.ok)throw 0;return r.text();}).then(function(t){if(!/<\/html>\s*$/i.test(t))throw 0;return new DOMParser().parseFromString(t,'text/html');}).catch(function(e){if(n>0)return get(u,n-1);throw e;});}
+function scan(){var ids=Object.keys(CL);return Promise.all(ids.map(function(c){return get('/products-'+c+'.html').then(function(d){var out=[];d.querySelectorAll('.proh').forEach(function(e){var a=e.querySelector('a[href*="product-"]');if(!a)return;var href=a.getAttribute('href')||'',m=href.match(/product-(\d+)(?:-(\d+))?\.html/);if(!m)return;
+  var h=e.querySelector('.pronameone');h=h?h.textContent:'';if(!h||/^\s*more\s*$/i.test(h)){var tt=e.querySelector('[title]');h=tt?tt.getAttribute('title'):'';}if(!h){var ia=e.querySelector('img[alt]');h=ia?ia.getAttribute('alt'):'';}h=(h||'').replace(/\s+/g,' ').trim();if(!h)return;
+  var im=e.querySelector('img'),src=im?im.getAttribute('src')||'':'',f=src.split('/').pop()||'',mm=f.match(/^(9*)(20\d{12})/),ts=0;
+  if(mm){var s=mm[2];ts=new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8),+s.slice(8,10),+s.slice(10,12)).getTime();}
+  out.push({cid:+c,id:+m[1],href:new URL(href,location.origin).href,name:h,img:src?new URL(src,location.origin).href:'',ts:ts});});return out;}).catch(function(){return null;});})).then(function(r){return {recs:[].concat.apply([],r.filter(Boolean)),partial:r.some(function(x){return !x;})};});}
+function pick(recs,W){var cut=Date.now()-DAYS*864e5,g={};recs.forEach(function(a){var k=key(a.name);if(!k)return;var c=g[k]||(g[k]={k:k,recs:[],clinics:[],minTs:0});c.recs.push(a);if(c.clinics.indexOf(a.cid)<0)c.clinics.push(a.cid);if(a.ts&&(!c.minTs||a.ts<c.minTs))c.minTs=a.ts;});
+  var listed=[],photo=[];Object.keys(g).forEach(function(k){var c=g[k],has=Object.prototype.hasOwnProperty.call(W,k),ts=has?(W[k]?new Date(W[k]+'T00:00:00+08:00').getTime():0):c.minTs;c.ts=ts;if(ts&&ts>=cut)(has?listed:photo).push(c);});
+  if(photo.length>BULK)photo=[];
+  return listed.concat(photo).map(function(c){c.recs.sort(function(a,b){return a.id-b.id;});var r=c.recs[0];c.clinics.sort(function(a,b){return a-b;});return {k:c.k,name:r.name,href:r.href,img:r.img,ts:c.ts,clinics:c.clinics};}).sort(function(a,b){return b.ts-a.ts;});}
+function detail(b){return get(b.href).then(function(d){var f=d.querySelector('.producttitle');if(f&&f.textContent.trim())b.name=f.textContent.replace(/\s+/g,' ').trim();b.secs=[];var bp=d.querySelector('.baseprod');
+  if(bp)bp.querySelectorAll('strong').forEach(function(g){var e=g.nextElementSibling;while(e&&e.tagName==='BR')e=e.nextElementSibling;var a=[];if(e&&e.tagName==='UL')e.querySelectorAll('li').forEach(function(c){c=c.textContent.replace(/\s+/g,' ').trim();if(c)a.push(c);});b.secs.push({title:g.textContent.replace(/\//g,'／').trim(),items:a});});
+  var im=d.querySelector('.proddetail img, #myTabContent img');b.sch=im?new URL(im.getAttribute('src'),location.origin).href:'';return b;},function(){b.secs=[];b.sch='';return b;});}
+function load(){var c=null;try{c=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+  if(c&&Date.now()-c.t<TTL&&c.days===DAYS&&Array.isArray(c.list))return Promise.resolve(c.list);
+  return scan().then(function(r){var list=pick(r.recs,gtmDates());return Promise.all(list.map(detail)).then(function(l){if(!r.partial){try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),days:DAYS,list:l}));}catch(e){}}return l;});});}
+function slide(b){var d=split(b.name),tags=b.clinics.map(function(a){return '<a href="/products-'+a+'.html">'+CL[a]+'院區</a>';}).join(''),secs=b.secs&&b.secs.length?b.secs:[{title:'學經歷',items:[]},{title:'治療專科／證書',items:[]}],mid='';
+  secs.forEach(function(a){mid+='<h4>'+esc(a.title)+'</h4>'+(a.items.length?'<ul>'+a.items.map(function(c){return '<li>'+esc(c)+'</li>';}).join('')+'</ul>':'<div class="ec_nd_none">尚未填寫</div>');});
+  var el=document.createElement('div');el.className='ec_nd_slide';
+  el.innerHTML='<div class="ec_nd_card"><div class="ec_nd_left"><div class="ec_nd_ph"><img src="'+esc(b.img)+'" alt="'+esc(d.name)+'"></div><div class="ec_nd_badge">'+CROWN+'新進醫師</div><div><div class="ec_nd_name">'+(d.pre?'<small>'+esc(d.pre)+'</small>':'')+'<b>'+esc(d.name)+'</b>'+(d.suf?'<small>'+esc(d.suf)+'</small>':'')+'</div><div class="ec_nd_tags">'+tags+'</div></div></div><div class="ec_nd_mid">'+mid+'</div><div class="ec_nd_sch"><h4>個人班表<small>點圖可放大</small></h4>'+(b.sch?'<img loading="lazy" src="'+esc(b.sch)+'" alt="'+esc(d.name)+' 班表">':'<div class="ec_nd_none">班表更新中</div>')+'</div></div>';
+  return el;}
+function nameOf(s){var b=s.querySelector('.ec_nd_name b');return b?b.textContent.replace(/\s/g,''):'';}
+function build(){var anchor=document.querySelector('.in_news');if(!anchor)return null;
+  var css=[].some.call(document.getElementsByTagName('style'),function(s){return (s.textContent||'').indexOf('#ec_nd')>=0;});if(!css)return null;
+  var g=document.createElement('div');g.id='ec_nd';g.className='col-xs-12';g.dkOwn=true;
+  g.innerHTML='<div class="ec_nd_head"><span class="ec_nd_en">New Doctors</span><span class="ec_nd_zh">'+CROWN+'金鶯集團新進醫師</span></div><div class="ec_nd_wrap"><button type="button" class="ec_nd_btn ec_nd_prev" aria-label="上一位">❮</button><div class="ec_nd_track"></div><button type="button" class="ec_nd_btn ec_nd_next" aria-label="下一位">❯</button></div><div class="ec_nd_dots"></div>';
+  anchor.parentNode.insertBefore(g,anchor);return g;}
+function bind(root,n){root.dkCount=n;root.classList.toggle('ec_one',n<2);var e=root.querySelector('.ec_nd_track'),dots=root.querySelector('.ec_nd_dots');if(!e)return;
+  var idx=function(){return e.clientWidth?Math.round(e.scrollLeft/e.clientWidth):0;},go=function(k){k=(k+n)%n;e.scrollTo({left:k*e.clientWidth,behavior:'smooth'});};
+  if(dots){var h='',cur=idx();for(var i=0;i<n;i++)h+='<button type="button" aria-label="第'+(i+1)+'位"'+(i===cur?' class="on"':'')+'></button>';dots.innerHTML=h;[].forEach.call(dots.children,function(b,i){b.onclick=function(){go(i);};});}
+  var pv=root.querySelector('.ec_nd_prev'),nx=root.querySelector('.ec_nd_next');if(pv)pv.onclick=function(){go(idx()-1);};if(nx)nx.onclick=function(){go(idx()+1);};
+  if(!e.dkScroll){e.dkScroll=1;e.addEventListener('scroll',function(){var k=idx(),d=root.querySelector('.ec_nd_dots');if(d)[].forEach.call(d.children,function(b,i){b.className=i===k?'on':'';});},{passive:true});}}
+var LIST=null,giveUp=false;
+function merge(){if(!LIST)return;var gtm=null,own=null;[].forEach.call(document.querySelectorAll('[id="ec_nd"]'),function(r){if(r.dkOwn)own=r;else if(!gtm)gtm=r;});
+  if(gtm&&own){own.parentNode.removeChild(own);own=null;}
+  var root=gtm||own;if(!root){if(!giveUp||!LIST.length)return;root=build();if(!root)return;}
+  var track=root.querySelector('.ec_nd_track');if(!track)return;
+  var have={};[].forEach.call(track.querySelectorAll('.ec_nd_slide'),function(s){have[nameOf(s)]=1;});
+  LIST.forEach(function(b){if(b&&b.k&&!have[b.k]){track.appendChild(slide(b));have[b.k]=1;}});
+  var order=LIST.map(function(b){return b.k;}),rank=function(s){return order.indexOf(nameOf(s));};
+  var cur=[].slice.call(track.querySelectorAll('.ec_nd_slide')),sorted=cur.slice().sort(function(a,b){return rank(a)-rank(b);});
+  if(sorted.some(function(s,i){return s!==cur[i];}))sorted.forEach(function(s){track.appendChild(s);});
+  if(root.dkCount!==sorted.length)bind(root,sorted.length);}
+function start(){var q=false,mo=new MutationObserver(function(){if(q)return;q=true;requestAnimationFrame(function(){q=false;merge();});});
+  mo.observe(document.body,{childList:true,subtree:true});setTimeout(function(){giveUp=true;merge();},20000);setTimeout(function(){mo.disconnect();},90000);
+  load().then(function(l){LIST=(l||[]).filter(function(b){return b&&b.k;});merge();},function(){});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+
+/* Home vaccine board header 20261101: no logo; the location button and the walk-in pill share a row, the area chips sit together on the next row */
+(function(){
+var p=location.pathname;if(p!=='/'&&p!=='/index.html')return;
+var B='#jy-vaccine-board ',s=document.createElement('style');s.id='dk-vax-head-20261101';
+s.textContent=B+'.jv-logo{display:none!important}'
++B+'.jv-in{display:flex!important;flex-wrap:wrap;justify-content:center;align-items:center;column-gap:8px}'
++B+'.jv-in>*{flex:0 0 100%;order:20;min-width:0}'
++B+'.jv-head,'+B+'.jv-head>div,'+B+'.jv-tools{display:contents!important}'
++B+'.jv-kick{order:1;flex:0 0 auto}'
++B+'.jv-title{order:2;flex:0 0 100%;justify-content:center}'
++B+'#jv-geo-btn{order:3;flex:0 0 auto;height:36px;margin:14px 0 0!important}'
++B+'.jv-sub{order:4;flex:0 0 auto;display:inline-flex!important;align-items:center;height:36px;box-sizing:border-box;margin:14px 0 0!important}'
++B+'.jv-in::before{content:"";order:5;flex:0 0 100%;height:10px}'
++B+'.jv-chip{order:6;flex:0 0 auto}'
++B+'#jv-geo-msg{order:7;flex:0 0 100%;margin-top:6px}'
++B+'.jv-legend{order:8}'
++B+'.jv-grid{order:9}'
+/* keep 不分廠牌 on one line inside the narrow two-column cards */
++B+'.jv-row .jv-vac{flex:1 1 auto;min-width:0}'
++B+'.jv-qty.txt{padding:4px 7px!important;font-size:13px!important}';
+(document.head||document.documentElement).appendChild(s);
 })();
