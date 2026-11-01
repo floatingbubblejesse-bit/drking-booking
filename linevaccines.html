@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><link rel="canonical" href="https://floatingbubblejesse-bit.github.io/drking-booking/linevaccines.html"><title>疫苗一覽</title><style>html,body{margin:0;background:#f4f7f5}#line-vaccine-app{display:block}</style></head><body>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><link rel="canonical" href="https://floatingbubblejesse-bit.github.io/drking-booking/linevaccines.html"><title>流感疫苗即時庫存</title><style>html,body{margin:0;background:#f4f7f5}#line-vaccine-app{display:block}</style></head><body>
 <div id="line-vaccine-app"></div>
 <script id="lineVaccineSnapshot" type="application/json">{"vaccines":["自費-GSK伏適流","自費-東洋輔流威護","公費疫苗-不分廠牌"],"clinics":[{"name":"鶯歌院區","qty":[0,0,"不提供"],"updatedAt":"2026-10-31 20:50"},{"name":"三樹院區","qty":[0,0,"不提供"],"updatedAt":"2026-10-28 17:51"},{"name":"桃園院區","qty":[0,2,"不提供"],"updatedAt":"2026-10-31 17:10"},{"name":"土城院區","qty":[0,1,"不提供"],"updatedAt":"2026-10-31 21:24"},{"name":"八德院區","qty":[0,1,"不提供"],"updatedAt":"2026-11-01 09:01"},{"name":"龍潭院區","qty":[0,0,33],"updatedAt":"2026-10-30 19:42"},{"name":"大溪院區","qty":[0,5,"不提供"],"updatedAt":"2026-10-31 19:26"},{"name":"大竹院區","qty":[0,0,54],"updatedAt":"2026-10-15 21:41"},{"name":"大湳院區","qty":[0,0,"不提供"],"updatedAt":"2026-10-16 10:05"},{"name":"平鎮院區","qty":[0,13,"不提供"],"updatedAt":"2026-10-30 08:08"},{"name":"埔心院區","qty":[0,2,"不提供"],"updatedAt":"2026-10-30 11:00"},{"name":"觀音院區","qty":[3,2,"不提供"],"updatedAt":"2026-10-31 20:05"},{"name":"龍岡院區","qty":[0,0,"不提供"],"updatedAt":"2026-10-19 15:40"}],"latestUpdate":"2026-11-01 09:01","generatedAt":"2026-11-01 10:22"}</script>
 <script id="lineVaccineApp20261028">
@@ -153,7 +153,7 @@ main{max-width:900px;margin:auto;padding:var(--page-gap) var(--page-gap) 0}.clin
   }
   function mountVaccinePage(config){
     const host=document.getElementById('line-vaccine-app');if(!host||host.shadowRoot)return;
-    document.body.append(host);document.title='疫苗一覽';
+    document.body.append(host);document.title='流感疫苗即時庫存';
     const root=host.attachShadow({mode:'open'}),model=createVaccineModel(config),style=document.createElement('style');style.textContent=config.css;root.append(style);
     const storageKey='line_vaccine_public_v1',locationKey='line_vaccine_location_v1';
     let state=model.initial(config.seed,'seed'),position=null;
