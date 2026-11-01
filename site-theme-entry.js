@@ -6,7 +6,7 @@
     var ref = new URL(document.referrer);
     internal = /^(www\.)?drking\.com\.tw$/i.test(ref.hostname);
   } catch (_) {}
-  if (url.pathname === '/about.html' && url.searchParams.get('original') !== '1' && !internal) {
+  if (url.pathname === '/about.html' && url.searchParams.get('original') !== '1' && url.hash !== '#original' && !internal) {
     location.replace('/trackall.html' + url.search);
     return;
   }
@@ -15,7 +15,8 @@
       try {
         var target = new URL(link.getAttribute('href'), location.href);
         if (/^(www\.)?drking\.com\.tw$/i.test(target.hostname) && target.pathname === '/about.html') {
-          target.searchParams.set('original', '1');
+          target.searchParams.delete('original');
+          target.hash = 'original';
           link.setAttribute('href', target.pathname + target.search + target.hash);
         }
       } catch (_) {}
