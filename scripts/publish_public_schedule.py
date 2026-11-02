@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Publish only validated, already-public clinic timetables; Python stdlib only."""
+"""Publish only validated, already-public clinic timetables; Python stdlib only.
+
+Source: the EIP doctor-board public timetable API (the Google Sheet / Apps Script source was retired on 2026-11-02).
+Each EIP branch-week is converted to the unchanged allclinic-bundle-v1 shape the LINE pages already validate."""
 from __future__ import annotations
 
 import hashlib
@@ -14,14 +17,18 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-SOURCE_URL = "https://script.google.com/macros/s/AKfycbxgqUfWwelvtQDBYu4-Y_JXGj0pWwaI1ltA9RSei7HZGW-Tqr27elypzT1XwOSbu3F28Q/exec?view=linedoctors"
+SOURCE_URL = "https://erp.drking.com.tw/api/v1/doctor-board/view"
+SOURCE_HOST = "erp.drking.com.tw"
+SOURCE_MARK = "eip-doctor-board-v1"
 TARGET = Path("public-schedule/latest.json")
 SCHEMA = "allclinic-bundle-v1"
 CLINIC_SCHEMA = "allclinic-readonly-v1"
 CODES = tuple("ABCDEFGHIJKLMN")
 SESSIONS = ("早診", "午診", "晚診")
 TAIPEI = timezone(timedelta(hours=8))
-MAX_RESPONSE_BYTES = 2_000_000
+MAX_RESPONSE_BYTES = 4_000_000
+SESSION_BY_PREFIX = {"早": "早診", "午": "午診", "晚": "晚診"}
+MAX_CELLS = 8
 MAX_SOURCE_AGE_SECONDS = 120
 MAX_FUTURE_SECONDS = 60
 
@@ -170,28 +177,141 @@ def validate_snapshot(raw, now=None):
     return {"ok": True, "view": "linedoctors", "schema": SCHEMA, "version": version, "generatedAt": generated_at, "froms": starts, "stale": False, "clinics": clean}
 
 
-class GooglePublicRedirects(HTTPRedirectHandler):
+def iso_ms(value):
+    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def eip_time(value):
+    """EIP times are "07:30"; the public cache keeps the sheet-era "7:30" form."""
+    match = re.match(r"([0-9]{1,2}):([0-9]{2})", str("" if value is None else value).strip())
+    if not match or int(match.group(1)) > 23 or int(match.group(2)) > 59:
+        return ""
+    return str(int(match.group(1))) + ":" + match.group(2)
+
+
+def usable_name(value):
+    return 0 < len(value) <= 60 and not re.search(r"[\x00-\x1f\x7f<>]", value)
+
+
+def convert_branch(start, branch):
+    """One EIP branch-week -> the old board list (same rules as the browser bridge in CMS 39/40/41).
+
+    Off cells without a doctor become 休診; weight-clinic visits listed under 午診 that start before
+    noon move to 早診, exactly as the retired sheet adapter published them."""
+    require(isinstance(branch, dict), "eip-branch")
+    dates = [(datetime.fromisoformat(start).date() + timedelta(days=i)).isoformat() for i in range(7)]
+    boards, by_kind = [], {}
+    raw_boards = branch.get("boards") or []
+    require(isinstance(raw_boards, list), "eip-boards")
+    for raw in raw_boards:
+        if not isinstance(raw, dict):
+            continue
+        days_meta = raw.get("days")
+        if isinstance(days_meta, list) and days_meta and isinstance(days_meta[0], dict) and days_meta[0].get("date"):
+            require(days_meta[0]["date"] == start, "eip-week")
+        kind = "weight" if raw.get("isWl") is True else "health"
+        board = by_kind.get(kind)
+        if board is None:
+            board = {"kind": kind, "dates": dates, "rows": [{"session": session, "days": [[] for _ in range(7)]} for session in SESSIONS]}
+            by_kind[kind] = board
+            boards.append(board)
+        rows = {row["session"]: row for row in board["rows"]}
+        for raw_row in raw.get("rows") or []:
+            if not isinstance(raw_row, dict):
+                continue
+            session = SESSION_BY_PREFIX.get(str(raw_row.get("session") or "").strip()[:1])
+            if not session:
+                continue
+            raw_days = raw_row.get("days") or []
+            for day in range(7):
+                cells = raw_days[day] if isinstance(raw_days, list) and day < len(raw_days) else []
+                if not isinstance(cells, list):
+                    continue
+                for cell in cells:
+                    if not isinstance(cell, dict):
+                        continue
+                    off = cell.get("off") is True
+                    name = str("" if cell.get("doctor") is None else cell.get("doctor")).strip()
+                    if not name and off:
+                        name = "休診"
+                    if not name or not usable_name(name):
+                        continue
+                    start_time, end_time = eip_time(cell.get("start")), eip_time(cell.get("end"))
+                    if not start_time or not end_time:
+                        start_time = end_time = ""
+                    changed = cell.get("changed") is True
+                    target = rows[session]
+                    if kind == "weight" and session == "午診":
+                        ref = eip_time(cell.get("baseStart") if changed and cell.get("baseStart") else cell.get("start")) or eip_time(cell.get("baseStart"))
+                        if ref and int(ref.split(":")[0]) < 12:
+                            target = rows["早診"]
+                    if len(target["days"][day]) < MAX_CELLS:
+                        target["days"][day].append({"name": name, "start": start_time, "end": end_time, "off": off, "changed": changed})
+    boards.sort(key=lambda board: 0 if board["kind"] == "health" else 1)
+    if not boards:
+        boards.append({"kind": "health", "dates": dates, "rows": [{"session": session, "days": [[] for _ in range(7)]} for session in SESSIONS]})
+    return boards
+
+
+def build_snapshot(starts, week_lists, fetched_at):
+    """Assemble the linedoctors bundle (versions and hashes included) from four EIP all-branch weeks."""
+    require(len(starts) == 4 and len(week_lists) == 4, "eip-weeks")
+    checked_at = iso_ms(fetched_at)
+    clinics, stored = [], []
+    for code in CODES:
+        stored_weeks = []
+        try:
+            for start, branches in zip(starts, week_lists):
+                branch = next((b for b in branches if isinstance(b, dict) and b.get("branchCode") == code), None)
+                require(branch is not None, "eip-branch-missing")
+                end = (datetime.fromisoformat(start).date() + timedelta(days=6)).isoformat()
+                stored_weeks.append({"from": start, "to": end, "boards": convert_branch(start, branch)})
+        except InvalidSnapshot:
+            clinics.append({"ok": False, "clinic": code, "available": False, "reason": "not_provided", "checkedAt": checked_at, "stale": False})
+            stored.append({"clinic": code, "available": False, "reason": "not_provided", "checkedAt": checked_at, "stale": False})
+            continue
+        version = CLINIC_SCHEMA + "|" + code + "|" + digest(stored_weeks)
+        weeks = [{"ok": True, "clinic": code, "from": w["from"], "to": w["to"], "updatedAt": checked_at, "version": version, "boards": w["boards"]} for w in stored_weeks]
+        clinics.append({"ok": True, "clinic": code, "available": True, "version": version, "checkedAt": checked_at, "stale": False, "weeks": weeks, "currentVersion": version})
+        stored.append({"clinic": code, "available": True, "version": version, "checkedAt": checked_at, "stale": False, "weeks": stored_weeks})
+    stored_bundle = {"schema": SCHEMA, "froms": list(starts), "generatedAt": checked_at, "clinics": stored}
+    return {"ok": True, "view": "linedoctors", "schema": SCHEMA, "version": SCHEMA + "|" + digest(stored_bundle),
+            "generatedAt": checked_at, "froms": list(starts), "stale": False, "clinics": clinics}
+
+
+class EipNoRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         parsed = urlparse(newurl)
-        require(parsed.scheme == "https" and parsed.hostname in ("script.google.com", "script.googleusercontent.com") and not parsed.username and not parsed.password, "redirect")
+        require(parsed.scheme == "https" and parsed.hostname == SOURCE_HOST and not parsed.username and not parsed.password, "redirect")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def fetch_snapshot():
-    request = Request(SOURCE_URL, headers={"Accept": "application/json", "User-Agent": "DrKing-Public-Schedule-Cache/1"})
-    with build_opener(GooglePublicRedirects()).open(request, timeout=45) as response:
+def fetch_week(start):
+    request = Request(SOURCE_URL + "?all=1&date=" + start, headers={"Accept": "application/json", "User-Agent": "DrKing-Public-Schedule-Cache/2"})
+    with build_opener(EipNoRedirects()).open(request, timeout=45) as response:
         require(response.status == 200, "http-status")
         body = response.read(MAX_RESPONSE_BYTES + 1)
     require(len(body) <= MAX_RESPONSE_BYTES, "response-size")
     try:
-        return json.loads(body.decode("utf-8"))
+        raw = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         raise InvalidSnapshot("response-json") from None
+    require(isinstance(raw, dict) and raw.get("success") is True and isinstance(raw.get("data"), dict), "eip-response")
+    data = raw["data"]
+    require(isinstance(data.get("list"), list) and data.get("date", start) == start, "eip-response")
+    return data["list"]
+
+
+def fetch_snapshot():
+    starts = week_starts(datetime.now(timezone.utc))
+    week_lists = [fetch_week(start) for start in starts]
+    return build_snapshot(starts, week_lists, datetime.now(timezone.utc))
 
 
 def publish_snapshot(raw, target=TARGET, now=None):
     """The prior file is never touched until the complete new snapshot is valid."""
     snapshot = validate_snapshot(raw, now)
+    snapshot["source"] = SOURCE_MARK
     target = Path(target)
     if target.exists():
         try:
