@@ -34,8 +34,9 @@ jobs:
           python-version: '3.12'
       - name: Validate publisher
         run: python -m unittest discover -s scripts -p test_public_schedule_cache.py -v
-      - name: Retrieve and validate public timetable
+      - name: Retrieve and validate public timetable (EIP doctor-board API)
         id: schedule_update
+        continue-on-error: true
         run: python scripts/publish_public_schedule.py
       - name: Validate vaccine publisher
         id: vaccine_test
@@ -76,6 +77,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent
+      - name: Report timetable cache retention
+        if: ${{ !cancelled() && steps.schedule_update.outcome == 'failure' }}
+        run: echo "::warning::Timetable refresh from the EIP API failed; the last valid public timetable cache was preserved."
       - name: Report vaccine cache retention
         if: ${{ !cancelled() && (steps.vaccine_test.outcome == 'failure' || steps.vaccine_update.outcome == 'failure') }}
         run: echo "::warning::Vaccine refresh failed; the last valid public vaccine cache and HTML snapshot were preserved."
