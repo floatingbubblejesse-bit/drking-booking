@@ -186,7 +186,7 @@ class PublicScheduleCacheTests(unittest.TestCase):
             target = Path(tmp) / "latest.json"
             self.assertTrue(publisher.publish_snapshot(self.value, target, NOW))
             self.assertFalse(publisher.publish_snapshot(self.value, target, NOW))
-            self.assertEqual(json.loads(target.read_text()), self.value)
+            self.assertEqual(json.loads(target.read_text()), dict(self.value, source=publisher.SOURCE_MARK))
 
     def test_invalid_or_older_snapshot_retains_previous_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,12 +209,88 @@ class PublicScheduleCacheTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), before)
             self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["latest.json"])
 
-    def test_redirect_rejects_non_google_or_http(self):
-        handler = publisher.GooglePublicRedirects()
+    def test_redirect_rejects_non_eip_or_http(self):
+        handler = publisher.EipNoRedirects()
         request = Request(publisher.SOURCE_URL)
-        for url in ("http://script.google.com/x", "https://evil.example/x", "https://user:password@script.google.com/x"):
+        for url in ("http://erp.drking.com.tw/x", "https://evil.example/x", "https://user:password@erp.drking.com.tw/x"):
             with self.assertRaises(publisher.InvalidSnapshot):
                 handler.redirect_request(request, None, 302, "Found", {}, url)
+
+
+def eip_cell(doctor, start="", end="", off=False, changed=False, base_start=None):
+    return {"doctor": doctor, "start": start, "end": end, "off": off, "changed": changed, "note": "",
+            "baseDoctor": doctor, "baseStart": start if base_start is None else base_start, "baseEnd": end}
+
+
+def eip_branch(code, start, health=None, weight=None):
+    dates = [(datetime.fromisoformat(start).date() + timedelta(days=i)).isoformat() for i in range(7)]
+    days = [{"date": d, "md": d[5:], "label": "", "changed": False} for d in dates]
+    def board(title, rows, wl):
+        empty = {s: [[] for _ in range(7)] for s in publisher.SESSIONS}
+        empty.update(rows or {})
+        value = {"title": title, "changed": False, "showDates": True, "days": days,
+                 "rows": [{"session": s, "days": empty[s]} for s in publisher.SESSIONS]}
+        if wl:
+            value["isWl"] = True
+        return value
+    return {"branchCode": code, "branchName": code + "院區",
+            "boards": [board(code + "健保", health, False), board(code + "減重", weight, True)]}
+
+
+def eip_weeks(now=NOW):
+    starts = publisher.week_starts(now)
+    lists = []
+    for start in starts:
+        branches = []
+        for code in publisher.CODES:
+            health = {"早診": [[eip_cell("林永昌", "07:30", "12:00")] for _ in range(7)]}
+            weight = {"午診": [[eip_cell("張慧馨", "11:00", "13:00"), eip_cell("闕壯理", "15:00", "17:00")]] + [[] for _ in range(6)]}
+            branches.append(eip_branch(code, start, health, weight))
+        lists.append(branches)
+    return starts, lists
+
+
+class EipConversionTests(unittest.TestCase):
+    def test_eip_snapshot_validates_and_keeps_sheet_shape(self):
+        starts, lists = eip_weeks()
+        raw = publisher.build_snapshot(starts, lists, NOW - timedelta(seconds=5))
+        result = publisher.validate_snapshot(raw, NOW)
+        self.assertEqual(result, raw)
+        week = result["clinics"][0]["weeks"][0]
+        health, weight = week["boards"]
+        self.assertEqual((health["kind"], weight["kind"]), ("health", "weight"))
+        self.assertEqual(health["rows"][0]["days"][0], [{"name": "林永昌", "start": "7:30", "end": "12:00", "off": False, "changed": False}])
+        # a weight visit listed at noon but starting at 11:00 is published in 早診, the 15:00 one stays
+        self.assertEqual([c["name"] for c in weight["rows"][0]["days"][0]], ["張慧馨"])
+        self.assertEqual([c["name"] for c in weight["rows"][1]["days"][0]], ["闕壯理"])
+
+    def test_doctor_on_leave_becomes_closed_cell(self):
+        start = publisher.week_starts(NOW)[0]
+        leave = eip_cell("", off=True, changed=True, base_start="15:00")
+        leave["baseDoctor"] = "林永昌"
+        boards = publisher.convert_branch(start, eip_branch("A", start, None, {"午診": [[leave]] + [[] for _ in range(6)]}))
+        self.assertEqual(boards[1]["rows"][1]["days"][0], [{"name": "休診", "start": "", "end": "", "off": True, "changed": True}])
+
+    def test_empty_cells_markup_and_overflow_dropped(self):
+        start = publisher.week_starts(NOW)[0]
+        cells = [eip_cell(""), eip_cell("<b>x</b>", "08:00", "09:00")] + [eip_cell("醫師" + str(i), "08:00", "09:00") for i in range(10)]
+        boards = publisher.convert_branch(start, eip_branch("A", start, {"早診": [cells] + [[] for _ in range(6)]}))
+        self.assertEqual([c["name"] for c in boards[0]["rows"][0]["days"][0]], ["醫師" + str(i) for i in range(8)])
+
+    def test_missing_branch_or_wrong_week_is_not_provided(self):
+        starts, lists = eip_weeks()
+        lists[0] = [b for b in lists[0] if b["branchCode"] != "C"]
+        lists[1][3]["boards"][0]["days"][0]["date"] = "2026-01-05"
+        raw = publisher.build_snapshot(starts, lists, NOW - timedelta(seconds=5))
+        result = publisher.validate_snapshot(raw, NOW)
+        unavailable = [c["clinic"] for c in result["clinics"] if c["available"] is False]
+        self.assertEqual(unavailable, ["C", "D"])
+
+    def test_branch_without_boards_gets_an_empty_board(self):
+        start = publisher.week_starts(NOW)[0]
+        boards = publisher.convert_branch(start, {"branchCode": "A", "boards": []})
+        self.assertEqual(len(boards), 1)
+        self.assertEqual([r["session"] for r in boards[0]["rows"]], list(publisher.SESSIONS))
 
 
 if __name__ == "__main__":
