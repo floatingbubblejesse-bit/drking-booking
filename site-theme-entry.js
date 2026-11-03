@@ -510,3 +510,21 @@ function run(){[].forEach.call(document.querySelectorAll('a[href$="jiayi.html"],
   var root=document.querySelector('.bannercon');if(!root)return;texts(root);[].forEach.call(root.querySelectorAll('.subcon p'),split);}
 run();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);
 })();
+
+/* Official windows edge 20261103: the official 門診表／所有院區電話 windows (#dk-official-window, built by 頁尾資訊) get the same look as the LINE
+   schedule window: on phones a 12px dark strip above a rounded window top edge, and everywhere a round light-green close button */
+(function(){
+var W='html body #dk-official-window',s=document.createElement('style');s.id='dk-official-window-edge-20261103';
+s.textContent=W+' .dk-window-close{width:40px!important;height:40px!important;padding:8px!important;border:1px solid #cfdcd4!important;border-radius:50%!important;background:#e6eee9!important;color:#304639!important}'
++W+' .dk-window-close:hover,'+W+' .dk-window-close:active{background:#d3e0d8!important}'
++W+' .dk-window-close svg{width:22px!important;height:22px!important;stroke-width:2.2!important}'
++W+':not([data-kind="schedule"]) .dk-window-close{top:2px!important;right:6px!important}'
++'@media(max-width:640px){'
++W+'{align-items:stretch!important;padding:calc(12px + env(safe-area-inset-top)) 0 0!important;background:rgba(16,28,23,.6)!important}'
++W+' .dk-window-box{height:100%!important;padding-top:8px!important;border-radius:18px 18px 0 0!important;box-shadow:0 -3px 16px rgba(0,0,0,.3)!important}'
++W+':not([data-kind="schedule"]) .dk-window-controls{flex-basis:44px!important;padding-top:0!important}'
++W+'[data-kind="schedule"] .dk-window-controls{top:8px!important}'
++W+'[data-kind="schedule"] .dk-window-close{top:5px!important}'
++'}';
+(document.head||document.documentElement).appendChild(s);
+})();
