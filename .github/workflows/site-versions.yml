@@ -1,0 +1,56 @@
+name: Snapshot site back-office content
+
+on:
+  schedule:
+    - cron: '37 18 * * *'
+  workflow_dispatch:
+    inputs:
+      freeze:
+        description: 'Keep this snapshot as a named version, e.g. stable-20261103 (leave empty for a normal snapshot)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-versions
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test snapshot rules
+        run: python -m unittest discover -s scripts -p test_snapshot_site.py -v
+      - name: Snapshot the back-office blocks from the public pages
+        env:
+          FREEZE: ${{ github.event.inputs.freeze }}
+        run: |
+          if [ -n "$FREEZE" ]; then python scripts/snapshot_site.py --freeze "$FREEZE"; else python scripts/snapshot_site.py; fi
+      - name: Commit the snapshot
+        env:
+          FREEZE: ${{ github.event.inputs.freeze }}
+        shell: bash
+        run: |
+          git add -A versions
+          if git diff --cached --quiet; then
+            echo "Back-office content unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$FREEZE" ]; then msg="Site back-office version $FREEZE"; else msg="Site back-office snapshot"; fi
+          git commit -m "$msg"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then exit 0; fi
+            sleep 8
+          done
+          exit 1
