@@ -573,8 +573,8 @@ function find(){var r=document.getElementById('dk-official-window');if(r&&r!==ro
 if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
 })();
 
-/* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags down in the upper half
-   of the window (the 門診表 frame handles its own part, CMS 40), like the LINE schedule window; a drag only starts after 8px
+/* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags down anywhere in the
+   window (the 門診表 frame handles its own part, CMS 40), like the LINE schedule window; a drag only starts after 8px
    straight down and not while the content under the finger is scrolled, so taps and scrolling still work; on phones the window
    now starts at the very top with a framed, rounded top edge */
 (function(){
@@ -603,7 +603,7 @@ function zone(root,box,t,y){
   if(t===root)return true;
   var br=box.getBoundingClientRect();
   if(root.dataset.kind==='schedule')return t===box&&y-br.top<=38;
-  if(!box.contains(t)||t.closest('.dk-window-close')||y-br.top>br.height/2)return false;
+  if(!box.contains(t)||t.closest('.dk-window-close'))return false;
   for(var n=t;n&&n!==root;n=n.parentElement){if(n.scrollTop>0)return false;}
   return true;}
 function move(e){if(!drag)return;var y=e.touches[0].clientY,x=e.touches[0].clientX,dy=y-drag.y;
