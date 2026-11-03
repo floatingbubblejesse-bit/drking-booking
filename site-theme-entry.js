@@ -582,12 +582,13 @@ var W='html body #dk-official-window',css=document.createElement('style');css.id
 css.textContent='@media(max-width:640px){'+W+'{padding-top:env(safe-area-inset-top)!important}'
 +W+' .dk-window-box{padding-top:35px!important;border:1px solid #9fb2a8!important;border-bottom:0!important;background:linear-gradient(#e3eae6 0,#e3eae6 35px,#f4f9f9 35px)!important}'
 +W+' .dk-window-box::before{content:"";position:absolute;top:15px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#a7b6ae;z-index:3;pointer-events:none}'
-+W+'[data-kind="schedule"] .dk-window-controls{top:28px!important}'
-/* close button below the grey band, centred on the tabs / title row as before: a plain, larger ✕ without the round frame */
++W+'[data-kind="schedule"] .dk-window-controls{top:0!important;pointer-events:none}'
+/* close button: a plain, larger ✕ without the round frame; in the 門診表 window it sits in the grey band at the top right
+   (its controls box lets taps through to the schedule row below), in the phone window it stays on the title row */
 +W+' .dk-window-close{width:32px!important;height:32px!important;padding:0!important;border:0!important;background:transparent!important}'
 +W+' .dk-window-close:hover,'+W+' .dk-window-close:active{background:transparent!important}'+W+' .dk-window-close:active{opacity:.6}'
 +W+' .dk-window-close svg{width:32px!important;height:32px!important;stroke-width:1.8!important}'
-+W+'[data-kind="schedule"] .dk-window-close{top:9px!important}'
++W+'[data-kind="schedule"] .dk-window-close{top:2px!important;pointer-events:auto}'
 +W+':not([data-kind="schedule"]) .dk-window-close{top:6px!important;right:10px!important}}';
 (document.head||document.documentElement).appendChild(css);
 var drag=null;
