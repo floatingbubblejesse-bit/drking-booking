@@ -590,9 +590,9 @@ css.textContent='@media(max-width:640px){'+W+'{padding-top:env(safe-area-inset-t
 +W+' .dk-window-close:hover,'+W+' .dk-window-close:active{background:#f7faf8!important}'+W+' .dk-window-close:active{opacity:.6}'
 +W+' .dk-window-close svg{width:16px!important;height:16px!important;stroke-width:2.2!important}'
 +W+'[data-kind="schedule"] .dk-window-close{top:4px!important;pointer-events:auto}'
-+W+':not([data-kind="schedule"]) .dk-window-close{top:-31px!important;right:12px!important}'
++W+':not([data-kind="schedule"]) .dk-window-close{top:4px!important;right:12px!important;width:36px!important;height:36px!important}'+W+':not([data-kind="schedule"]) .dk-window-close svg{width:20px!important;height:20px!important}'
 /* phone window: like the 門診表 window, the grey header runs from the top down to below the 所有院區電話 title,
-   with the ✕ in the grab band and a line plus soft shadow above the clinic buttons */
+   with a larger round ✕ on the title row and a line plus soft shadow above the clinic buttons */
 +W+':not([data-kind="schedule"]) .dk-window-box{background:linear-gradient(#e3eae6 0,#e3eae6 60px,#f4f9f9 60px)!important}'
 +W+':not([data-kind="schedule"]) .dk-window-controls{box-sizing:border-box!important;flex-basis:52px!important;padding-bottom:8px!important;background:#e3eae6!important;border-bottom:1px solid #b8ccbd!important;z-index:2!important}'
 +W+':not([data-kind="schedule"]) .dk-window-controls::after{content:"";position:absolute;left:0;right:0;top:100%;height:8px;background:linear-gradient(rgba(30,50,40,.16),rgba(30,50,40,0));pointer-events:none}'
