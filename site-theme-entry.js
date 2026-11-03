@@ -165,9 +165,12 @@ function styleLb(n,fr){
     return;}
   if(n<80)setTimeout(function(){styleLb(n+1,fr);},125);else lb.classList.add('dk-ready');
 }
+/* titles the doctor schedule popup leaves out (11/3): 執行長 for 蕭捷存／黃錦崧, 減重名醫 for 蕭捷健 */
+var LB_DROP={'蕭捷存':['執行長'],'黃錦崧':['執行長'],'蕭捷健':['減重名醫']};
 function openLb(box){
   makeLb();
-  var name=box.dkName,rest=roles(box.dkFull);
+  var name=box.dkName,rest=roles(box.dkFull),drop=LB_DROP[name];
+  if(drop)rest=rest.split(' ').filter(function(r){return r&&drop.indexOf(r)<0;}).join(' ');
   lbHead.textContent=name;if(rest){var s=document.createElement('small');s.textContent=rest;lbHead.appendChild(s);}
   lbState={x:window.scrollX,y:window.scrollY,body:document.body.style.cssText,root:document.documentElement.style.overflow,opener:box};
   document.body.style.position='fixed';document.body.style.top=(-lbState.y)+'px';document.body.style.left=(-lbState.x)+'px';document.body.style.width='100%';document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';
