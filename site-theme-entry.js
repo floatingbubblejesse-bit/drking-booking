@@ -573,8 +573,9 @@ function find(){var r=document.getElementById('dk-official-window');if(r&&r!==ro
 if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
 })();
 
-/* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags the window top down
-   (the grey grab band above the tabs, or the 所有院區電話 title row), like the LINE schedule window; on phones the window
+/* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags down in the upper half
+   of the window (the 門診表 frame handles its own part, CMS 40), like the LINE schedule window; a drag only starts after 8px
+   straight down and not while the content under the finger is scrolled, so taps and scrolling still work; on phones the window
    now starts at the very top with a framed, rounded top edge */
 (function(){
 var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
@@ -594,16 +595,21 @@ css.textContent='@media(max-width:640px){'+W+'{padding-top:env(safe-area-inset-t
 var drag=null;
 function zone(root,box,t,y){
   if(t===root)return true;
-  if(t===box)return y-box.getBoundingClientRect().top<=38;
-  return root.dataset.kind!=='schedule'&&!!t.closest('.dk-window-controls')&&!t.closest('button');}
-function move(e){if(!drag)return;var dy=Math.max(0,e.touches[0].clientY-drag.y);drag.dy=dy;if(dy>2&&e.cancelable)e.preventDefault();
-  drag.box.style.transform='translateY('+dy+'px)';}
-function end(){if(!drag)return;var d=drag,box=d.box,root=d.root;drag=null;var v=d.dy/Math.max(1,Date.now()-d.t);
+  var br=box.getBoundingClientRect();
+  if(root.dataset.kind==='schedule')return t===box&&y-br.top<=38;
+  if(!box.contains(t)||t.closest('.dk-window-close')||y-br.top>br.height/2)return false;
+  for(var n=t;n&&n!==root;n=n.parentElement){if(n.scrollTop>0)return false;}
+  return true;}
+function move(e){if(!drag)return;var y=e.touches[0].clientY,x=e.touches[0].clientX,dy=y-drag.y;
+  if(!drag.on){if(dy>8&&Math.abs(dy)>Math.abs(x-drag.x)){drag.on=true;drag.t=Date.now();drag.box.style.transition='none';}
+    else{if(Math.abs(x-drag.x)>8||dy<-8)drag=null;return;}}
+  if(e.cancelable)e.preventDefault();dy=Math.max(0,dy);drag.dy=dy;drag.box.style.transform='translateY('+dy+'px)';}
+function end(){if(!drag)return;var d=drag,box=d.box,root=d.root;drag=null;if(!d.on)return;var v=d.dy/Math.max(1,Date.now()-d.t);
   if(d.dy>90||(d.dy>30&&v>0.5)){box.style.transition='transform .2s ease-in';box.style.transform='translateY(100%)';
     setTimeout(function(){var b=root.querySelector('.dk-window-close');if(b&&!root.hidden)b.click();box.style.transition='';box.style.transform='';},190);}
   else{box.style.transition='transform .2s ease-out';box.style.transform='';setTimeout(function(){if(!drag)box.style.transition='';},220);}}
 document.addEventListener('touchstart',function(e){var root=document.getElementById('dk-official-window');if(!root||root.hidden||e.touches.length!==1)return;
   var box=root.querySelector('.dk-window-box'),t=e.target;if(!box||!(t instanceof Element)||!zone(root,box,t,e.touches[0].clientY))return;
   if(!root.dkSwipe){root.dkSwipe=1;root.addEventListener('touchmove',move,{passive:false});root.addEventListener('touchend',end);root.addEventListener('touchcancel',end);}
-  drag={root:root,box:box,y:e.touches[0].clientY,t:Date.now(),dy:0};box.style.transition='none';},{passive:true});
+  drag={root:root,box:box,y:e.touches[0].clientY,x:e.touches[0].clientX,t:Date.now(),dy:0,on:false};},{passive:true});
 })();
