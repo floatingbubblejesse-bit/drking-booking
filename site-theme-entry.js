@@ -606,9 +606,11 @@ function zone(root,box,t,y){
   if(!box.contains(t)||t.closest('.dk-window-close'))return false;
   for(var n=t;n&&n!==root;n=n.parentElement){if(n.scrollTop>0)return false;}
   return true;}
-function move(e){if(!drag)return;var y=e.touches[0].clientY,x=e.touches[0].clientX,dy=y-drag.y;
-  if(!drag.on){if(dy>8&&Math.abs(dy)>Math.abs(x-drag.x)){drag.on=true;drag.t=Date.now();drag.box.style.transition='none';}
-    else{if(Math.abs(x-drag.x)>8||dy<-8)drag=null;return;}}
+function move(e){if(!drag)return;var y=e.touches[0].clientY,x=e.touches[0].clientX,dy=y-drag.y,dx=Math.abs(x-drag.x);
+  if(!drag.on){if(dy<-4||dx>Math.max(8,dy)){drag=null;return;}
+    /* stop the browser from starting its own scroll or page bounce while the finger heads down, so the very first pull works */
+    if(dy>2&&dy>dx&&e.cancelable)e.preventDefault();if(dy<=8)return;
+    drag.on=true;drag.t=Date.now();drag.box.style.transition='none';}
   if(e.cancelable)e.preventDefault();dy=Math.max(0,dy);drag.dy=dy;drag.box.style.transform='translateY('+dy+'px)';}
 function end(){if(!drag)return;var d=drag,box=d.box,root=d.root;drag=null;if(!d.on)return;var v=d.dy/Math.max(1,Date.now()-d.t);
   if(d.dy>90||(d.dy>30&&v>0.5)){box.style.transition='transform .2s ease-in';box.style.transform='translateY(100%)';
@@ -616,6 +618,11 @@ function end(){if(!drag)return;var d=drag,box=d.box,root=d.root;drag=null;if(!d.
   else{box.style.transition='transform .2s ease-out';box.style.transform='';setTimeout(function(){if(!drag)box.style.transition='';},220);}}
 document.addEventListener('touchstart',function(e){var root=document.getElementById('dk-official-window');if(!root||root.hidden||e.touches.length!==1)return;
   var box=root.querySelector('.dk-window-box'),t=e.target;if(!box||!(t instanceof Element)||!zone(root,box,t,e.touches[0].clientY))return;
-  if(!root.dkSwipe){root.dkSwipe=1;root.addEventListener('touchmove',move,{passive:false});root.addEventListener('touchend',end);root.addEventListener('touchcancel',end);}
-  drag={root:root,box:box,y:e.touches[0].clientY,x:e.touches[0].clientX,t:Date.now(),dy:0,on:false};},{passive:true});
+  hook();drag={root:root,box:box,y:e.touches[0].clientY,x:e.touches[0].clientX,t:Date.now(),dy:0,on:false};},{passive:true});
+/* the move/end listeners must already be on the window before the first touch starts (iOS decides at touchstart whether a
+   page may block scrolling), so hook them up as soon as the window element exists instead of on the first touch */
+function hook(){var root=document.getElementById('dk-official-window');if(!root||root.dkSwipe)return;root.dkSwipe=1;
+  root.addEventListener('touchmove',move,{passive:false});root.addEventListener('touchend',end);root.addEventListener('touchcancel',end);}
+function watch(){hook();new MutationObserver(hook).observe(document.body,{childList:true});}
+if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch);
 })();
