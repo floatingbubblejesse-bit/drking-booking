@@ -531,3 +531,44 @@ s.textContent=W+' .dk-window-close{width:40px!important;height:40px!important;pa
 +'}';
 (document.head||document.documentElement).appendChild(s);
 })();
+
+/* Official schedule window settle 20261103: on iPhone Safari the 門診表 window showed its content loading in steps (layout, then the
+   schedule moving into place). The schedule frame now stays hidden behind 「班表載入中…」 until the schedule is drawn and has stopped moving. */
+(function(){
+var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
+var R='html body #dk-official-window[data-kind="schedule"]',css=document.createElement('style');css.id='dk-official-sched-settle-20261103';
+css.textContent=R+':not(.dk-sched-ready) .dk-window-frame{visibility:hidden!important}'
++R+':not(.dk-sched-ready) .dk-window-box::after{content:"班表載入中…";position:absolute;left:0;right:0;top:42%;text-align:center;color:#61736e;font-size:15px;letter-spacing:.1em;pointer-events:none;animation:dkSchedWait .2s .45s both}'
++R+'.dk-sched-ready .dk-window-frame{animation:dkSchedIn .16s ease-out}'
++'@keyframes dkSchedWait{from{opacity:0}to{opacity:1}}@keyframes dkSchedIn{from{opacity:0}to{opacity:1}}';
+(document.head||document.documentElement).appendChild(css);
+var BASE=location.origin+'/lineclinicschedule.html?embed=official';
+/* the address the window is about to load (same rule as the 頁尾資訊 window code), so a reused frame that is still navigating is not shown early */
+function target(doctor,clinic){var u=BASE;if(doctor)u+='&doctor='+encodeURIComponent(doctor);if(clinic)u+='#ec-'+encodeURIComponent(clinic);else if(location.hash.indexOf('#ec-')===0)u+=location.hash;return u;}
+var want=null,root=null,timer=0,sig='',same=0,t0=0,startDoc=null,nav=false,extra=0,shownDoc=null;
+window.addEventListener('pointerdown',function(e){var t=e.target instanceof Element?e.target:null;if(!t)return;var d=t.closest('.qdlx');if(d){want=target(d.textContent);return;}if(t.closest('#ec_qn .ec_sched'))want=target();},true);
+document.addEventListener('dk-open-doctor-schedule',function(e){var d=e.detail||{};want=target(d.doctor,d.clinic);});
+function frame(){return root&&root.querySelector('iframe');}
+function docOf(f){try{return f&&f.contentDocument;}catch(e){return null;}}
+function busy(sr){var w=document.createTreeWalker(sr,NodeFilter.SHOW_TEXT),n;while((n=w.nextNode())){if(n.nodeValue.indexOf('正在讀取')>=0){var e=n.parentElement;if(e&&e.getClientRects().length)return true;}}
+  var st=sr.querySelector('.dlw-status');if(st&&st.getClientRects().length&&!/已核對/.test(st.getAttribute('aria-label')||''))return true;return false;}
+function check(){timer=0;if(!root||root.hidden||root.dataset.kind!=='schedule')return;
+  var d=docOf(frame());
+  if(root.classList.contains('dk-sched-ready')){if(d!==shownDoc){root.classList.remove('dk-sched-ready');sig='';same=0;t0=Date.now();nav=false;extra=0;}else{timer=setTimeout(check,120);return;}}
+  var ok=false;
+  try{if(d&&d.location.href.indexOf('/lineclinicschedule.html')>=0&&!(d===startDoc&&(nav||Date.now()-t0<extra))){
+    var app=d.getElementById('line-clinic-app'),sr=app&&app.shadowRoot;
+    if(sr&&sr.getElementById('official-embed-brand-rule')&&!busy(sr)){var vp=sr.querySelector('.viewport'),tm=sr.querySelector('.portal-team');
+      var s=[vp?vp.scrollHeight:0,vp?Math.round(vp.scrollTop):0,tm?Math.round(tm.getBoundingClientRect().height):0,sr.querySelectorAll('*').length].join(',');
+      if(s===sig)same++;else{sig=s;same=0;}ok=same>=3;}}}catch(e){}
+  if(ok||Date.now()-t0>7000){root.classList.add('dk-sched-ready');shownDoc=d;timer=setTimeout(check,120);return;}
+  timer=setTimeout(check,60);}
+function start(){if(timer)clearTimeout(timer);timer=0;root.classList.remove('dk-sched-ready');sig='';same=0;t0=Date.now();
+  var f=frame(),d=docOf(f),href='';try{href=f?f.contentWindow.location.href:'';}catch(e){}
+  startDoc=d;nav=!!(want&&href&&href.indexOf('/lineclinicschedule.html')>=0&&href!==want);extra=want?0:400;want=null;check();}
+function watch(r){root=r;
+  new MutationObserver(function(){var open=!root.hidden&&root.dataset.kind==='schedule';if(open&&!root.dkOpen){root.dkOpen=1;start();}else if(!open){root.dkOpen=0;root.classList.remove('dk-sched-ready');if(timer){clearTimeout(timer);timer=0;}}}).observe(r,{attributes:true,attributeFilter:['hidden','data-kind']});
+  if(!r.hidden&&r.dataset.kind==='schedule'){r.dkOpen=1;start();}}
+function find(){var r=document.getElementById('dk-official-window');if(r&&r!==root)watch(r);return !!r;}
+if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
+})();
