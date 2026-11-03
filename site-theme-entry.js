@@ -588,10 +588,7 @@ css.textContent='@media(max-width:640px){'+W+'{padding-top:env(safe-area-inset-t
 +W+' .dk-window-close{width:32px!important;height:32px!important;padding:0!important;border:0!important;background:transparent!important}'
 +W+' .dk-window-close:hover,'+W+' .dk-window-close:active{background:transparent!important}'+W+' .dk-window-close:active{opacity:.6}'
 +W+' .dk-window-close svg{width:32px!important;height:32px!important;stroke-width:1.8!important}'
-+W+'[data-kind="schedule"] .dk-window-close{top:2px!important;pointer-events:auto;color:#fff!important}'
-/* 門診表 window header in dark green with a white grab bar and ✕ (continues into the CMS 40 header row) */
-+W+'[data-kind="schedule"] .dk-window-box{border-color:#3e6a56!important;background:linear-gradient(#3e6a56 0,#3e6a56 35px,#f4f9f9 35px)!important}'
-+W+'[data-kind="schedule"] .dk-window-box::before{background:rgba(255,255,255,.5)}'
++W+'[data-kind="schedule"] .dk-window-close{top:2px!important;pointer-events:auto}'
 +W+':not([data-kind="schedule"]) .dk-window-close{top:6px!important;right:10px!important}}';
 (document.head||document.documentElement).appendChild(css);
 var drag=null;
