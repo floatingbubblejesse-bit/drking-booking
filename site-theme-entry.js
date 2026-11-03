@@ -578,14 +578,14 @@ if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});
 (function(){
 var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
 var W='html body #dk-official-window',css=document.createElement('style');css.id='dk-official-window-swipe-20261103';
-css.textContent='@media(max-width:640px){'+W+' .dk-window-box{padding-top:16px!important}'
-+W+' .dk-window-box::before{content:"";position:absolute;top:6px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#c3d0c8;z-index:3;pointer-events:none}'
+css.textContent='@media(max-width:640px){'+W+' .dk-window-box{padding-top:24px!important}'
++W+' .dk-window-box::before{content:"";position:absolute;top:10px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#c3d0c8;z-index:3;pointer-events:none}'
 +W+'[data-kind="schedule"] .dk-window-controls{top:16px!important}}';
 (document.head||document.documentElement).appendChild(css);
 var drag=null;
 function zone(root,box,t,y){
   if(t===root)return true;
-  if(t===box)return y-box.getBoundingClientRect().top<=26;
+  if(t===box)return y-box.getBoundingClientRect().top<=30;
   return root.dataset.kind!=='schedule'&&!!t.closest('.dk-window-controls')&&!t.closest('button');}
 function move(e){if(!drag)return;var dy=Math.max(0,e.touches[0].clientY-drag.y);drag.dy=dy;if(dy>2&&e.cancelable)e.preventDefault();
   drag.box.style.transform='translateY('+dy+'px)';}
