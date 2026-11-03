@@ -524,7 +524,7 @@ s.textContent=W+' .dk-window-close{width:40px!important;height:40px!important;pa
 +W+':not([data-kind="schedule"]) .dk-window-close{top:2px!important;right:6px!important}'
 +'@media(max-width:640px){'
 +W+'{align-items:stretch!important;padding:calc(12px + env(safe-area-inset-top)) 0 0!important;background:rgba(16,28,23,.6)!important}'
-+W+' .dk-window-box{height:100%!important;padding-top:8px!important;border-radius:18px 18px 0 0!important;box-shadow:0 -3px 16px rgba(0,0,0,.3)!important}'
++W+' .dk-window-box{height:100%!important;padding-top:8px!important;border-radius:36px 36px 0 0!important;box-shadow:0 -3px 16px rgba(0,0,0,.3)!important}'
 +W+':not([data-kind="schedule"]) .dk-window-controls{flex-basis:44px!important;padding-top:0!important}'
 +W+'[data-kind="schedule"] .dk-window-controls{top:8px!important}'
 +W+'[data-kind="schedule"] .dk-window-close{top:5px!important}'
