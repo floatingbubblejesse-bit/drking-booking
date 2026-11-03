@@ -574,18 +574,20 @@ if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});
 })();
 
 /* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags the window top down
-   (the dark strip, the grab bar, or the 所有院區電話 title row), like the LINE schedule window */
+   (the grey grab band above the tabs, or the 所有院區電話 title row), like the LINE schedule window; on phones the window
+   now starts at the very top with a framed, rounded top edge */
 (function(){
 var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
 var W='html body #dk-official-window',css=document.createElement('style');css.id='dk-official-window-swipe-20261103';
-css.textContent='@media(max-width:640px){'+W+' .dk-window-box{padding-top:24px!important}'
-+W+' .dk-window-box::before{content:"";position:absolute;top:10px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#c3d0c8;z-index:3;pointer-events:none}'
-+W+'[data-kind="schedule"] .dk-window-controls{top:16px!important}}';
+css.textContent='@media(max-width:640px){'+W+'{padding-top:env(safe-area-inset-top)!important}'
++W+' .dk-window-box{padding-top:35px!important;border:1px solid #9fb2a8!important;border-bottom:0!important;background:linear-gradient(#e3eae6 0,#e3eae6 35px,#f4f9f9 35px)!important}'
++W+' .dk-window-box::before{content:"";position:absolute;top:15px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#a7b6ae;z-index:3;pointer-events:none}'
++W+'[data-kind="schedule"] .dk-window-controls{top:28px!important}}';
 (document.head||document.documentElement).appendChild(css);
 var drag=null;
 function zone(root,box,t,y){
   if(t===root)return true;
-  if(t===box)return y-box.getBoundingClientRect().top<=30;
+  if(t===box)return y-box.getBoundingClientRect().top<=38;
   return root.dataset.kind!=='schedule'&&!!t.closest('.dk-window-controls')&&!t.closest('button');}
 function move(e){if(!drag)return;var dy=Math.max(0,e.touches[0].clientY-drag.y);drag.dy=dy;if(dy>2&&e.cancelable)e.preventDefault();
   drag.box.style.transform='translateY('+dy+'px)';}
