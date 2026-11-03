@@ -573,31 +573,28 @@ function find(){var r=document.getElementById('dk-official-window');if(r&&r!==ro
 if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
 })();
 
-/* Swipe down to close 20261103: the official 門診表／所有院區電話 windows close when the window is pulled down with a finger
-   (only when the content under the finger is already at its top; sideways swipes between weeks are left alone) */
+/* Official windows swipe down 20261103: the official 門診表／所有院區電話 windows close when a finger drags the window top down
+   (the dark strip, the grab bar, or the 所有院區電話 title row), like the LINE schedule window */
 (function(){
 var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
-function dkSwipe(target,box,close){if(!target||!box||target.dkSwipe)return;target.dkSwipe=1;
-var sx=0,sy=0,on=false,dead=false,dy=0,ly=0,lt=0,vel=0;
-function scrolled(e){var p=e.composedPath?e.composedPath():[];for(var i=0;i<p.length;i++){var el=p[i];if(!el||el.nodeType!==1)continue;if(el===target)break;var v=el.ownerDocument.defaultView,cs=v&&v.getComputedStyle(el);
-if(cs&&(cs.overflowY==="auto"||cs.overflowY==="scroll")&&el.scrollHeight>el.clientHeight+1&&el.scrollTop>0)return true;}
-if(target.nodeType===9&&target.scrollingElement&&target.scrollingElement.scrollTop>0)return true;return false;}
-function reset(){box.style.transition="";box.style.transform="";}
-target.addEventListener("touchstart",function(e){on=false;dy=0;vel=0;if(e.touches.length!==1){dead=true;return;}var t=e.touches[0];sx=t.clientX;sy=t.clientY;ly=sy;lt=Date.now();dead=scrolled(e);},{passive:true});
-target.addEventListener("touchmove",function(e){if(dead||e.touches.length!==1)return;var t=e.touches[0],mx=t.clientX-sx,my=t.clientY-sy;
-if(!on){if(Math.abs(mx)<8&&Math.abs(my)<8)return;if(my>0&&my>Math.abs(mx)*1.3){on=true;box.style.transition="none";}else{dead=true;return;}}
-if(e.cancelable)e.preventDefault();dy=Math.max(0,my);var now=Date.now();vel=(t.clientY-ly)/Math.max(1,now-lt);ly=t.clientY;lt=now;box.style.transform="translateY("+dy+"px)";},{passive:false});
-function end(){if(!on){dead=false;return;}on=false;dead=false;box.style.transition="transform .2s ease-out";
-if(dy>110||(vel>0.5&&dy>40)){box.style.transform="translateY(100%)";setTimeout(function(){close();reset();},200);}else{box.style.transform="";setTimeout(function(){box.style.transition="";},220);}}
-target.addEventListener("touchend",end,{passive:true});target.addEventListener("touchcancel",end,{passive:true});}
-var root=null,iv=0;
-function box(){return root.querySelector('.dk-window-box');}
-function close(){var b=root.querySelector('.dk-window-close');if(b&&!root.hidden)b.click();}
-function tick(){if(!root||root.hidden){clearInterval(iv);iv=0;return;}var f=root.querySelector('iframe'),d=null;try{d=f&&f.contentDocument;}catch(e){}
-  if(d&&d.documentElement&&d.location.href.indexOf('/lineclinicschedule.html')>=0)dkSwipe(d,box(),close);}
-function watch(r){root=r;dkSwipe(box(),box(),close);
-  new MutationObserver(function(){if(!root.hidden&&!iv){iv=setInterval(tick,250);tick();}}).observe(r,{attributes:true,attributeFilter:['hidden']});
-  if(!r.hidden){iv=setInterval(tick,250);tick();}}
-function find(){var r=document.getElementById('dk-official-window');if(r&&r!==root)watch(r);return !!r;}
-if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
+var W='html body #dk-official-window',css=document.createElement('style');css.id='dk-official-window-swipe-20261103';
+css.textContent='@media(max-width:640px){'+W+' .dk-window-box{padding-top:16px!important}'
++W+' .dk-window-box::before{content:"";position:absolute;top:6px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:#c3d0c8;z-index:3;pointer-events:none}'
++W+'[data-kind="schedule"] .dk-window-controls{top:16px!important}}';
+(document.head||document.documentElement).appendChild(css);
+var drag=null;
+function zone(root,box,t,y){
+  if(t===root)return true;
+  if(t===box)return y-box.getBoundingClientRect().top<=26;
+  return root.dataset.kind!=='schedule'&&!!t.closest('.dk-window-controls')&&!t.closest('button');}
+function move(e){if(!drag)return;var dy=Math.max(0,e.touches[0].clientY-drag.y);drag.dy=dy;if(dy>2&&e.cancelable)e.preventDefault();
+  drag.box.style.transform='translateY('+dy+'px)';}
+function end(){if(!drag)return;var d=drag,box=d.box,root=d.root;drag=null;var v=d.dy/Math.max(1,Date.now()-d.t);
+  if(d.dy>90||(d.dy>30&&v>0.5)){box.style.transition='transform .2s ease-in';box.style.transform='translateY(100%)';
+    setTimeout(function(){var b=root.querySelector('.dk-window-close');if(b&&!root.hidden)b.click();box.style.transition='';box.style.transform='';},190);}
+  else{box.style.transition='transform .2s ease-out';box.style.transform='';setTimeout(function(){if(!drag)box.style.transition='';},220);}}
+document.addEventListener('touchstart',function(e){var root=document.getElementById('dk-official-window');if(!root||root.hidden||e.touches.length!==1)return;
+  var box=root.querySelector('.dk-window-box'),t=e.target;if(!box||!(t instanceof Element)||!zone(root,box,t,e.touches[0].clientY))return;
+  if(!root.dkSwipe){root.dkSwipe=1;root.addEventListener('touchmove',move,{passive:false});root.addEventListener('touchend',end);root.addEventListener('touchcancel',end);}
+  drag={root:root,box:box,y:e.touches[0].clientY,t:Date.now(),dy:0};box.style.transition='none';},{passive:true});
 })();
