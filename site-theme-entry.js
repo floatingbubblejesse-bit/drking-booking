@@ -626,3 +626,27 @@ function hook(){var root=document.getElementById('dk-official-window');if(!root|
 function watch(){hook();new MutationObserver(hook).observe(document.body,{childList:true});}
 if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch);
 })();
+
+/* Location prompts 20261104: iPhone Chrome does not remember a site's location permission, so every automatic location request
+   (the 所有院區電話 window sorting, the search list sorting) asked again on each visit. An automatic request now gets the position
+   saved last time (up to 30 days old) instead of a prompt; a real request still runs when the browser already allows location,
+   when nothing has been saved yet, or right after the visitor taps a locate button (依我的位置排序／重新定位). */
+(function(){
+var g=navigator.geolocation;if(!g||!g.getCurrentPosition||g.dkGate)return;
+if(location.pathname.toLowerCase().indexOf('/sys_manage')===0)return;
+var real=g.getCurrentPosition.bind(g),tapped=0,SEL='.qS,.locate,[data-dk-locate]';
+document.addEventListener('click',function(e){if(!e.isTrusted)return;var path=e.composedPath?e.composedPath():[e.target];
+  for(var i=0;i<path.length;i++){var n=path[i];if(n&&n.matches&&n.matches(SEL)){tapped=Date.now();return;}}},true);
+function saved(){var best=null;['line_clinic_location_v1','geo_last'].forEach(function(k){try{var v=JSON.parse(localStorage.getItem(k)),at=v?(v.at||v.t||0):0;
+  if(v&&isFinite(v.lat)&&isFinite(v.lng)&&Math.abs(v.lat)<=90&&Math.abs(v.lng)<=180&&(!best||at>best.at))best={lat:+v.lat,lng:+v.lng,at:at};}catch(e){}});
+  return best&&Date.now()-best.at<2592e6?best:null;}
+function keep(pos){try{var v={lat:pos.coords.latitude,lng:pos.coords.longitude,at:Date.now()};
+  localStorage.setItem('line_clinic_location_v1',JSON.stringify(v));localStorage.setItem('geo_last',JSON.stringify({lat:v.lat,lng:v.lng,t:v.at}));}catch(e){}}
+g.getCurrentPosition=function(ok,fail,opt){
+  var s=Date.now()-tapped<2000?null:saved();
+  function ask(){real(function(pos){keep(pos);if(ok)ok(pos);},fail,opt);}
+  function serve(){if(ok)ok({coords:{latitude:s.lat,longitude:s.lng,accuracy:1000,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:s.at});}
+  if(!s){ask();return;}
+  try{navigator.permissions.query({name:'geolocation'}).then(function(r){if(r.state==='granted')ask();else serve();},serve);}catch(e){setTimeout(serve,0);}};
+g.dkGate=1;
+})();
