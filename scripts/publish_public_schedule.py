@@ -245,8 +245,12 @@ def convert_branch(start, branch):
                         ref = eip_time(cell.get("baseStart") if changed and cell.get("baseStart") else cell.get("start")) or eip_time(cell.get("baseStart"))
                         if ref and int(ref.split(":")[0]) < 12:
                             target = rows["早診"]
+                    # "changed" is published only for a substitute doctor (a different doctor than the base schedule),
+                    # which the pages mark with a light 代 beside the name; time-only edits, added visits and leave stay plain
+                    base_doctor = str("" if cell.get("baseDoctor") is None else cell.get("baseDoctor")).strip()
+                    substitute = changed and not off and bool(base_doctor) and base_doctor != name
                     if len(target["days"][day]) < MAX_CELLS:
-                        target["days"][day].append({"name": name, "start": start_time, "end": end_time, "off": off, "changed": changed})
+                        target["days"][day].append({"name": name, "start": start_time, "end": end_time, "off": off, "changed": substitute})
     boards.sort(key=lambda board: 0 if board["kind"] == "health" else 1)
     if not boards:
         boards.append({"kind": "health", "dates": dates, "rows": [{"session": session, "days": [[] for _ in range(7)]} for session in SESSIONS]})
