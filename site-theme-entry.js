@@ -724,7 +724,7 @@ function bar(){if(!root)return null;var b=root.querySelector('.dk-phone-ask');if
 function sync(){var b=bar();if(!b)return;b.hidden=!(refused()||!hasPoint());if(!busy){b.firstChild.disabled=false;b.firstChild.textContent=LABEL;}}
 function go(){if(busy||!navigator.geolocation)return;var btn=this;busy=true;btn.disabled=true;btn.textContent='定位中…';
   navigator.geolocation.getCurrentPosition(function(pos){busy=false;order({lat:pos.coords.latitude,lng:pos.coords.longitude});sync();},
-    function(err){busy=false;sync();if(err&&err.code===1){btn.textContent='請到設定開啟定位';setTimeout(function(){if(!busy)btn.textContent=LABEL;},3000);}},
+    function(err){busy=false;sync();if(err&&err.code===1){btn.textContent='未取得定位權限';setTimeout(function(){if(!busy)btn.textContent=LABEL;},3000);}},
     {enableHighAccuracy:false,timeout:10000,maximumAge:0});}
 document.addEventListener('dk-geo-change',sync);
 function watch(r){root=r;new MutationObserver(function(){if(!r.hidden&&r.dataset.kind!=='schedule')sync();}).observe(r,{attributes:true,attributeFilter:['hidden','data-kind']});if(!r.hidden)sync();}
