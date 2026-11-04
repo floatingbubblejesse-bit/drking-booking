@@ -631,25 +631,34 @@ if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch
    location request (the 所有院區電話 window sorting, the search list sorting) asked again on each visit. An automatic request now
    gets the position saved last time (up to 3 minutes old, shared by every page of the site) instead of a prompt; a real request still
    runs when the browser already allows location, when nothing has been saved yet, or right after the visitor taps a locate button
-   (依我的位置排序／重新定位). watchPosition follows the same rule. */
+   (依我的位置排序／重新定位). watchPosition follows the same rule. A refusal is
+   remembered: after 不允許, automatic requests stop (no prompt) until a locate button is tapped. */
 (function(){
 var g=navigator.geolocation;if(!g||!g.getCurrentPosition||g.dkGate)return;
 if(location.pathname.toLowerCase().indexOf('/sys_manage')===0)return;
 var real=g.getCurrentPosition.bind(g),realWatch=g.watchPosition?g.watchPosition.bind(g):null,realClear=g.clearWatch?g.clearWatch.bind(g):function(){};
-var tapped=0,seq=0,fakes={},SEL='.qS,.locate,[data-dk-locate],[aria-label*="定位"]';
+var tapped=0,seq=0,fakes={},DK='line_clinic_geo_denied_v1',SEL='.qS,.locate,[data-dk-locate],[aria-label*="定位"]';
 document.addEventListener('click',function(e){if(!e.isTrusted)return;var path=e.composedPath?e.composedPath():[e.target];
   for(var i=0;i<path.length;i++){var n=path[i];if(n&&n.matches&&n.matches(SEL)){tapped=Date.now();return;}}},true);
-function saved(){if(Date.now()-tapped<2000)return null;var best=null;['line_clinic_location_v1','geo_last'].forEach(function(k){try{var v=JSON.parse(localStorage.getItem(k)),at=v?(v.at||v.t||0):0;
+function explicit(){return Date.now()-tapped<2000;}
+function saved(){if(explicit())return null;var best=null;['line_clinic_location_v1','geo_last'].forEach(function(k){try{var v=JSON.parse(localStorage.getItem(k)),at=v?(v.at||v.t||0):0;
   if(v&&isFinite(v.lat)&&isFinite(v.lng)&&Math.abs(v.lat)<=90&&Math.abs(v.lng)<=180&&(!best||at>best.at))best={lat:+v.lat,lng:+v.lng,at:at};}catch(e){}});
   return best&&Date.now()-best.at<18e4?best:null;}
+/* a refusal is remembered (shared key with the LINE pages); after it, automatic requests stop until a locate button is tapped */
+function refused(){try{return localStorage.getItem(DK)==='1';}catch(e){return false;}}
+function mark(v){try{localStorage.setItem(DK,v?'1':'0');}catch(e){}try{document.dispatchEvent(new Event('dk-geo-change'));}catch(e){}}
 function keep(ok){return function(pos){try{var v={lat:pos.coords.latitude,lng:pos.coords.longitude,at:Date.now()};
-  localStorage.setItem('line_clinic_location_v1',JSON.stringify(v));localStorage.setItem('geo_last',JSON.stringify({lat:v.lat,lng:v.lng,t:v.at}));}catch(e){}if(ok)ok(pos);};}
+  localStorage.setItem('line_clinic_location_v1',JSON.stringify(v));localStorage.setItem('geo_last',JSON.stringify({lat:v.lat,lng:v.lng,t:v.at}));}catch(e){}mark(false);if(ok)ok(pos);};}
+function note(fail){return function(err){if(err&&err.code===1)mark(true);if(fail)fail(err);};}
+function refuse(fail){setTimeout(function(){if(fail)fail({code:1,message:'User denied Geolocation',PERMISSION_DENIED:1,POSITION_UNAVAILABLE:2,TIMEOUT:3});},0);}
 function serve(ok,s){if(ok)ok({coords:{latitude:s.lat,longitude:s.lng,accuracy:1000,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:s.at});}
 function allowed(cb){try{navigator.permissions.query({name:'geolocation'}).then(function(r){cb(r.state==='granted');},function(){cb(false);});}catch(e){setTimeout(function(){cb(false);},0);}}
-g.getCurrentPosition=function(ok,fail,opt){var s=saved();if(!s){real(keep(ok),fail,opt);return;}
-  allowed(function(yes){if(yes)real(keep(ok),fail,opt);else serve(ok,s);});};
-if(realWatch){g.watchPosition=function(ok,fail,opt){var s=saved();if(!s)return realWatch(keep(ok),fail,opt);
-    var id=-(++seq);fakes[id]=0;allowed(function(yes){if(!(id in fakes))return;if(yes)fakes[id]=realWatch(keep(ok),fail,opt);else serve(ok,s);});return id;};
+g.getCurrentPosition=function(ok,fail,opt){var s=saved();
+  if(s){allowed(function(yes){if(yes)real(keep(ok),note(fail),opt);else serve(ok,s);});return;}
+  if(!explicit()&&refused()){allowed(function(yes){if(yes)real(keep(ok),note(fail),opt);else refuse(fail);});return;}
+  real(keep(ok),note(fail),opt);};
+if(realWatch){g.watchPosition=function(ok,fail,opt){var s=saved();if(!s&&(explicit()||!refused()))return realWatch(keep(ok),note(fail),opt);
+    var id=-(++seq);fakes[id]=0;allowed(function(yes){if(!(id in fakes))return;if(yes)fakes[id]=realWatch(keep(ok),note(fail),opt);else if(s)serve(ok,s);else refuse(fail);});return id;};
   g.clearWatch=function(id){if(id<0){var r=fakes[id];delete fakes[id];if(r)realClear(r);}else realClear(id);};}
 g.dkGate=1;
 })();
@@ -687,5 +696,38 @@ function fill(root){var box=root.querySelector('.dk-window-box');if(!box)return;
 function watch(r){new MutationObserver(function(){var open=!r.hidden&&r.dataset.kind==='schedule';if(open&&!r.dkSkel){r.dkSkel=1;fill(r);}else if(!open)r.dkSkel=0;}).observe(r,{attributes:true,attributeFilter:['hidden','data-kind']});
   if(!r.hidden&&r.dataset.kind==='schedule'){r.dkSkel=1;fill(r);}}
 var done=null;function find(){var r=document.getElementById('dk-official-window');if(r&&r!==done){done=r;watch(r);}return !!r;}
+if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
+})();
+
+/* Official phone window locate button 20261104: in 所有院區電話, a 依我的位置排序 pill appears above the clinic buttons when
+   location was refused or has never been found; tapping it asks for location and re-orders the clinics from near to far. */
+(function(){
+var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
+var W='html body #dk-official-window',css=document.createElement('style');css.id='dk-official-phone-ask-20261104';
+css.textContent=W+' .dk-phone-ask{position:relative;z-index:1;display:flex;flex:none;justify-content:center;padding:10px 0 0}'
++W+' .dk-phone-ask[hidden],'+W+'[data-kind="schedule"] .dk-phone-ask{display:none!important}'
++W+' .dk-phone-ask:not([hidden])+.dk-phone-grid{padding-top:10px!important}'
++W+' .dk-phone-ask button{display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;height:34px;margin:0;padding:0 14px 0 12px;border:1px solid #b8ccbd;border-radius:999px;background:#fffefa;color:#2f5a46;font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;white-space:nowrap;box-shadow:0 1px 2px rgba(30,50,40,.1);cursor:pointer;-webkit-tap-highlight-color:transparent}'
++W+' .dk-phone-ask button:disabled{opacity:.6;cursor:wait}'
++W+' .dk-phone-ask button::before{content:"";flex:none;width:8px;height:8px;margin-top:-3px;border:2px solid currentColor;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}';
+(document.head||document.documentElement).appendChild(css);
+var C={A:[24.9529837,121.3513375],B:[24.9458761,121.3818186],C:[24.9806516,121.4176074],D:[24.9820308,121.3193793],E:[24.976515,121.442198],F:[24.9304146,121.2911793],G:[24.8664383,121.2147782],H:[24.8840177,121.2894696],I:[25.0217492,121.2632595],J:[24.9641796,121.2997468],K:[24.9008497,121.2110723],L:[24.9099334,121.1822147],M:[25.0468336,121.1422956],N:[24.9328648,121.2557877]};
+var root=null,busy=false,LABEL='依我的位置排序';
+function hasPoint(){return ['geo_last','line_clinic_location_v1'].some(function(k){try{var v=JSON.parse(localStorage.getItem(k));return !!(v&&isFinite(v.lat)&&isFinite(v.lng));}catch(e){return false;}});}
+function refused(){try{return localStorage.getItem('line_clinic_geo_denied_v1')==='1';}catch(e){return false;}}
+function order(pt){var grid=root&&root.querySelector('.dk-phone-grid');if(!grid)return;var r=Math.PI/180;
+  [].slice.call(grid.querySelectorAll('a[data-clinic]')).map(function(a,i){var c=C[a.dataset.clinic];var d=c?Math.pow(Math.sin((c[0]-pt.lat)*r/2),2)+Math.cos(c[0]*r)*Math.cos(pt.lat*r)*Math.pow(Math.sin((c[1]-pt.lng)*r/2),2):9;return {a:a,i:i,d:d};})
+  .sort(function(x,y){return x.d-y.d||x.i-y.i;}).forEach(function(x){grid.appendChild(x.a);});}
+function bar(){if(!root)return null;var b=root.querySelector('.dk-phone-ask');if(b)return b;var grid=root.querySelector('.dk-phone-grid');if(!grid)return null;
+  b=document.createElement('div');b.className='dk-phone-ask';b.hidden=true;b.innerHTML='<button type="button" data-dk-locate="1"></button>';b.firstChild.textContent=LABEL;
+  b.firstChild.addEventListener('click',go);grid.parentNode.insertBefore(b,grid);return b;}
+function sync(){var b=bar();if(!b)return;b.hidden=!(refused()||!hasPoint());if(!busy){b.firstChild.disabled=false;b.firstChild.textContent=LABEL;}}
+function go(){if(busy||!navigator.geolocation)return;var btn=this;busy=true;btn.disabled=true;btn.textContent='定位中…';
+  navigator.geolocation.getCurrentPosition(function(pos){busy=false;order({lat:pos.coords.latitude,lng:pos.coords.longitude});sync();},
+    function(err){busy=false;sync();if(err&&err.code===1){btn.textContent='請到設定開啟定位';setTimeout(function(){if(!busy)btn.textContent=LABEL;},3000);}},
+    {enableHighAccuracy:false,timeout:10000,maximumAge:0});}
+document.addEventListener('dk-geo-change',sync);
+function watch(r){root=r;new MutationObserver(function(){if(!r.hidden&&r.dataset.kind!=='schedule')sync();}).observe(r,{attributes:true,attributeFilter:['hidden','data-kind']});if(!r.hidden)sync();}
+function find(){var r=document.getElementById('dk-official-window');if(r&&r!==root)watch(r);return !!r;}
 if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
 })();
