@@ -627,26 +627,65 @@ function watch(){hook();new MutationObserver(hook).observe(document.body,{childL
 if(document.body)watch();else document.addEventListener('DOMContentLoaded',watch);
 })();
 
-/* Location prompts 20261104: iPhone Chrome does not remember a site's location permission, so every automatic location request
-   (the 所有院區電話 window sorting, the search list sorting) asked again on each visit. An automatic request now gets the position
-   saved last time (up to 30 days old) instead of a prompt; a real request still runs when the browser already allows location,
-   when nothing has been saved yet, or right after the visitor taps a locate button (依我的位置排序／重新定位). */
+/* Location prompts 20261104: iPhone Chrome and the LINE browser do not remember a site's location permission, so every automatic
+   location request (the 所有院區電話 window sorting, the search list sorting) asked again on each visit. An automatic request now
+   gets the position saved last time (up to 30 days old, shared by every page of the site) instead of a prompt; a real request still
+   runs when the browser already allows location, when nothing has been saved yet, or right after the visitor taps a locate button
+   (依我的位置排序／重新定位). watchPosition follows the same rule. */
 (function(){
 var g=navigator.geolocation;if(!g||!g.getCurrentPosition||g.dkGate)return;
 if(location.pathname.toLowerCase().indexOf('/sys_manage')===0)return;
-var real=g.getCurrentPosition.bind(g),tapped=0,SEL='.qS,.locate,[data-dk-locate]';
+var real=g.getCurrentPosition.bind(g),realWatch=g.watchPosition?g.watchPosition.bind(g):null,realClear=g.clearWatch?g.clearWatch.bind(g):function(){};
+var tapped=0,seq=0,fakes={},SEL='.qS,.locate,[data-dk-locate],[aria-label*="定位"]';
 document.addEventListener('click',function(e){if(!e.isTrusted)return;var path=e.composedPath?e.composedPath():[e.target];
   for(var i=0;i<path.length;i++){var n=path[i];if(n&&n.matches&&n.matches(SEL)){tapped=Date.now();return;}}},true);
-function saved(){var best=null;['line_clinic_location_v1','geo_last'].forEach(function(k){try{var v=JSON.parse(localStorage.getItem(k)),at=v?(v.at||v.t||0):0;
+function saved(){if(Date.now()-tapped<2000)return null;var best=null;['line_clinic_location_v1','geo_last'].forEach(function(k){try{var v=JSON.parse(localStorage.getItem(k)),at=v?(v.at||v.t||0):0;
   if(v&&isFinite(v.lat)&&isFinite(v.lng)&&Math.abs(v.lat)<=90&&Math.abs(v.lng)<=180&&(!best||at>best.at))best={lat:+v.lat,lng:+v.lng,at:at};}catch(e){}});
   return best&&Date.now()-best.at<2592e6?best:null;}
-function keep(pos){try{var v={lat:pos.coords.latitude,lng:pos.coords.longitude,at:Date.now()};
-  localStorage.setItem('line_clinic_location_v1',JSON.stringify(v));localStorage.setItem('geo_last',JSON.stringify({lat:v.lat,lng:v.lng,t:v.at}));}catch(e){}}
-g.getCurrentPosition=function(ok,fail,opt){
-  var s=Date.now()-tapped<2000?null:saved();
-  function ask(){real(function(pos){keep(pos);if(ok)ok(pos);},fail,opt);}
-  function serve(){if(ok)ok({coords:{latitude:s.lat,longitude:s.lng,accuracy:1000,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:s.at});}
-  if(!s){ask();return;}
-  try{navigator.permissions.query({name:'geolocation'}).then(function(r){if(r.state==='granted')ask();else serve();},serve);}catch(e){setTimeout(serve,0);}};
+function keep(ok){return function(pos){try{var v={lat:pos.coords.latitude,lng:pos.coords.longitude,at:Date.now()};
+  localStorage.setItem('line_clinic_location_v1',JSON.stringify(v));localStorage.setItem('geo_last',JSON.stringify({lat:v.lat,lng:v.lng,t:v.at}));}catch(e){}if(ok)ok(pos);};}
+function serve(ok,s){if(ok)ok({coords:{latitude:s.lat,longitude:s.lng,accuracy:1000,altitude:null,altitudeAccuracy:null,heading:null,speed:null},timestamp:s.at});}
+function allowed(cb){try{navigator.permissions.query({name:'geolocation'}).then(function(r){cb(r.state==='granted');},function(){cb(false);});}catch(e){setTimeout(function(){cb(false);},0);}}
+g.getCurrentPosition=function(ok,fail,opt){var s=saved();if(!s){real(keep(ok),fail,opt);return;}
+  allowed(function(yes){if(yes)real(keep(ok),fail,opt);else serve(ok,s);});};
+if(realWatch){g.watchPosition=function(ok,fail,opt){var s=saved();if(!s)return realWatch(keep(ok),fail,opt);
+    var id=-(++seq);fakes[id]=0;allowed(function(yes){if(!(id in fakes))return;if(yes)fakes[id]=realWatch(keep(ok),fail,opt);else serve(ok,s);});return id;};
+  g.clearWatch=function(id){if(id<0){var r=fakes[id];delete fakes[id];if(r)realClear(r);}else realClear(id);};}
 g.dkGate=1;
+})();
+
+/* Official schedule window header placeholder 20261104: while the 門診表 window loads, phones showed only the small grey pull band
+   above an empty window. The full grey header (clinic box and the 健保／減重／醫師 buttons, drawn like the real one in CMS 40) now
+   shows from the first moment and is replaced by the real header, in the same place, once the schedule is ready. */
+(function(){
+var p=location.pathname.toLowerCase();if(p.indexOf('/line')===0||p.indexOf('/sys_manage')===0)return;
+var R='html body #dk-official-window[data-kind="schedule"]',S=R+' .dk-skel',css=document.createElement('style');css.id='dk-official-sched-skel-20261104';
+css.textContent='.dk-skel{display:none}'
++'@media(max-width:640px){'+R+':not(.dk-sched-ready) .dk-skel{display:grid}}'
++S+'{position:absolute;left:0;right:0;top:35px;z-index:1;box-sizing:border-box;height:57px;grid-template-columns:96px repeat(3,minmax(0,1fr));align-items:start;padding:0 10px 10px;background:#e3eae6;border-bottom:1px solid #b8ccbd;box-shadow:0 3px 8px rgba(30,50,40,.18);pointer-events:none;font-family:-apple-system,system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;-webkit-text-size-adjust:100%}'
++S+' .dk-skel-clinic{position:relative;box-sizing:border-box;width:88px;height:42px;margin-top:2px;padding:4px 26px 4px 12px;border:1px solid #b8ccbd;border-radius:12px;background:#fffefa;color:#304639;font-family:-apple-system,system-ui,Arial,sans-serif;font-size:19px;font-weight:700;line-height:32px;white-space:nowrap;overflow:hidden}'
++S+' .dk-skel-clinic::after{content:"";position:absolute;top:20px;right:12px;box-sizing:border-box;width:8px;height:8px;border-right:2px solid #547362;border-bottom:2px solid #547362;transform:translateY(-7.5px) rotate(45deg)}'
++S+' .dk-skel-kind,'+S+' .dk-skel-tabs{display:grid;box-sizing:border-box;height:46px;column-gap:3px;background:#cfdad3}'
++S+' .dk-skel-kind{grid-column:2/4;grid-template-columns:1fr 1fr;padding:3px 1.5px 3px 3px;border-radius:13px 0 0 13px}'
++S+' .dk-skel-tabs{grid-column:4/5;grid-template-columns:1fr;padding:3px 3px 3px 1.5px;border-radius:0 13px 13px 0}'
++S+' span{display:block;height:40px;border-radius:10px;color:#4c6356;font-size:19px;font-weight:700;line-height:40px;text-align:center;white-space:nowrap}'
++S+' span.on{background:#fffefa;color:#1f3328;box-shadow:0 1px 3px rgba(0,0,0,.18)}';
+(document.head||document.documentElement).appendChild(css);
+var hint=null;
+window.addEventListener('click',function(e){var t=e.target instanceof Element?e.target:null;if(!t)return;var d=t.closest('.qdlx');if(d)hint={doctor:d.textContent};else if(t.closest('#ec_qn .ec_sched'))hint={};},true);
+document.addEventListener('dk-open-doctor-schedule',function(e){var d=e.detail||{};hint={doctor:d.doctor,clinic:d.clinic};});
+/* no clinic given: the schedule opens the clinic nearest the saved position (樹林 last), as CMS 40 does */
+var C={'鶯歌':[24.9529837,121.3513375],'三樹':[24.9458761,121.3818186],'桃園':[24.9820308,121.3193793],'土城':[24.976515,121.442198],'八德':[24.9304146,121.2911793],'龍潭':[24.8664383,121.2147782],'大溪':[24.8840177,121.2894696],'大竹':[25.0217492,121.2632595],'大湳':[24.9641796,121.2997468],'平鎮':[24.9008497,121.2110723],'埔心':[24.9099334,121.1822147],'觀音':[25.0468336,121.1422956],'龍岡':[24.9328648,121.2557877]};
+function near(){var v=null;['line_clinic_location_v1','geo_last'].some(function(k){try{var x=JSON.parse(localStorage.getItem(k));if(x&&isFinite(x.lat)&&isFinite(x.lng)){v=x;return true;}}catch(e){}return false;});
+  if(!v)return '';var best='',bd=1e9;for(var n in C){var dy=C[n][0]-v.lat,dx=(C[n][1]-v.lng)*0.906,dd=dx*dx+dy*dy;if(dd<bd){bd=dd;best=n;}}return best;}
+function name(h){var c=h&&h.clinic||'';if(!c&&location.hash.indexOf('#ec-')===0){try{c=decodeURIComponent(location.hash.slice(4));}catch(e){c='';}}return c?String(c).replace('院區','').trim():near();}
+function fill(root){var box=root.querySelector('.dk-window-box');if(!box)return;var sk=box.querySelector('.dk-skel');
+  if(!sk){sk=document.createElement('div');sk.className='dk-skel';sk.setAttribute('aria-hidden','true');
+    sk.innerHTML='<div class="dk-skel-clinic"></div><div class="dk-skel-kind"><span>健保</span><span>減重</span></div><div class="dk-skel-tabs"><span>醫師</span></div>';box.appendChild(sk);}
+  var h=hint;hint=null;var doc=!!(h&&h.doctor),s=sk.querySelectorAll('span');
+  sk.firstChild.textContent=name(h);s[0].className=doc?'':'on';s[1].className='';s[2].className=doc?'on':'';}
+function watch(r){new MutationObserver(function(){var open=!r.hidden&&r.dataset.kind==='schedule';if(open&&!r.dkSkel){r.dkSkel=1;fill(r);}else if(!open)r.dkSkel=0;}).observe(r,{attributes:true,attributeFilter:['hidden','data-kind']});
+  if(!r.hidden&&r.dataset.kind==='schedule'){r.dkSkel=1;fill(r);}}
+var done=null;function find(){var r=document.getElementById('dk-official-window');if(r&&r!==done){done=r;watch(r);}return !!r;}
+if(!find()){var mo=new MutationObserver(function(){if(find())mo.disconnect();});mo.observe(document.documentElement,{childList:true,subtree:true});}
 })();
