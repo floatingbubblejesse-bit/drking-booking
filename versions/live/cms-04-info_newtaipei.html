@@ -103,10 +103,11 @@ html body #ec_mapwrap #ec_bar>#ec-mode-toggle{width:100%!important}
 .info_item .items>p.dkHours{white-space:nowrap;overflow:hidden}
 .info_item .items>p.dkHoursNote{margin-left:28px}
 html body .botconmarn>.info_area{display:none!important}
-.info_item .items>p.dkSchedP svg{display:inline-block;width:18px;height:18px;margin-right:10px;vertical-align:middle}
-.info_item .items>p.dkSchedP a{cursor:pointer}
+.info_item .items>a.dkTSched{float:right;display:inline-flex;align-items:center;justify-content:center;height:30px;margin:2px 0 0 8px;padding:0 12px;border:1.5px solid #b9cfbf;border-radius:999px;background:#fffefa;color:#367f77;font-size:15px;font-weight:600;letter-spacing:1px;line-height:1;text-decoration:none;white-space:nowrap;box-sizing:border-box;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.info_item .items>a.dkTSched:active{background:#eef4f0}
 .info_item .items>p>a{text-decoration:underline;text-underline-offset:3px}
 .info_item ul>li.ec_near .items>b::after{content:"（最近）";font-size:16px;font-weight:600}
+@media(max-width:350px){.info_item .items>a.dkTSched{margin-left:4px;padding:0 9px;font-size:14px;letter-spacing:0}.info_item ul>li.ec_near .items>b::after{font-size:14px}}
 #dkSchedLb{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:64px 12px 16px;background:rgba(10,20,18,.82);box-sizing:border-box}
 #dkSchedLb[hidden]{display:none}
 #dkSchedLb>.dkLbClose{position:absolute;top:12px;right:12px;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#fff;color:#1e2b28;font-size:24px;line-height:1;cursor:pointer}
@@ -129,12 +130,12 @@ var name=cardName(li);if(!name)return;
 var tel=null,hours=null,note=null;
 qa(":scope>p",items).forEach(function(p){if(p.classList.contains("ec_dist"))return;var a=q("a[href]",p);if(a&&a.getAttribute("href").toLowerCase().indexOf("tel:")===0)tel=p;else if(!a&&!hours)hours=p;else if(!a&&!note)note=p});
 if(note)note.classList.add("dkHoursNote");
-var sp=el("p","dkSchedP");sp.appendChild(schedIcon());var link=el("a","","門診表");link.href="#";link.setAttribute("role","button");link.addEventListener("click",function(e){e.preventDefault();showLb(name,link,false)});sp.appendChild(link);
-if(hours){hours.classList.add("dkHours");addAllYear(hours);items.insertBefore(sp,hours)}else if(tel&&tel.nextSibling)items.insertBefore(sp,tel.nextSibling);else items.appendChild(sp);
+/* 門診表 button on the right of the clinic name (20261104), replacing the 門診表 row */var link=el("a","dkTSched","門診表");link.href="#";link.setAttribute("role","button");link.addEventListener("click",function(e){e.preventDefault();showLb(name,link,false)});items.insertBefore(link,q(":scope>b",items));
+if(hours){hours.classList.add("dkHours");addAllYear(hours)}
 items.classList.add("dkInfoReady");
 }
 function addAllYear(p){if(p.textContent.indexOf("全年無休")>-1)return;var ic=p.querySelector("img,svg"),t=document.createTextNode("全年無休 ");if(ic&&ic.nextSibling)p.insertBefore(t,ic.nextSibling);else if(ic)p.appendChild(t);else p.insertBefore(t,p.firstChild)}
-function fitHours(){qa(".info_item .items>p.dkHours").forEach(function(p){p.style.fontSize="";p.style.whiteSpace="";var w=p.clientWidth;if(!w||p.scrollWidth<=w)return;var f=parseFloat(getComputedStyle(p).fontSize),n=0;while(p.scrollWidth>w&&f>12&&n<12){f=Math.max(12,f-.5);p.style.fontSize=f+"px";n++}if(p.scrollWidth>w){p.style.fontSize="";p.style.whiteSpace="normal"}})}
+function fitHours(){qa(".info_item .items>a.dkTSched").forEach(function(a){var b=a.nextElementSibling,lh=b?parseFloat(getComputedStyle(b).lineHeight):0;if(lh&&a.offsetHeight)a.style.marginTop=Math.max(0,(lh-a.offsetHeight)/2)+"px"});qa(".info_item .items>p.dkHours").forEach(function(p){p.style.fontSize="";p.style.whiteSpace="";var w=p.clientWidth;if(!w||p.scrollWidth<=w)return;var f=parseFloat(getComputedStyle(p).fontSize),n=0;while(p.scrollWidth>w&&f>12&&n<12){f=Math.max(12,f-.5);p.style.fontSize=f+"px";n++}if(p.scrollWidth>w){p.style.fontSize="";p.style.whiteSpace="normal"}})}
 function headerBottom(){var e=document.elementFromPoint(Math.round(window.innerWidth/2),2);while(e&&e!==document.body&&e!==document.documentElement){var p=getComputedStyle(e).position;if(p==="fixed"||p==="sticky")return Math.max(0,e.getBoundingClientRect().bottom);e=e.parentElement}return 0}
 var jumpT=null,jt1=0,jt2=0;
 function alignTo(li,smooth){var sp=document.getElementById("dkJumpSpacer"),it=q(".info_item");if(!sp&&it&&it.parentNode){sp=el("div");sp.id="dkJumpSpacer";it.parentNode.insertBefore(sp,it.nextSibling);window.addEventListener("scroll",function(){if((!jumpT||Date.now()>jumpT.until)&&sp.offsetHeight&&sp.getBoundingClientRect().top>window.innerHeight)sp.style.height="0px"},{passive:true})}

@@ -8,10 +8,10 @@
 | 項目 | 後台位置 | 狀態 |
 |---|---|---|
 | CMS 1 診所介紹 | `common.php?act=edit&id=1` | 相同 |
-| CMS 2 院區資訊 | `common.php?act=edit&id=2` | 相同 |
+| CMS 2 院區資訊 | `common.php?act=edit&id=2` | **已變更** |
 | CMS 3 看診進度 | `common.php?act=edit&id=3` | 相同 |
-| CMS 4 院區資訊-新北市 | `common.php?act=edit&id=4` | 相同 |
-| CMS 5 院區資訊-桃園市 | `common.php?act=edit&id=5` | 相同 |
+| CMS 4 院區資訊-新北市 | `common.php?act=edit&id=4` | **已變更** |
+| CMS 5 院區資訊-桃園市 | `common.php?act=edit&id=5` | **已變更** |
 | CMS 6 聯絡我們 | `common.php?act=edit&id=6` | 相同 |
 | CMS 18 點選可看單院看診進度 | `common.php?act=edit&id=18` | 相同 |
 | CMS 38 點選可看單院詳細進度 | `common.php?act=edit&id=38` | 相同 |
@@ -26,10 +26,10 @@
 | 項目 | 後台位置 | 狀態 |
 |---|---|---|
 | CMS 1 診所介紹 | `common.php?act=edit&id=1` | 相同 |
-| CMS 2 院區資訊 | `common.php?act=edit&id=2` | 相同 |
+| CMS 2 院區資訊 | `common.php?act=edit&id=2` | **已變更** |
 | CMS 3 看診進度 | `common.php?act=edit&id=3` | 相同 |
-| CMS 4 院區資訊-新北市 | `common.php?act=edit&id=4` | 相同 |
-| CMS 5 院區資訊-桃園市 | `common.php?act=edit&id=5` | 相同 |
+| CMS 4 院區資訊-新北市 | `common.php?act=edit&id=4` | **已變更** |
+| CMS 5 院區資訊-桃園市 | `common.php?act=edit&id=5` | **已變更** |
 | CMS 6 聯絡我們 | `common.php?act=edit&id=6` | 相同 |
 | CMS 18 點選可看單院看診進度 | `common.php?act=edit&id=18` | 相同 |
 | CMS 38 點選可看單院詳細進度 | `common.php?act=edit&id=38` | 相同 |
