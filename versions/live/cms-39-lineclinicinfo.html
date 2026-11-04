@@ -508,7 +508,7 @@ else if(!state.items)row.append(element('span','closed',state.error?'暫時無�
 else if(!data||data.st==='closed'||!data.rooms?.length)row.append(element('span','closed','休診中'));
 else if(data.st!=='ok')row.append(element('span','closed','讀取中…'));
 else{
-row.append(element('span','number',String(data.rooms[data.rooms.length-1].c??'--')));
+/* clinic number = the larger room number, not the last room (20261104) */row.append(element("span","number",String((()=>{const v=data.rooms.map(r=>r.c).filter(c=>c!=null&&c!==""&&isFinite(c)).map(Number);return v.length?Math.max(...v):(data.rooms[data.rooms.length-1].c??"--")})())));
 const wait=element('span','waiting');wait.append(element('small','', '候診'),element('b','',String(data.sum??'--')));row.append(wait);
 const docs=element('span','doctors');docs.append(element('small','','醫師'));const names=element('span','');data.rooms.forEach(r=>names.append(element('b','',r.d||'--')));docs.append(names);row.append(docs);
 }
