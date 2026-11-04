@@ -66,6 +66,13 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
 #phone-page-card a[data-clinic]:hover{background:var(--phone-clinic-bg);border-color:var(--phone-clinic-border);color:#293e33}
 #phone-page-card a[data-clinic]:active,#phone-page-card a[data-clinic]:focus-visible{background:var(--phone-clinic-bg);border-color:#7b2028;box-shadow:0 0 0 1px #7b2028;outline:none}
 </style>
+<style id="phone-ask-20261104">
+/* 依我的位置排序: shown when location was refused or never found; tapping asks for location again */
+body>#phone-page-card .phone-ask{flex:none;align-self:center;margin:8px auto 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;height:34px;padding:0 14px 0 12px;border:1px solid #b8ccbd;border-radius:999px;background:#fffefa;color:#2f5a46;font-size:15px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 1px 2px rgba(30,50,40,.1);-webkit-tap-highlight-color:transparent;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}
+body>#phone-page-card .phone-ask[hidden]{display:none}
+body>#phone-page-card .phone-ask:disabled{opacity:.6}
+body>#phone-page-card .phone-ask::before{content:"";flex:none;width:8px;height:8px;margin-top:-3px;border:2px solid currentColor;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+</style>
 </head>
 <body>
 <section aria-label="電話掛號" id="phone-page-card">
@@ -134,12 +141,13 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
   function received(position){
     const point={lat:position?.coords?.latitude,lng:position?.coords?.longitude,at:Date.now()};
     pending=false;if(!valid(point))return;
-    location=point;granted=true;denied=false;save(deniedKey,'0');save(cacheKey,JSON.stringify(point));sort();host.dataset.locationState='located';
+    location=point;granted=true;denied=false;save(deniedKey,'0');save(cacheKey,JSON.stringify(point));sort();host.dataset.locationState='located';syncAsk();
   }
   function failed(error){
     pending=false;
     if(error?.code===1){granted=false;denied=true;save(deniedKey,'1');stop();}
     host.dataset.locationState=location?'remembered':'unavailable';
+    syncAsk();
   }
   function startWatch(){
     if(document.hidden||denied||!granted||!navigator.geolocation?.watchPosition)return false;
@@ -170,7 +178,7 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
       }catch(error){}}
       if(document.hidden||pending)return;
       host.dataset.locationPermission=permission;
-      if(permission==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();host.dataset.locationState=location?'remembered':'unavailable';return;}
+      if(permission==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();host.dataset.locationState=location?'remembered':'unavailable';syncAsk();return;}
       if(permission==='granted'){granted=true;denied=false;save(deniedKey,'0');}
       if(denied||watch!==null)return;
       const first=initialPending&&!location&&!attempted;initialPending=false;
@@ -180,6 +188,11 @@ body>#phone-page-card .phone-page-grid{box-sizing:border-box;padding:16px max(16
     }finally{checking=false;}
   }
   function permissionChanged(){if(permissionStatus?.state==='granted'){attempted=false;refresh();}else if(permissionStatus?.state==='denied'){granted=false;denied=true;save(deniedKey,'1');stop();}}
+  /* 依我的位置排序 (20261104): appears when location was refused or never found */
+  const ask=document.createElement('button');ask.type='button';ask.className='phone-ask';ask.dataset.dkLocate='1';ask.textContent='依我的位置排序';ask.hidden=true;grid.before(ask);
+  function syncAsk(){ask.hidden=document.documentElement.classList.contains('phone-official-embed')||!(denied||!location);if(!pending){ask.disabled=false;ask.textContent='依我的位置排序';}}
+  ask.addEventListener('click',()=>{if(pending)return;denied=false;save(deniedKey,'0');ask.disabled=true;ask.textContent='定位中…';locate();});
+  syncAsk();
   sort();
   if(document.documentElement.classList.contains('phone-official-embed')){
     window.addEventListener('message',function(event){
