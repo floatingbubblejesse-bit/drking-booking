@@ -1,0 +1,293 @@
+<style id="qOfficialNoDistance20261027" type="text/css">html body.qr.qD #showtrack .qA>.qkm{display:none!important}html body.qr.qD #showtrack .qA>.qnav{margin-left:auto!important}
+</style>
+<style id="qOfficialNoBreadcrumb20261026" type="text/css">html body #indcon2 .subtitle1{display:none!important;visibility:hidden!important}
+</style>
+<script id="qOfficialRemoveBreadcrumb20261026">
+(function(){
+  if(location.pathname!==`/trackall.html`)return;
+  document.querySelectorAll(`#indcon2 .subtitle1`).forEach(function(element){element.remove();});
+})();
+</script>
+<div class="col-xs-12" id="showtrack">&nbsp;</div>
+<script>$(function(){ gettrack(); });</script>
+<style id="qSingleClinicType20261025" type="text/css">/* Single-clinic readable single-line type, 2026-10-25. */
+html body.qD #showtrack .elite_number>ul>li.qsc{padding-left:12px!important;padding-right:12px!important}
+html body.qD #geo_bar .qsr{grid-template-columns:max-content minmax(0,1fr) max-content!important;gap:6px!important;letter-spacing:0!important}
+html body.qD #geo_bar .qnt{font-size:18px!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD #geo_bar .qdate,html body.qD #geo_bar .qcd{font-size:16px!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qdr:not(.qdw){grid-template-columns:max-content minmax(0,1fr) max-content max-content!important;gap:6px!important;white-space:nowrap!important}
+html body.qD .qdr:not(.qdw)>span,html body.qD .dn-group small{font-size:18px!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qdr>.dn-group{container-type:inline-size;min-width:0;gap:4px!important}
+html body.qD .qdr .qdlx{font-size:min(36px,calc((100cqw - 52px)/3.5))!important;padding:5px 4px!important;min-height:44px;letter-spacing:0!important;white-space:nowrap!important;flex-shrink:0}
+html body.qD .qdr .qdlx.qln{font-size:min(29px,calc((100cqw - 52px)/4.65))!important}
+html body.qD .qdr:not(.qdw)>b{font-size:clamp(34px,10.6vw,44px)!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qdr.qdw{grid-template-columns:minmax(0,1fr) max-content max-content!important;gap:6px!important;white-space:nowrap!important}
+html body.qD .qdw>small{grid-column:1!important;font-size:clamp(15px,4.4vw,18px)!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qdw>span{grid-column:2!important;font-size:clamp(17px,4.8vw,20px)!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qdw>b{grid-column:3!important;font-size:clamp(28px,8vw,34px)!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qkm{font-size:clamp(18px,5vw,21px)!important;letter-spacing:0!important;white-space:nowrap!important}
+html body.qD .qA{gap:8px!important}
+html body.qD #ec_qn .ec_sched,html body.qD #ec_qn .qreg{font-size:clamp(20px,5.6vw,23px)!important;letter-spacing:2px!important;white-space:nowrap!important}
+@media(max-width:350px){html body.qD #showtrack .elite_number>ul>li.qsc{padding-left:10px!important;padding-right:10px!important}html body.qD #geo_bar .qnt{font-size:17px!important}html body.qD #geo_bar .qdate,html body.qD #geo_bar .qcd{font-size:14px!important}html body.qD .qdr:not(.qdw)>span,html body.qD .dn-group small{font-size:16px!important}html body.qD .qdr .qdlx{font-size:min(29px,calc((100cqw - 48px)/3.5))!important}html body.qD .qdr .qdlx.qln{font-size:min(24px,calc((100cqw - 48px)/4.65))!important}}
+</style>
+<style id="qClinicHoursAlignment20261025" type="text/css">html body.qD #ci>p.qhours-row{align-items:start!important}
+html body.qD #ci .qhours-grid{display:grid!important;grid-template-columns:5ch .9em 5ch;column-gap:.15em;row-gap:2px;width:max-content;max-width:100%;font-variant-numeric:tabular-nums;font-feature-settings:"tnum";letter-spacing:0!important;line-height:1.65;white-space:nowrap!important}
+html body.qD #ci .qhours-grid.qhours-breaks{grid-template-columns:2em 5ch .9em 5ch 2em}
+html body.qD #ci .qhours-grid>span{min-width:0;white-space:nowrap!important;overflow-wrap:normal!important;letter-spacing:0!important;font:inherit;color:inherit}
+html body.qD #ci .qhours-start,html body.qD #ci .qhours-end{text-align:right}
+html body.qD #ci .qhours-separator{text-align:center}
+</style>
+<script id="qClinicHoursAlignmentScript20261025">
+(function(){
+  if(window.__qClinicHoursAligned)return;
+  window.__qClinicHoursAligned=true;
+  var queued=false;
+  function cell(text,className){
+    var el=document.createElement("span");
+    el.className=className;
+    el.textContent=text;
+    return el;
+  }
+  function align(){
+    queued=false;
+    document.querySelectorAll("#ci>p>span:not([data-q-hours-aligned])").forEach(function(el){
+      var parts=el.textContent.trim().split(/[、，,]/).map(function(s){return s.trim();});
+      var breaks=parts.every(function(s){return /^(上午|中午|下午|晚上)[ 　]*[0-9]{1,2}:[0-9]{2}/.test(s);});
+      var rows=parts.map(function(s){return s.match(/^(?:(上午|中午|下午|晚上)[ 　]*)?([0-9]{1,2}:[0-9]{2})[ 　]*([～~〜–－-])[ 　]*([0-9]{1,2}:[0-9]{2})[ 　]*(休診)?$/);});
+      if(!rows.length||rows.some(function(r){return !r;})||(!breaks&&rows.some(function(r){return r[1]||r[5];})))return;
+      var fragment=document.createDocumentFragment();
+      rows.forEach(function(r){
+        if(breaks)fragment.appendChild(cell(r[1],"qhours-label"));
+        fragment.appendChild(cell(r[2],"qhours-start"));
+        fragment.appendChild(cell(r[3],"qhours-separator"));
+        fragment.appendChild(cell(r[4],"qhours-end"));
+        if(breaks)fragment.appendChild(cell(r[5]||"","qhours-note"));
+      });
+      el.dataset.qHoursAligned="1";
+      el.classList.add("qhours-grid");
+      if(breaks)el.classList.add("qhours-breaks");
+      el.parentElement.classList.add("qhours-row");
+      el.replaceChildren(fragment);
+    });
+  }
+  function queue(){if(!queued){queued=true;requestAnimationFrame(align);}}
+  function boot(){
+    align();
+    new MutationObserver(function(records){
+      if(records.some(function(r){
+        if(r.target.nodeType===1&&r.target.closest("#ci"))return true;
+        return Array.from(r.addedNodes).some(function(n){return n.nodeType===1&&(n.id==="ci"||n.querySelector("#ci"));});
+      }))queue();
+    }).observe(document.body,{childList:true,subtree:true});
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
+})();
+
+</script><script id="qDoctorCardSourceRestore20261026">
+(function(){
+  var installAttempts=0;
+  function scrollToCard(card){
+    var root=document.scrollingElement||document.documentElement;
+    var htmlBehavior=document.documentElement.style.scrollBehavior;
+    var bodyBehavior=document.body.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior=`auto`;
+    document.body.style.scrollBehavior=`auto`;
+    function align(){
+      if(!card.isConnected)return;
+      var header=document.querySelector(`.top`);
+      var offset=header?Math.max(0,header.getBoundingClientRect().bottom):56;
+      var top=Math.max(0,card.getBoundingClientRect().top+window.pageYOffset-offset-16);
+      window.scrollTo(0,top);
+      root.scrollTop=top;
+    }
+    align();
+    requestAnimationFrame(function(){align();requestAnimationFrame(function(){
+      document.documentElement.style.scrollBehavior=htmlBehavior;
+      document.body.style.scrollBehavior=bodyBehavior;
+    });});
+  }
+  function install(){
+    if(window.__qDoctorCardSourceRestored)return;
+    if(typeof window.qf7!==`function`||typeof window.qf5!==`function`){if(++installAttempts<100)setTimeout(install,100);return;}
+    window.__qDoctorCardSourceRestored=true;
+    document.documentElement.dataset.qDoctorNavigation=`immediate-v2`;
+    var original=window.qf7;
+    var clinics=`鶯歌 三樹 樹林 桃園 土城 八德 龍潭 大溪 大竹 大湳 平鎮 埔心 觀音 龍岡`.split(` `);
+    window.qf7=function(clinic){
+      var category=clinics.indexOf(clinic.replace(`院區`,``))+2;
+      return original(clinic).then(function(profiles){
+        return profiles.map(function(profile){
+          if(category<2||!profile.href)return profile;
+          var url=new URL(profile.href,location.href);
+          var match=url.pathname.match(/product-([0-9]+)[.]html$/);
+          if(!match||url.origin!==location.origin)return profile;
+          var restored=Object.assign({},profile);
+          url.pathname=url.pathname.replace(match[0],`product-`+match[1]+`-`+category+`.html`);
+          restored.href=url.pathname+url.search+url.hash;
+          return restored;
+        });
+      });
+    };
+    var request=0,activeButton=null;
+    function doctorName(value){
+      return String(value||``).replace(/[ 　]/g,``).replace(/(總院長|副院長|院長|醫師|主任|執行長)$/g,``).trim();
+    }
+    document.addEventListener(`click`,function(event){
+      var button=event.target.closest(`.qdlx,.dp-menu button`);
+      if(!button||!document.body.classList.contains(`qD`))return;
+      var clinic;
+      try{clinic=decodeURIComponent(location.hash.slice(4));}catch(error){return;}
+      if(!clinic||location.hash.indexOf(`#ec-`)!==0)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      var name=doctorName(button.dataset.name||button.textContent);
+      var route=location.hash,token=++request,started=Date.now();
+      if(activeButton)activeButton.removeAttribute(`aria-busy`);
+      activeButton=button;button.setAttribute(`aria-busy`,`true`);
+      if(event.detail>0)button.blur();
+      var oldStatus=document.getElementById(`qDoctorJumpStatus`);
+      if(oldStatus)oldStatus.remove();
+      window.qf5(clinic);
+      function finish(){button.removeAttribute(`aria-busy`);if(activeButton===button)activeButton=null;}
+      function jump(){
+        if(token!==request||location.hash!==route||!document.body.classList.contains(`qD`)){finish();return;}
+        var panel=document.getElementById(`dp`);
+        var cards=panel&&panel.dataset.clinic===clinic?Array.from(panel.querySelectorAll(`.dp-card`)):[];
+        var card=cards.find(function(item){return doctorName(item.dataset.name)===name;});
+        var expired=Date.now()-started>=8000;
+        if(card){
+          panel.querySelectorAll(`.dp-menu button`).forEach(function(item){item.setAttribute(`aria-pressed`,String(doctorName(item.dataset.name)===name));});
+          var bio=card.querySelector(`.dp-bio`);
+          if(bio){bio.classList.remove(`dp-expanded`);bio.setAttribute(`aria-expanded`,`false`);var more=bio.querySelector(`.dp-more`);if(more)more.textContent=`… 展開`;}
+          scrollToCard(card);
+          finish();
+          return;
+        }
+        if(expired){
+          if(panel){var status=document.createElement(`p`);status.id=`qDoctorJumpStatus`;status.setAttribute(`role`,`status`);status.textContent=`醫師卡片暫時無法載入，請稍後再試`;panel.prepend(status);scrollToCard(status);}
+          finish();return;
+        }
+        setTimeout(jump,60);
+      }
+      jump();
+    },true);
+  }
+  if(document.readyState===`loading`)document.addEventListener(`DOMContentLoaded`,install);else install();
+})();
+</script><script id="qOfficialReliableLoad20261026">
+(function(){
+  if(location.pathname!==`/trackall.html`)return;
+  var attempts=0;
+  var fallback={"鶯歌院區":[{"name":"林永昌","role":"院長","href":"/product-8-2.html","thumb":"/uploads/product/202507/480_480/202610112048569f33.png"},{"name":"陳珠","role":"醫師","href":"/product-7-2.html","thumb":"/uploads/product/202507/480_480/202610112106379f81.png"},{"name":"鍾偉瑋","role":"醫師","href":"/product-6-2.html","thumb":"/uploads/product/202507/480_480/202610112114249f80.png"},{"name":"李軍逸","role":"醫師","href":"/product-5-2.html","thumb":"/uploads/product/202507/480_480/202610112047249f76.png"},{"name":"陳郁凡","role":"醫師","href":"/product-4-2.html","thumb":"/uploads/product/202507/480_480/202610112106149f13.png"}],"三樹院區":[{"name":"蕭捷存","role":"院長","href":"/product-11-3.html","thumb":"/uploads/product/202507/480_480/202610112113269f11.png"},{"name":"黃錦崧","role":"院長","href":"/product-10-3.html","thumb":"/uploads/product/202507/480_480/202610112110459f62.png"},{"name":"蕭捷健","role":"醫師","href":"/product-9-3.html","thumb":"/uploads/product/202507/480_480/202610112113459f73.png"},{"name":"張慧馨","role":"院長","href":"/product-16-3.html","thumb":"/uploads/product/202507/480_480/202610112102209f88.png"},{"name":"陳富玫","role":"醫師","href":"/product-15-3.html","thumb":"/uploads/product/202507/480_480/202610112106569f68.png"},{"name":"闕壯理","role":"醫師","href":"/product-14-3.html","thumb":"/uploads/product/202507/480_480/202610112114429f83.png"},{"name":"黃允玫","role":"醫師","href":"/product-13-3.html","thumb":"/uploads/product/202507/480_480/202610112109289f13.png"},{"name":"鍾偉瑋","role":"醫師","href":"/product-6-3.html","thumb":"/uploads/product/202507/480_480/202610112114249f80.png"},{"name":"李軍逸","role":"醫師","href":"/product-5-3.html","thumb":"/uploads/product/202507/480_480/202610112047249f76.png"},{"name":"陳郁凡","role":"醫師","href":"/product-4-3.html","thumb":"/uploads/product/202507/480_480/202610112106149f13.png"}],"樹林院區":[{"name":"林秉承","role":"院長","href":"/product-21-4.html","thumb":"/uploads/product/202507/480_480/202610112050179f45.png"},{"name":"廖崇淵","role":"醫師","href":"/product-20-4.html","thumb":"/uploads/product/202507/480_480/202610112111459f24.png"},{"name":"尤騰","role":"醫師","href":"/product-19-4.html","thumb":"/uploads/product/202507/480_480/202610112028199f26.png"},{"name":"何中誠","role":"醫師","href":"/product-18-4.html","thumb":"/uploads/product/202507/480_480/202610112045509f43.png"},{"name":"陳永仁","role":"醫師","href":"/product-17-4.html","thumb":"/uploads/product/202507/480_480/202610112103279f68.png"},{"name":"李軍逸","role":"醫師","href":"/product-5-4.html","thumb":"/uploads/product/202507/480_480/202610112047249f76.png"},{"name":"黃炯達","role":"院長","href":"/product-67-4.html","thumb":"/uploads/product/202507/480_480/202610112110129f80.png"}],"桃園院區":[{"name":"蕭捷健","role":"醫師","href":"/product-9-5.html","thumb":"/uploads/product/202507/480_480/202610112113459f73.png"},{"name":"蕭宇伯","role":"醫師","href":"/product-25-5.html","thumb":"/uploads/product/202507/480_480/202610112113089f31.png"},{"name":"李豪權","role":"醫師","href":"/product-24-5.html","thumb":"/uploads/product/202507/480_480/202610112048089f11.png"},{"name":"曾㨗聖","role":"醫師","href":"/product-22-5.html","thumb":"/uploads/product/202507/480_480/202610112108419f59.png"},{"name":"陳佳舜","role":"醫師","href":"/product-85-5.html","thumb":"/uploads/product/202507/480_480/202610112103549f60.png"},{"name":"高國峯","role":"醫師","href":"/product-23-5.html","thumb":"/uploads/product/202507/480_480/202610112057039f40.png"},{"name":"鍾偉瑋","role":"醫師","href":"/product-6-5.html","thumb":"/uploads/product/202507/480_480/202610112114249f80.png"},{"name":"廖崇淵","role":"醫師","href":"/product-81-5.html","thumb":"/uploads/product/202507/480_480/202610112111599f77.png"},{"name":"陳昭銘","role":"院長","href":"/product-69-5.html","thumb":"/uploads/product/202507/480_480/202610112105539f18.png"}],"土城院區":[{"name":"蕭捷健","role":"醫師","href":"/product-9-6.html","thumb":"/uploads/product/202507/480_480/202610112113459f73.png"},{"name":"張簡千郁","role":"院長","href":"/product-28-6.html","thumb":"/uploads/product/202507/480_480/202610112102419f75.png"},{"name":"陳麒中","role":"醫師","href":"/product-27-6.html","thumb":"/uploads/product/202507/480_480/202610112107399f17.png"},{"name":"黃濰","role":"醫師","href":"/product-56-6.html","thumb":"/uploads/product/202507/480_480/202610112111069f46.png"},{"name":"何金蔚","role":"醫師","href":"/product-26-6.html","thumb":"/uploads/product/202507/480_480/202610112046079f56.png"},{"name":"林秉承","role":"院長","href":"/product-21-6.html","thumb":"/uploads/product/202507/480_480/202610112050179f45.png"},{"name":"廖崇淵","role":"醫師","href":"/product-20-6.html","thumb":"/uploads/product/202507/480_480/202610112111459f24.png"},{"name":"尤騰","role":"醫師","href":"/product-19-6.html","thumb":"/uploads/product/202507/480_480/202610112028199f26.png"},{"name":"何中誠","role":"醫師","href":"/product-18-6.html","thumb":"/uploads/product/202507/480_480/202610112045509f43.png"},{"name":"陳永仁","role":"醫師","href":"/product-17-6.html","thumb":"/uploads/product/202507/480_480/202610112103279f68.png"}],"八德院區":[{"name":"廖崑竹","role":"院長","href":"/product-31-7.html","thumb":"/uploads/product/202507/480_480/202610112112199f77.png"},{"name":"李彥輝","role":"醫師","href":"/product-30-7.html","thumb":"/uploads/product/202507/480_480/202610112047109f44.png"},{"name":"楊大緯","role":"醫師","href":"/product-60-7.html","thumb":"/uploads/product/202507/480_480/202610112111279f39.png"},{"name":"王志冉","role":"醫師","href":"/product-63-7.html","thumb":"/uploads/product/202507/480_480/202610112029059f90.png"},{"name":"曾韋綸","role":"醫師","href":"/product-72-7.html","thumb":"/uploads/product/202507/480_480/202610112108219f69.png"},{"name":"黃炯達","role":"院長","href":"/product-66-7.html","thumb":"/uploads/product/202507/480_480/202610112110289f64.png"}],"龍潭院區":[{"name":"何冠達","role":"院長","href":"/product-35-8.html","thumb":"/uploads/product/202507/480_480/202610112046239f70.png"},{"name":"何中庸","role":"醫師","href":"/product-33-8.html","thumb":"/uploads/product/202507/480_480/202610112045259f78.png"},{"name":"華志倫","role":"醫師","href":"/product-32-8.html","thumb":"/uploads/product/202507/480_480/202610112109039f61.png"},{"name":"陳昭銘","role":"院長","href":"/product-34-8.html","thumb":"/uploads/product/202507/480_480/202610112105179f71.png"},{"name":"廖崑竹","role":"院長","href":"/product-82-8.html","thumb":"/uploads/product/202507/480_480/202610112112489f97.png"}],"大溪院區":[{"name":"林鼎盛","role":"院長","href":"/product-39-9.html","thumb":"/uploads/product/202507/480_480/202610112051289f46.png"},{"name":"林昆澤","role":"院長","href":"/product-79-9.html","thumb":"/uploads/product/202507/480_480/202610112049489f80.png"},{"name":"巫清隆","role":"醫師","href":"/product-71-9.html","thumb":"/uploads/product/202507/480_480/202603011617449f47.png"},{"name":"呂瑩純","role":"醫師","href":"/product-70-9.html","thumb":"/uploads/product/202507/480_480/202610112046549f69.png"},{"name":"謝騰緯","role":"醫師","href":"/product-87-9.html","thumb":"/uploads/product/202507/480_480/202610112114019f28.png"},{"name":"廖崑竹","role":"院長","href":"/product-74-9.html","thumb":"/uploads/product/202507/480_480/202610112112349f14.png"},{"name":"李逸瑋","role":"院長","href":"/product-78-9.html","thumb":"/uploads/product/202507/480_480/202610112047529f23.png"}],"大竹院區":[{"name":"陳秉峰","role":"院長","href":"/product-41-10.html","thumb":"/uploads/product/202507/480_480/202610112104339f69.png"},{"name":"沈士強","role":"醫師","href":"/product-40-10.html","thumb":"/uploads/product/202507/480_480/202610112048319f21.png"},{"name":"彭榆真","role":"醫師","href":"/product-55-10.html","thumb":"/uploads/product/202507/480_480/202610112108009f54.png"},{"name":"李軍逸","role":"醫師","href":"/product-5-10.html","thumb":"/uploads/product/202507/480_480/202610112047249f76.png"}],"大湳院區":[{"name":"黃炯達","role":"院長","href":"/product-65-11.html","thumb":"/uploads/product/202507/480_480/202610112109469f84.png"},{"name":"洪岱熙","role":"醫師","href":"/product-59-11.html","thumb":"/uploads/product/202507/480_480/202610112056129f38.png"},{"name":"高國峯","role":"醫師","href":"/product-23-11.html","thumb":"/uploads/product/202507/480_480/202610112057039f40.png"},{"name":"李彥輝","role":"醫師","href":"/product-30-11.html","thumb":"/uploads/product/202507/480_480/202610112047109f44.png"},{"name":"陳永仁","role":"醫師","href":"/product-17-11.html","thumb":"/uploads/product/202507/480_480/202610112103279f68.png"},{"name":"廖崇淵","role":"醫師","href":"/product-81-11.html","thumb":"/uploads/product/202507/480_480/202610112111599f77.png"},{"name":"陳佳舜","role":"醫師","href":"/product-84-11.html","thumb":"/uploads/product/202507/480_480/202610112104119f30.png"}],"平鎮院區":[{"name":"蕭捷健","role":"醫師","href":"/product-9-12.html","thumb":"/uploads/product/202507/480_480/202610112113459f73.png"},{"name":"陳昭銘","role":"院長","href":"/product-68-12.html","thumb":"/uploads/product/202507/480_480/202610112105039f63.png"},{"name":"甘家銘","role":"醫師","href":"/product-57-12.html","thumb":"/uploads/product/202507/480_480/202610112044339f47.png"},{"name":"何冠達","role":"院長","href":"/product-64-12.html","thumb":"/uploads/product/202507/480_480/202610112046369f66.png"}],"埔心院區":[{"name":"梁培毅","role":"院長","href":"/product-29-13.html","thumb":"/uploads/product/202507/480_480/202610112103079f63.png"},{"name":"徐翊庭","role":"醫師","href":"/product-83-13.html","thumb":"/uploads/product/202507/480_480/202610112056329f82.png"},{"name":"黃炯達","role":"院長","href":"/product-42-13.html","thumb":"/uploads/product/202507/480_480/202610112109599f33.png"},{"name":"陳昭銘","role":"院長","href":"/product-69-13.html","thumb":"/uploads/product/202507/480_480/202610112105539f18.png"}],"觀音院區":[{"name":"李逸瑋","role":"院長","href":"/product-38-14.html","thumb":"/uploads/product/202507/480_480/202610112047399f85.png"},{"name":"林鼎盛","role":"院長","href":"/product-77-14.html","thumb":"/uploads/product/202507/480_480/202610112051529f13.png"},{"name":"侯進坤","role":"醫師","href":"/product-73-14.html","thumb":"/uploads/product/202507/480_480/202610112052129f27.png"},{"name":"陳佳舜","role":"醫師","href":"/product-84-14.html","thumb":"/uploads/product/202507/480_480/202610112104119f30.png"}],"龍岡院區":[{"name":"蕭捷存","role":"院長","href":"/product-11-15.html","thumb":"/uploads/product/202507/480_480/202610112113269f11.png"},{"name":"黃錦崧","role":"院長","href":"/product-10-15.html","thumb":"/uploads/product/202507/480_480/202610112110459f62.png"},{"name":"林昆澤","role":"院長","href":"/product-79-15.html","thumb":"/uploads/product/202507/480_480/202610112049489f80.png"},{"name":"林君瀚","role":"醫師","href":"/product-88-15.html","thumb":"/uploads/product/202507/480_480/202610112049179f57.png"},{"name":"林鼎盛","role":"院長","href":"/product-77-15.html","thumb":"/uploads/product/202507/480_480/202610112051529f13.png"},{"name":"黃炯達","role":"院長","href":"/product-42-15.html","thumb":"/uploads/product/202507/480_480/202610112109599f33.png"},{"name":"徐翊庭","role":"醫師","href":"/product-86-15.html","thumb":"/uploads/product/202507/480_480/202610112056489f14.png"}]};
+  function install(){
+    if(typeof window.qf3!==`function`||typeof window.qf7!==`function`){if(++attempts<100)setTimeout(install,100);return;}
+    var originalFetch=window.qf3,originalRoster=window.qf7;
+    var jobs=[],active=0;
+    function drain(){while(active<3&&jobs.length){var job=jobs.shift();active++;job.task().then(job.resolve,job.reject).finally(function(){active--;drain();});}}
+    function queued(task){return new Promise(function(resolve,reject){jobs.push({task:task,resolve:resolve,reject:reject});drain();});}
+    window.qf3=function(input){
+      var url=new URL(input,location.href);
+      if(url.origin!==location.origin||!new RegExp(`^/(?:products?-[0-9]+(?:-[0-9]+)*|info_all)[.]html$`).test(url.pathname))return originalFetch(input);
+      function load(attempt){
+        var fresh=new URL(url.href);fresh.searchParams.set(`webinfo`,Date.now().toString(36)+`-`+attempt);
+        var controller=new AbortController(),timeout=setTimeout(function(){controller.abort();},8000);
+        return fetch(fresh.href,{cache:`no-store`,credentials:`same-origin`,signal:controller.signal})
+          .then(function(response){if(!response.ok)throw new Error(`資料讀取失敗`);return response.text();})
+          .then(function(text){
+            var doc=new DOMParser().parseFromString(text,`text/html`);
+            var selector=url.pathname.indexOf(`/products-`)===0?`a[href*="product-"]`:url.pathname.indexOf(`/product-`)===0?`.baseprod,.sp-slide img,.sp-thumbnail img,.proddetail img`:`.items`;
+            if(!doc.querySelector(selector))throw new Error(`資料內容不完整`);return doc;
+          }).finally(function(){clearTimeout(timeout);})
+          .catch(function(error){if(attempt>=2)throw error;return new Promise(function(resolve){setTimeout(resolve,400*(attempt+1));}).then(function(){return load(attempt+1);});});
+      }
+      return queued(function(){return load(0);});
+    };
+    window.qf7=function(clinic){
+      var backup=fallback[clinic];
+      var current=Promise.resolve().then(function(){return originalRoster(clinic);}).then(function(rows){return rows&&rows.length?rows:(backup||[]);},function(){return backup||[];});
+      if(!backup)return current;
+      return new Promise(function(resolve){
+        var done=false,timer=setTimeout(function(){if(!done){done=true;resolve(backup);}},2000);
+        current.then(function(rows){if(!done){done=true;clearTimeout(timer);resolve(rows);}});
+      });
+    };
+    document.documentElement.dataset.qOfficialLoader=`independent-retry-v1`;
+  }
+  if(document.readyState===`loading`)document.addEventListener(`DOMContentLoaded`,install);else install();
+})();
+
+</script><script id="qOfficialRows20261026">
+(function(){
+  if(location.pathname!==`/trackall.html`)return;
+  var queued=false;
+  function align(){
+    queued=false;
+    if(innerWidth>700||document.body.classList.contains(`qD`))return;
+    var list=document.getElementById(`ql`),footer=document.getElementById(`ec_qn`);
+    if(!list||!footer||getComputedStyle(footer).position!==`fixed`)return;
+    var top=list.getBoundingClientRect().top+window.scrollY;
+    var height=Math.max(86,(footer.getBoundingClientRect().top-top-8)/4).toFixed(2)+`px`;
+    if(list.style.getPropertyValue(`--clinic-row-height`)!==height)list.style.setProperty(`--clinic-row-height`,height);
+  }
+  function schedule(){if(!queued){queued=true;requestAnimationFrame(align);}}
+  function boot(){
+    schedule();
+    new MutationObserver(schedule).observe(document.head,{childList:true});
+    var container=document.getElementById(`showtrack`);
+    if(container)new MutationObserver(schedule).observe(container,{childList:true,subtree:true});
+    var footer=document.getElementById(`ec_qn`);if(footer)new ResizeObserver(schedule).observe(footer);
+  }
+  window.addEventListener(`load`,schedule);
+  window.addEventListener(`resize`,schedule);
+  window.addEventListener(`hashchange`,schedule);
+  if(document.readyState===`loading`)document.addEventListener(`DOMContentLoaded`,boot);else boot();
+})();
+
+</script>
+<style id="qOfficialMemoDate20261026" type="text/css">html body.qr #geo_bar .qdate{display:none!important}
+html body.qr #geo_bar .qOfficialDate{grid-column:2;grid-row:1;text-align:center;font-size:16px;color:#879186;letter-spacing:0;white-space:nowrap}
+html body.qr #showtrack .qOfficialMemo{display:none}
+html body.qr.qD #showtrack .qsc>.qOfficialMemo{display:block;margin:12px 0;padding:0;flex:none;font-size:18px;line-height:1.6;color:#304639;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:350px){html body.qr #geo_bar .qOfficialDate{font-size:14px}}
+</style>
+<script id="qOfficialMemoDateScript20261026">
+(function(){
+  if(location.pathname!==`/trackall.html`)return;
+  var pending=false,memoItems=null,attempts=0;
+  function captureBackendMemo(){
+    if(typeof window.applyTrackData!==`function`){if(++attempts<100)setTimeout(captureBackendMemo,100);return;}
+    var original=window.applyTrackData;
+    window.applyTrackData=function(response){
+      if(response&&response.items)memoItems=response.items;
+      var result=original.apply(this,arguments);schedule();return result;
+    };
+  }
+  function update(){
+    pending=false;
+    var date=new Intl.DateTimeFormat(`zh-TW`,{timeZone:`Asia/Taipei`,month:`numeric`,day:`numeric`,weekday:`long`}).format(new Date()).replace(`星期`,`週`);
+    document.querySelectorAll(`#geo_bar .qdate`).forEach(function(source){
+      var visible=source.parentElement.querySelector(`.qOfficialDate`);
+      if(!visible){visible=document.createElement(`span`);visible.className=`qOfficialDate`;source.after(visible);}
+      if(visible.textContent!==date)visible.textContent=date;
+    });
+    document.querySelectorAll(`#showtrack .elite_number>ul>li`).forEach(function(card){
+      var source=card.querySelector(`.memo_text`),note=card.querySelector(`.qOfficialMemo`);
+      var payload=memoItems&&memoItems[card.dataset.hospid];
+      var text=memoItems?String(payload&&payload.memo||``).trim():source?source.textContent.trim():``;
+      if(!text){if(note)note.remove();return;}
+      var detail=card.querySelector(`.qdd`);if(!detail)return;
+      if(!note){note=document.createElement(`p`);note.className=`qOfficialMemo`;note.setAttribute(`aria-label`,`院區最新公告`);detail.after(note);}
+      if(note.textContent!==text)note.textContent=text;
+    });
+  }
+  function schedule(){if(!pending){pending=true;requestAnimationFrame(update);}}
+  function boot(){
+    schedule();
+    new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});
+    setInterval(schedule,60000);
+  }
+  captureBackendMemo();
+  if(document.readyState===`loading`)document.addEventListener(`DOMContentLoaded`,boot);else boot();
+})();
+
+</script>
+<style id="qAllHoursCard20261031">html body.qr:not(.qD) .qoh{box-sizing:border-box!important;width:calc(100% - 16px)!important;max-width:none!important;margin:14px auto 18px!important;padding:0!important;border:1px solid #cec6b3!important;border-radius:14px!important;background:#fffefa!important;overflow:hidden;box-shadow:0 4px 16px #3046390a!important}html body.qr:not(.qD) .qoh .info_box_t{box-sizing:border-box!important;width:100%!important;max-width:none!important;margin:0!important;padding:0 14px 14px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}html body.qr:not(.qD) .qoh h2{margin:0 -14px 12px!important;padding:12px 8px!important;border-bottom:1px dashed #bdb7a6!important;font-size:22px!important;text-align:center!important;color:#304639!important}html body.qr:not(.qD) .qoh p{margin:6px 0 12px!important;font-size:16px!important;line-height:1.6!important}html body.qr:not(.qD) .qoh b{font-size:17px!important;color:#547362!important;line-height:1.8!important}html body.qr:not(.qD) .qoh .qtime{color:#547362!important}</style>
