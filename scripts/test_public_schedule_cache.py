@@ -269,7 +269,17 @@ class EipConversionTests(unittest.TestCase):
         leave = eip_cell("", off=True, changed=True, base_start="15:00")
         leave["baseDoctor"] = "林永昌"
         boards = publisher.convert_branch(start, eip_branch("A", start, None, {"午診": [[leave]] + [[] for _ in range(6)]}))
-        self.assertEqual(boards[1]["rows"][1]["days"][0], [{"name": "休診", "start": "", "end": "", "off": True, "changed": True}])
+        self.assertEqual(boards[1]["rows"][1]["days"][0], [{"name": "休診", "start": "", "end": "", "off": True, "changed": False}])
+
+    def test_only_a_substitute_doctor_is_flagged_changed(self):
+        start = publisher.week_starts(NOW)[0]
+        substitute = eip_cell("李軍逸", "09:00", "12:00", changed=True)
+        substitute["baseDoctor"] = "林永昌"
+        retimed = eip_cell("陳珠", "15:00", "16:30", changed=True, base_start="13:00")
+        added = eip_cell("陳富玫", "18:30", "21:30", changed=True)
+        added["baseDoctor"] = ""
+        boards = publisher.convert_branch(start, eip_branch("A", start, {"早診": [[substitute, retimed, added]] + [[] for _ in range(6)]}))
+        self.assertEqual([(c["name"], c["changed"]) for c in boards[0]["rows"][0]["days"][0]], [("李軍逸", True), ("陳珠", False), ("陳富玫", False)])
 
     def test_empty_cells_markup_and_overflow_dropped(self):
         start = publisher.week_starts(NOW)[0]
