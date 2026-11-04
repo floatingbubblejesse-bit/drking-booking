@@ -206,7 +206,7 @@ const css=`:host{all:initial;display:block;position:fixed;inset:0;z-index:214748
 .sw-appointment{min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:1px;border:1px solid var(--sw-grid);border-radius:4px;background:#fff}
 .sw-name{max-width:100%;font-size:var(--sw-name-size);line-height:calc(var(--sw-name-size) + 2px);font-weight:600;white-space:nowrap}
 .sw-time{max-width:100%;font-family:Arial,sans-serif;font-variant-numeric:tabular-nums;font-size:var(--sw-time-size);line-height:calc(var(--sw-time-size) + 2px);color:var(--sw-time);font-weight:600;white-space:nowrap;letter-spacing:-.2px}
-.sw-changed .sw-name{color:var(--sw-ink)}.sw-changed .sw-time{color:var(--sw-time)}.sw-appointment.sw-changed:not(.dlw-visit) .sw-name::after{content:"代";margin-left:2px;font-size:.7em;font-weight:500;color:#a3aea8;vertical-align:1px}.sw-empty{display:grid;place-items:center;border:1px solid transparent;border-radius:4px;background:rgba(116,130,120,.09);text-align:center;color:var(--sw-accent);opacity:1;font-size:17px}
+.sw-changed .sw-name{color:var(--sw-ink)}.sw-changed .sw-time{color:var(--sw-time)}.sw-appointment.sw-changed:not(.dlw-visit) .sw-name::after{content:"代";margin-left:2px;font-size:.7em;font-weight:500;color:#c0392b;vertical-align:1px}.sw-empty{display:grid;place-items:center;border:1px solid transparent;border-radius:4px;background:rgba(116,130,120,.09);text-align:center;color:var(--sw-accent);opacity:1;font-size:17px}
 .sw-appointment:not([data-physician]):has(>.sw-name:empty){border-color:transparent!important;background:rgba(116,130,120,.09)!important;box-shadow:none!important}
 .sw-message{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--sw-time);font-size:15px}.sw-message p{margin:0}
 @media(max-width:360px){.clinic-focus[data-sanshu-week="true"] .schedule-tab{font-size:15px}.sw-columns,.sw-day{grid-template-columns:40px repeat(3,minmax(0,1fr));gap:3px;column-gap:12px}.sw-week,.sw-columns{padding-left:12px;padding-right:12px}.sw-day-label b{font-size:11px}.sw-session{--sw-name-size:15px;--sw-time-size:11px}}
@@ -1531,7 +1531,7 @@ var CSS=`.content.single-view>.team{display:none!important}
 :host(.dk-single) .to-top{bottom:calc(max(30px,calc(env(safe-area-inset-bottom) + 14px)) + 76px)!important}
 .dk-qbar>*{flex:1 1 0;height:54px;margin:0;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:13px;font-family:inherit;font-size:21px;font-weight:500;line-height:1;letter-spacing:2px;text-decoration:none;cursor:pointer;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 .dk-qbar .dk-qsched{background:#fffefa;border:2px solid #b9cfbf;color:#367f77}
-.dk-qbar .dk-qtel{background:#168b90;border:1px solid #168b90;color:#fffefa}
+.dk-qbar .dk-qtel{background:#168b90;border:1px solid #168b90;color:#fffefa} :host(.dk-single) .statusbar{grid-template-columns:max-content max-content minmax(0,1fr) max-content} .statusbar .dk-tsched{height:32px;margin:0 0 0 2px;padding:0 10px;border:1.5px solid #b9cfbf;border-radius:999px;background:#fffefa;color:#367f77;font-family:inherit;font-size:14px;font-weight:600;letter-spacing:1px;line-height:1;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent} .statusbar .dk-tsched:active{background:#eef4f0} .dk-qbar .dk-qsched{display:none!important}
 .content.single-view>.progress .doctor-name{font-size:calc(36px * var(--progress-scale,1))!important;line-height:1.25!important;height:auto!important;min-height:44px!important}
 .content.single-view>.progress .doctor-name.long-name{font-size:calc(29px * var(--progress-scale,1))!important}
 @media (max-width:380px){.content.single-view>.progress .doctor-name.long-name{font-size:calc(27px * var(--progress-scale,1))!important}}
@@ -1639,6 +1639,7 @@ r.appendChild(bar);bar.querySelector(".dk-qsched").addEventListener("click",func
 bar.hidden=!single;var host=r.host;if(host)host.classList.toggle("dk-single",single);
 var nm=single?clinicName(r):"";var tt=(win&&!win.hidden)?WT:(nm?nm+"看診進度":"");if(tt&&document.title!==tt)document.title=tt;
 if(!single)return;
+/* 門診表 button beside the clinic title (20261104); the bottom bar keeps only 電話掛號 */var sb=r.querySelector(".statusbar"),ct=sb&&sb.querySelector(".clinic-title");if(ct&&!sb.querySelector(".dk-tsched")){var tb=document.createElement("button");tb.type="button";tb.className="dk-tsched";tb.textContent="門診表";tb.addEventListener("click",function(){openWin(r,"");});ct.after(tb);}
 var tel=link(r,/^tel:/);var ta=bar.querySelector(".dk-qtel");if(tel&&ta.getAttribute("href")!==tel)ta.setAttribute("href",tel);
 var p=r.querySelector(".content.single-view>.progress");if(!p)return;
 if(!p.querySelector(".dk-qa")){var qa=document.createElement("div");qa.className="dk-qa";
