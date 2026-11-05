@@ -52,7 +52,6 @@ button{font:inherit;color:inherit}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .clinic{display:grid;gap:8px;min-width:0}
 .cname{position:relative;display:grid;place-items:center;height:64px;background:var(--tile);font-size:clamp(28px,9vw,38px);font-weight:300;letter-spacing:2px}
-.cname small{position:absolute;right:6px;bottom:4px;font-family:var(--num);font-size:11px;font-weight:400;letter-spacing:0;opacity:.75}
 .cbody{display:grid;justify-items:center;padding:14px 10px 14px;background:var(--tile)}
 .big{font-family:var(--num);font-size:clamp(40px,13vw,52px);font-weight:300;line-height:1.05;font-variant-numeric:tabular-nums}
 .bar{width:58px;height:2px;margin:6px 0 8px;background:var(--ink)}
@@ -154,7 +153,6 @@ function render(){
     var a=el('a','clinic');a.href='https://www.drking.com.tw/lineclinicinfo.html#ec-'+encodeURIComponent(s.name+'院區');
     a.setAttribute('aria-label',s.name+'院區，診號 '+top+'，候診 '+s.wait+' 人');
     var head=el('div','cname',s.name);
-    if(s.km!=null)head.appendChild(el('small','',s.km<1?Math.round(s.km*1000)+' m':s.km.toFixed(1)+' km'));
     var body=el('div','cbody');
     body.appendChild(el('div','big',String(top)));
     body.appendChild(el('div','bar'));
