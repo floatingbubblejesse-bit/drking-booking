@@ -78,6 +78,8 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
 #dkClassic .dkc-docs.dkc-one{grid-template-columns:auto;justify-content:start}
 #dkClassic .dkc-docs.dkc-one .dkc-doc{padding:2px 5px;font-size:21px}
 #dkClassic .dkc-docs.dkc-one .dkc-doc span{font-size:clamp(18px,5.4vw,21px)}
+/* two doctors: bigger, taller cells */
+#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc{padding:5px 5px}#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc span{font-size:clamp(15px,4.6vw,18px)}#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc b{font-size:clamp(17px,5.4vw,21px)}
 #dkClassic .dkc-doc{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;min-width:0;padding:2px 4px;border-radius:5px;background:#4b9499;box-shadow:none;text-align:center;font-size:16px;-webkit-tap-highlight-color:transparent;transition:transform .1s,box-shadow .1s}
 #dkClassic .dkc-doc:active{transform:translateY(1px);box-shadow:none}
 #dkClassic .dkc-doc span{max-width:100%;min-width:0;font-size:clamp(13px,4vw,16px);line-height:1.3;white-space:nowrap;overflow:hidden}
@@ -496,9 +498,11 @@ near.addEventListener("click",locate);
 function autoLocate(){var g=navigator.geolocation,o={enableHighAccuracy:false,maximumAge:0,timeout:10000};if(!g)return;try{var raw=window.Geolocation&&Geolocation.prototype.getCurrentPosition;if(read(DEN)==="1"&&raw)raw.call(g,got,failed,o);else g.getCurrentPosition(got,failed,o)}catch(e){failed(e)}}
 try{var sv=JSON.parse(read(LOC)||"null");if(valid(sv))here=sv}catch(e){}
 /* list mode only (narrow screens, no #ec- clinic page open) */
+/* the bottom right button reads 掛號 (not 電話掛號) on the classic page, like the old app; the full text comes back outside it */
+function regText(on){var b=q("#ec_qn>button.qreg");if(!b)return;if(on){if(b.textContent!=="掛號"){b.setAttribute("data-dk-text",b.textContent);b.textContent="掛號"}}else if(b.hasAttribute("data-dk-text")){b.textContent=b.getAttribute("data-dk-text");b.removeAttribute("data-dk-text")}}
 function sync(){
   var on=listMode();root.classList.toggle("dk-classic",on);
-  if(on){brand();center();fit()}
+  if(on){brand();center();fit()}regText(on);
 }
 window.addEventListener("hashchange",sync);window.addEventListener("popstate",sync);
 /* the site opens a clinic page without always firing hashchange, so also check the address a few times a second */
@@ -509,7 +513,7 @@ window.addEventListener("resize",function(){center();if(window.innerWidth!==fitW
 try{var ci=JSON.parse(read("dkClassicItems")||"null");if(ci&&ci.items&&Date.now()-ci.t<12e4)items=ci.items}catch(e){}
 today();syncNear();render();sync();load();
 autoLocate();
-var tries=0,boot=setInterval(function(){tries++;brand();center();fit();if(tries>20)clearInterval(boot)},500);
+var tries=0,boot=setInterval(function(){tries++;brand();center();fit();regText(root.classList.contains("dk-classic"));if(tries>20)clearInterval(boot)},500);
 setInterval(tick,1000);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){center();fit()});
 /* rows view and single clinic view (screens wider than a phone, and the clinic pages opened from the tiles): when nobody is waiting, the clinic note (for example 14:00開始) replaces the doctor, like the classic tiles. The doctor names are kept and put back when the note goes. Outside the classic tiles the notes are read from the progress data every 10 seconds. */
