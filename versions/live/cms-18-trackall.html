@@ -323,11 +323,11 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
 #dkClassic .dkc-marquee span{display:inline-block;padding-left:100%;line-height:36px;font-size:16px;animation:dkcRun 14s linear infinite}
 @keyframes dkcRun{to{transform:translateX(-100%)}}
 @media (prefers-reduced-motion:reduce){#dkClassic .dkc-marquee span{animation:none;padding-left:16px}}
-#dkClassic .dkc-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));color:#1f4a4e;font-size:15px}
-#dkClassic .dkc-near{flex:none;display:inline-flex;align-items:center;gap:5px;margin:0;padding:1px 9px;border:1px solid rgba(31,74,78,.45);border-radius:999px;background:transparent;color:#1f4a4e;font:inherit;font-size:12px;line-height:1.5;cursor:default}
+#dkClassic .dkc-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));color:#1f4a4e;font-size:clamp(11px,3.5vw,14px);line-height:1.3}
+#dkClassic .dkc-meta>span{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dkClassic .dkc-near{flex:none;display:inline-flex;align-items:center;gap:4px;margin:0;padding:1px 8px;border:1px solid rgba(31,74,78,.45);border-radius:0;background:transparent;color:#1f4a4e;font:inherit;font-size:clamp(10.5px,3.2vw,12px);line-height:1.5;white-space:nowrap;cursor:default}
 #dkClassic .dkc-near[hidden]{display:none!important}
-#dkClassic .dkc-near.dkc-ask{border-color:rgba(255,255,255,.85);background:#2f6a70;color:#fff;font-weight:600;cursor:pointer}
-#dkClassic .dkc-near::before{content:"";width:7px;height:7px;border:1.5px solid currentColor;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+#dkClassic .dkc-near.dkc-ask{border-color:rgba(255,255,255,.85);background:transparent;color:#fff;font-weight:600;cursor:pointer}
 #dkClassic .dkc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 #dkClassic .dkc-clinic{display:grid;gap:8px;min-width:0;color:#fff;text-decoration:none}
 #dkClassic .dkc-cname{display:grid;place-items:center;height:52px;background:#2f6a70;font-size:clamp(24px,7.4vw,32px);font-weight:300;letter-spacing:2px}
@@ -429,11 +429,13 @@ var WD=["日","一","二","三","四","五","六"];
 function today(){var d=new Date();day.textContent=(d.getMonth()+1)+"月"+d.getDate()+"日 星期"+WD[d.getDay()]}
 function tick(){if(document.hidden||!root.classList.contains("dk-classic"))return;left--;if(left<=0){left=10;today();load()}cnt.textContent=left+"秒後自動更新"}
 /* sort by location (same saved position and refusal memory as the other pages) */
-function syncNear(){near.hidden=!!here&&read(DEN)!=="1"}
+function syncNear(){near.hidden=!!here}
 function got(pos){var p={lat:pos&&pos.coords&&pos.coords.latitude,lng:pos&&pos.coords&&pos.coords.longitude,at:Date.now()};if(!valid(p))return;here=p;save(LOC,JSON.stringify(p));save(DEN,"0");syncNear();render()}
 function failed(err){if(err&&err.code===1)save(DEN,"1");syncNear()}
 function locate(){if(!navigator.geolocation)return failed();try{navigator.geolocation.getCurrentPosition(got,failed,{enableHighAccuracy:false,maximumAge:0,timeout:10000})}catch(e){failed(e)}}
 near.addEventListener("click",locate);
+/* on opening the page always ask for the position (the phone shows its own allow prompt), even after an earlier 不允許 */
+function autoLocate(){var g=navigator.geolocation,o={enableHighAccuracy:false,maximumAge:0,timeout:10000};if(!g)return;try{var raw=window.Geolocation&&Geolocation.prototype.getCurrentPosition;if(read(DEN)==="1"&&raw)raw.call(g,got,failed,o);else g.getCurrentPosition(got,failed,o)}catch(e){failed(e)}}
 try{var sv=JSON.parse(read(LOC)||"null");if(valid(sv))here=sv}catch(e){}
 /* list mode only (narrow screens, no #ec- clinic page open) */
 function sync(){
@@ -446,7 +448,7 @@ setInterval(function(){if(root.classList.contains("dk-classic")!==listMode())syn
 if(mq.addEventListener)mq.addEventListener("change",sync);else if(mq.addListener)mq.addListener(sync);
 window.addEventListener("resize",function(){if(window.innerWidth!==fitW||Math.abs(window.innerHeight-fitH)>150)fit()});
 today();syncNear();render();sync();load();
-if(read(DEN)!=="1")locate();
+autoLocate();
 var tries=0,boot=setInterval(function(){tries++;brand();fit();if(tries>20)clearInterval(boot)},500);
 setInterval(tick,1000);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
