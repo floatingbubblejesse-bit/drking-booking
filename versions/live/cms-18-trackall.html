@@ -396,7 +396,7 @@ function listMode(){return mq.matches&&location.hash.indexOf("#ec-")!==0}
 var cd=q(".commondetail");if(!cd)return;
 /* page content */
 var box=el("div");box.id="dkClassic";
-var mar=el("div","dkc-marquee");mar.appendChild(el("span","","金醫師溫暖門診：說要看金醫師便不收費，無健保卡亦可。"));box.appendChild(mar);
+var mar=el("div","dkc-marquee");mar.appendChild(el("span","","金醫師溫暖門診：告知要看金醫師，不收費，無健保卡亦可。"));box.appendChild(mar);
 var meta=el("div","dkc-meta"),cnt=el("span","","10秒後更新"),near=el("button","dkc-near dkc-ask","依我的位置排序"),day=el("span");near.type="button";near.setAttribute("data-dk-locate","1");
 meta.appendChild(cnt);meta.appendChild(near);meta.appendChild(day);box.appendChild(meta);
 var grid=el("div","dkc-grid");grid.setAttribute("aria-label","各院區看診進度");box.appendChild(grid);
@@ -416,7 +416,8 @@ function navUrl(name){var ls=document.querySelectorAll("#showtrack .geo_nav");fo
 /* header brand: white oval logo, 金鶯診所, departments */
 function brand(){
   var logo=q(".top .logo");if(!logo||document.getElementById("dkClassicBrand"))return !!logo;
-  var a=el("a");a.id="dkClassicBrand";a.href="/";a.setAttribute("aria-label","金鶯診所首頁");
+  /* the home page (/) sends visitors back to this page unless ?original=1 is added, so the header opens the real home page with it */
+  var a=el("a");a.id="dkClassicBrand";a.href="/?original=1";a.setAttribute("aria-label","金鶯診所首頁");
   var ov=el("span","dkc-oval"),svg=document.createElementNS(NS,"svg"),c=document.createElementNS(NS,"circle"),p=document.createElementNS(NS,"path");
   svg.setAttribute("viewBox","27 32 256 247");svg.setAttribute("aria-hidden","true");
   c.setAttribute("cx","155.5");c.setAttribute("cy","155.5");c.setAttribute("r","150");c.setAttribute("fill","#3d8389");
