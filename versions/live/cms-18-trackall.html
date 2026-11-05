@@ -390,7 +390,7 @@ var cd=q(".commondetail");if(!cd)return;
 /* page content */
 var box=el("div");box.id="dkClassic";
 var mar=el("div","dkc-marquee");mar.appendChild(el("span","","金醫師溫暖門診：說要看金醫師便不收費，無健保卡亦可。"));box.appendChild(mar);
-var meta=el("div","dkc-meta"),cnt=el("span","","10秒後自動更新"),near=el("button","dkc-near dkc-ask","依我的位置排序"),day=el("span");near.type="button";near.setAttribute("data-dk-locate","1");
+var meta=el("div","dkc-meta"),cnt=el("span","","10秒後更新"),near=el("button","dkc-near dkc-ask","依我的位置排序"),day=el("span");near.type="button";near.setAttribute("data-dk-locate","1");
 meta.appendChild(cnt);meta.appendChild(near);meta.appendChild(day);box.appendChild(meta);
 var grid=el("div","dkc-grid");grid.setAttribute("aria-label","各院區看診進度");box.appendChild(grid);
 cd.insertBefore(box,cd.firstChild);
@@ -473,7 +473,7 @@ function load(){
 }
 var WD=["日","一","二","三","四","五","六"];
 function today(){var d=new Date();day.textContent=(d.getMonth()+1)+"月"+d.getDate()+"日 星期"+WD[d.getDay()]}
-function tick(){if(document.hidden||!root.classList.contains("dk-classic"))return;left--;if(left<=0){left=10;today();load()}cnt.textContent=left+"秒後自動更新"}
+function tick(){if(document.hidden||!root.classList.contains("dk-classic"))return;left--;if(left<=0){left=10;today();load()}cnt.textContent=left+"秒後更新"}
 /* sort by location (same saved position and refusal memory as the other pages) */
 function syncNear(){near.hidden=!!here}
 function got(pos){var p={lat:pos&&pos.coords&&pos.coords.latitude,lng:pos&&pos.coords&&pos.coords.longitude,at:Date.now()};if(!valid(p))return;here=p;save(LOC,JSON.stringify(p));save(DEN,"0");syncNear();render()}
