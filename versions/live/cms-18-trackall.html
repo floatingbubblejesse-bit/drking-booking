@@ -113,7 +113,7 @@ try{localStorage.removeItem("dkClassicItems");var si=Storage.prototype.setItem;S
 function badge(){if(!document.body||document.getElementById("dkDemoBadge"))return;var b=document.createElement("div");b.id="dkDemoBadge";b.setAttribute("role","note");b.textContent="示意資料・非即時進度";b.style.cssText="position:fixed;left:0;top:env(safe-area-inset-top,0px);z-index:2147483000;padding:0 8px 1px;border-radius:0 0 8px 0;background:rgba(0,0,0,.55);color:#fff;font:600 11px/1.45 system-ui,-apple-system,sans-serif;letter-spacing:1px;white-space:nowrap;pointer-events:none";document.body.appendChild(b)}
 if(document.body)badge();else document.addEventListener("DOMContentLoaded",badge);
 })();
-</script><script id="dkClassicEarly20261105">(function(){try{if(window.matchMedia("(max-width: 767px)").matches&&location.hash.indexOf("#ec-")!==0)document.documentElement.classList.add("dk-classic")}catch(e){}})();</script>
+</script><script id="dkClassicEarly20261105">/* Classic 版面開關（20261106 關閉）：dkClassicOn=0 手機用原本的院區列表；改成 1 就回到 Classic 版面 */window.dkClassicOn=0;(function(){try{if(window.dkClassicOn&&window.matchMedia("(max-width: 767px)").matches&&location.hash.indexOf("#ec-")!==0)document.documentElement.classList.add("dk-classic")}catch(e){}})();</script>
 <style id="qOfficialNoDistance20261027" type="text/css">html body.qr.qD #showtrack .qA>.qkm{display:none!important}html body.qr.qD #showtrack .qA>.qnav{margin-left:auto!important}
 </style>
 <style id="qOfficialNoBreadcrumb20261026" type="text/css">html body #indcon2 .subtitle1{display:none!important;visibility:hidden!important}
@@ -420,7 +420,7 @@ function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=c
 function read(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function save(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function valid(p){return p&&isFinite(p.lat)&&isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180}
-function listMode(){return mq.matches&&location.hash.indexOf("#ec-")!==0}
+function listMode(){return !!window.dkClassicOn&&mq.matches&&location.hash.indexOf("#ec-")!==0}
 var cd=q(".commondetail");if(!cd)return;
 /* page content */
 var box=el("div");box.id="dkClassic";
@@ -538,7 +538,7 @@ window.addEventListener("resize",function(){center();if(window.innerWidth!==fitW
 /* show the last numbers (under 2 minutes old) right away instead of 讀取中 while the first request runs */
 try{var ci=JSON.parse(read("dkClassicItems")||"null");if(ci&&ci.items&&Date.now()-ci.t<12e4)items=ci.items}catch(e){}
 today();syncNear();render();sync();load();
-autoLocate();
+if(window.dkClassicOn)autoLocate();
 var tries=0,boot=setInterval(function(){tries++;brand();center();fit();regText(root.classList.contains("dk-classic"));if(tries>20)clearInterval(boot)},500);
 setInterval(tick,1000);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){center();fit()});
