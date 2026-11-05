@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<script src="geo-gate.js?v=20261104"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3d8389">
+<title>金鶯看診進度 舊版復刻</title>
+<style>
+/* Old app look: teal page, dark tiles in two columns, buttons fixed at the bottom */
+:root{
+  --page:#3d8389;      /* page and header */
+  --band:#6aa8ad;      /* marquee band, bottom buttons */
+  --tile:#2f6a70;      /* clinic tiles */
+  --chip:#43898e;      /* doctor name chip */
+  --ink:#ffffff;
+  --sub:#1f4a4e;       /* update / date row text */
+  --font:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --num:-apple-system,"Helvetica Neue",Roboto,system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:var(--font);-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+
+/* header: ☰, logo, 金鶯診所, departments */
+.top{display:flex;align-items:center;gap:clamp(6px,2vw,10px);padding:calc(10px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 10px max(10px,env(safe-area-inset-left,0px));background:var(--page)}
+.menu-btn{flex:none;display:grid;place-items:center;width:34px;height:40px;margin:0;padding:0;border:0;background:none;cursor:pointer}
+.menu-btn span{display:block;width:22px;height:2.5px;border-radius:2px;background:var(--ink);box-shadow:0 -7px 0 var(--ink),0 7px 0 var(--ink)}
+.logo{flex:none;display:grid;place-items:center;width:clamp(56px,17vw,70px);height:clamp(40px,12vw,48px);border-radius:50%;background:#fff}
+.logo img{width:72%;height:auto;display:block}
+.brand{flex:none;font-size:clamp(26px,8.6vw,36px);font-weight:300;letter-spacing:1px;line-height:1;white-space:nowrap}
+.dept{flex:1;min-width:0;display:grid;gap:3px;font-size:clamp(11px,3.4vw,14px);font-weight:600;line-height:1.15;white-space:nowrap;text-align:right}
+
+/* marquee, one line */
+.marquee{display:block;height:36px;overflow:hidden;background:var(--band);white-space:nowrap}
+.marquee span{display:inline-block;padding-left:100%;line-height:36px;font-size:16px;animation:run 14s linear infinite}
+@keyframes run{to{transform:translateX(-100%)}}
+@media (prefers-reduced-motion:reduce){.marquee span{animation:none;padding-left:max(16px,env(safe-area-inset-left,0px))}}
+
+/* update / date row */
+.meta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));color:var(--sub);font-size:15px}
+.meta .mock{padding:1px 7px;border:1px solid rgba(31,74,78,.45);border-radius:999px;font-size:12px}
+.near{display:flex;justify-content:center;padding:0 16px 10px}
+.near button{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border:1.5px solid rgba(255,255,255,.75);border-radius:999px;background:var(--tile);font-size:15px;font-weight:600;cursor:pointer}
+.near button::before{content:"";width:10px;height:10px;border:2px solid currentColor;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+
+/* clinic tiles */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
+.clinic{display:grid;gap:8px;min-width:0}
+.cname{position:relative;display:grid;place-items:center;height:64px;background:var(--tile);font-size:clamp(28px,9vw,38px);font-weight:300;letter-spacing:2px}
+.cname small{position:absolute;right:6px;bottom:4px;font-family:var(--num);font-size:11px;font-weight:400;letter-spacing:0;opacity:.75}
+.cbody{display:grid;justify-items:center;padding:14px 10px 14px;background:var(--tile)}
+.big{font-family:var(--num);font-size:clamp(40px,13vw,52px);font-weight:300;line-height:1.05;font-variant-numeric:tabular-nums}
+.bar{width:58px;height:2px;margin:6px 0 8px;background:var(--ink)}
+.wait{display:flex;align-items:baseline;gap:12px;font-size:18px}
+.wait b{font-family:var(--num);font-size:32px;font-weight:500;font-variant-numeric:tabular-nums}
+.docs{justify-self:stretch;display:grid;gap:6px;margin-top:12px}
+.doc{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.doc span{min-width:0;padding:3px 7px;background:var(--chip);font-size:clamp(14px,4.6vw,18px);white-space:nowrap;overflow:hidden;text-overflow:clip}
+.doc b{flex:none;font-family:var(--num);font-size:clamp(18px,5.6vw,22px);font-weight:500;font-variant-numeric:tabular-nums}
+
+/* bottom buttons, fixed */
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:5;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));background:var(--page)}
+.bottom a{display:grid;place-items:center;height:72px;background:var(--band);font-size:clamp(28px,9vw,40px);font-weight:700;letter-spacing:2px}
+
+/* side menu */
+.drawer{position:fixed;inset:0;z-index:10;display:flex;background:rgba(10,30,32,.45)}
+.drawer nav{display:grid;align-content:start;gap:2px;width:min(78vw,300px);height:100%;padding:calc(20px + env(safe-area-inset-top,0px)) 0 20px max(0px,env(safe-area-inset-left,0px));background:var(--tile);box-shadow:4px 0 16px rgba(0,0,0,.25)}
+.drawer nav b{padding:6px 22px 14px;font-size:22px;font-weight:300}
+.drawer nav a{padding:14px 22px;font-size:18px;border-top:1px solid rgba(255,255,255,.12)}
+.drawer nav a[aria-current]{background:var(--chip)}
+:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="menu-btn" id="menu-btn" type="button" aria-label="選單" aria-expanded="false"><span></span></button>
+  <a class="logo" href="https://www.drking.com.tw/" aria-label="金鶯診所官網"><img src="drking-logo.svg" alt=""></a>
+  <div class="brand">金鶯診所</div>
+  <div class="dept" aria-label="科別"><span>耳鼻喉 小兒科 減重</span><span>慢性病 皮膚病 醫美</span></div>
+</header>
+
+<a class="marquee" href="https://www.drking.com.tw/lineclinicinfo.html"><span>【金鶯診所】更精準看診進度，點我</span></a>
+
+<div class="meta">
+  <span id="countdown">10秒後自動更新</span>
+  <span class="mock">模擬資料</span>
+  <span id="today"></span>
+</div>
+<div class="near" id="near" hidden><button type="button" id="near-btn" data-dk-locate="1">依我的位置排序</button></div>
+
+<main class="grid" id="grid" aria-label="各院區看診進度"></main>
+
+<nav class="bottom" aria-label="快速連結">
+  <a href="https://www.drking.com.tw/lineclinicschedule.html">門診表</a>
+  <a href="phone-liff.html">掛號</a>
+</nav>
+
+<div class="drawer" id="drawer" hidden>
+  <nav aria-label="選單">
+    <b>金鶯診所</b>
+    <a href="trackall-classic.html" aria-current="page">看診進度</a>
+    <a href="https://www.drking.com.tw/lineclinicschedule.html">門診表</a>
+    <a href="https://www.drking.com.tw/lineclinicinfo.html">院區資訊</a>
+    <a href="phone-liff.html">電話掛號</a>
+    <a href="linevaccines.html">疫苗一覽</a>
+    <a href="https://www.drking.com.tw/">官網首頁</a>
+  </nav>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* 14 clinics in the old app's order; two doctors each (names from this week's schedule; numbers are simulated) */
+var CLINICS=[
+ ['鶯歌',24.9529837,121.3513375,['陳珠','李軍逸']],
+ ['三樹',24.9458761,121.3818186,['張慧馨','闕壯理']],
+ ['樹林',24.9806516,121.4176074,['林秉承','陳永仁']],
+ ['桃園',24.9820308,121.3193793,['陳佳舜','廖崑竹']],
+ ['土城',24.976515,121.442198,['尤騰','何金蔚']],
+ ['八德',24.9304146,121.2911793,['廖崑竹','楊大緯']],
+ ['龍潭',24.8664383,121.2147782,['何中庸','華志倫']],
+ ['大溪',24.8840177,121.2894696,['巫清隆','呂瑩純']],
+ ['大竹',25.0217492,121.2632595,['陳秉峰','沈士強']],
+ ['大湳',24.9641796,121.2997468,['高國峯','黃炯達']],
+ ['平鎮',24.9008497,121.2110723,['陳昭銘','何冠達']],
+ ['埔心',24.9099334,121.1822147,['梁培毅','徐翊庭']],
+ ['觀音',25.0468336,121.1422956,['李逸瑋','侯進坤']],
+ ['龍岡',24.9328648,121.2557877,['林君瀚','黃錦崧']]
+];
+var grid=document.getElementById('grid'),near=document.getElementById('near'),nearBtn=document.getElementById('near-btn');
+var LOC='line_clinic_location_v1',DENIED='line_clinic_geo_denied_v1';
+function read(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function save(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function valid(p){return p&&isFinite(p.lat)&&isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180}
+
+/* simulated progress */
+var seed=new Date().getDate()*97+13;
+function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
+var state=CLINICS.map(function(c){
+  return {name:c[0],lat:c[1],lng:c[2],docs:c[3].map(function(n){return {name:n,num:8+Math.floor(rnd()*52)}}),wait:Math.floor(rnd()*22),km:null,index:0};
+});
+state.forEach(function(s,i){s.index=i});
+
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function render(){
+  var frag=document.createDocumentFragment();
+  state.forEach(function(s){
+    var top=Math.max.apply(null,s.docs.map(function(d){return d.num}));
+    var a=el('a','clinic');a.href='https://www.drking.com.tw/lineclinicinfo.html#ec-'+encodeURIComponent(s.name+'院區');
+    a.setAttribute('aria-label',s.name+'院區，診號 '+top+'，候診 '+s.wait+' 人');
+    var head=el('div','cname',s.name);
+    if(s.km!=null)head.appendChild(el('small','',s.km<1?Math.round(s.km*1000)+' m':s.km.toFixed(1)+' km'));
+    var body=el('div','cbody');
+    body.appendChild(el('div','big',String(top)));
+    body.appendChild(el('div','bar'));
+    var w=el('div','wait','候診');w.appendChild(el('b','',String(s.wait)));body.appendChild(w);
+    var docs=el('div','docs');
+    s.docs.forEach(function(d){var r=el('div','doc');r.appendChild(el('span','',d.name));r.appendChild(el('b','',String(d.num)));docs.appendChild(r)});
+    body.appendChild(docs);
+    a.appendChild(head);a.appendChild(body);frag.appendChild(a);
+  });
+  grid.replaceChildren(frag);
+}
+
+/* date, countdown */
+var WD=['日','一','二','三','四','五','六'];
+function today(){var d=new Date();document.getElementById('today').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 星期'+WD[d.getDay()]}
+var left=10,cd=document.getElementById('countdown');
+function tick(){
+  left--;
+  if(left<=0){
+    left=10;today();
+    state.forEach(function(s){s.docs.forEach(function(d){if(rnd()<.45)d.num++});s.wait=Math.max(0,s.wait+(rnd()<.5?-1:1)*(rnd()<.6?1:0))});
+    render();
+  }
+  cd.textContent=left+'秒後自動更新';
+}
+
+/* sort by location, same rules as the other LINE pages (shared saved position, refusal remembered) */
+function distance(p,s){var r=Math.PI/180,a=p.lat*r,b=s.lat*r,dl=(s.lat-p.lat)*r,dg=(s.lng-p.lng)*r;var h=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a)*Math.cos(b)*Math.sin(dg/2)*Math.sin(dg/2);return 2*6371*Math.asin(Math.min(1,Math.sqrt(h)))}
+var here=null;
+function sortNear(){
+  if(!here){state.forEach(function(s){s.km=null});state.sort(function(a,b){return a.index-b.index});return}
+  state.forEach(function(s){s.km=distance(here,s)});
+  state.sort(function(a,b){return a.km-b.km||a.index-b.index});
+}
+function syncAsk(){near.hidden=!!here&&read(DENIED)!=='1'}
+function got(pos){
+  var p={lat:pos&&pos.coords&&pos.coords.latitude,lng:pos&&pos.coords&&pos.coords.longitude,at:Date.now()};
+  if(!valid(p))return;
+  here=p;save(LOC,JSON.stringify(p));save(DENIED,'0');sortNear();render();syncAsk();
+}
+function failed(err){if(err&&err.code===1)save(DENIED,'1');syncAsk()}
+function locate(){
+  if(!navigator.geolocation)return failed();
+  try{navigator.geolocation.getCurrentPosition(got,failed,{enableHighAccuracy:false,maximumAge:0,timeout:10000})}catch(e){failed(e)}
+}
+try{var saved=JSON.parse(read(LOC)||'null');if(valid(saved))here=saved}catch(e){}
+nearBtn.addEventListener('click',locate);
+
+/* side menu */
+var drawer=document.getElementById('drawer'),menuBtn=document.getElementById('menu-btn');
+function openMenu(v){drawer.hidden=!v;menuBtn.setAttribute('aria-expanded',String(v))}
+menuBtn.addEventListener('click',function(){openMenu(true)});
+drawer.addEventListener('click',function(e){if(e.target===drawer)openMenu(false)});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')openMenu(false)});
+
+today();sortNear();render();syncAsk();
+if(read(DENIED)!=='1')locate();
+setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>
