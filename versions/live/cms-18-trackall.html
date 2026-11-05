@@ -44,6 +44,8 @@ html.dk-classic #dkClassicSearch{display:grid}
 #dkClassicSearch{position:fixed;right:12px;bottom:calc(190px + env(safe-area-inset-bottom,0px));z-index:9998;place-items:center;box-sizing:border-box;width:50px;height:50px;margin:0;padding:0;border:0;border-radius:50%;background:#fff;box-shadow:none;cursor:pointer}
 /* no shadows anywhere on this page (site LINE and back-to-top buttons too); back-to-top arrow centred in its circle; no scroll bar on the right while scrolling */
 html.dk-classic body div.right_icon.right_icon a.LINE,html.dk-classic body .scrollup.scrollup{box-shadow:none!important}html.dk-classic body .scrollup.scrollup::before{left:50%!important;top:50%!important;transform:translate(-50%,-50%) translateY(4px) rotate(45deg)!important}
+/* rows view: the clinic note takes the whole doctor column (no 醫師 label) */
+html body #qp#qp #ql#ql .qds.dkq-memo{grid-template-columns:minmax(0,1fr)!important}html body #qp#qp #ql#ql .qds.dkq-memo .qdl{display:none!important}
 html.dk-classic{scrollbar-width:none}html.dk-classic::-webkit-scrollbar,html.dk-classic body::-webkit-scrollbar{display:none;width:0;height:0}
 #dkClassicSearch svg{width:24px;height:24px}
 html.dk-classic body .right_icon.right_icon{left:auto!important;right:12px!important;bottom:calc(130px + env(safe-area-inset-bottom,0px))!important;width:50px!important;height:50px!important}
@@ -509,5 +511,9 @@ autoLocate();
 var tries=0,boot=setInterval(function(){tries++;brand();center();fit();if(tries>20)clearInterval(boot)},500);
 setInterval(tick,1000);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){center();fit()});
+/* rows view (screens wider than a phone, the look before the classic tiles): when nobody is waiting, the clinic note (for example 14:00開始) replaces the doctor names, like the classic tiles. The doctor names are kept and put back when the note goes. */
+var rowQ=false;function rowMemo(){rowQ=false;var list=document.getElementById("ql");if(!list)return;document.querySelectorAll("#showtrack .elite_number>ul>li").forEach(function(card){var nm=card.querySelector(".elite_name");if(!nm||!nm.firstChild)return;var name=nm.firstChild.textContent.trim().replace("院區","");var row=null;for(var i=0;i<list.children.length;i++){var x=list.children[i].querySelector(".qnm");if(x&&x.textContent===name){row=list.children[i];break}}if(!row)return;var ds=row.querySelector(".qds"),dn=row.querySelector(".qdns");if(!ds||!dn)return;var mt=card.querySelector(".memo_text"),memo=mt?mt.textContent.trim():"",wn=card.querySelector(".wait_num");if((wn&&Number(wn.textContent.trim())>0)||row.classList.contains("qlive"))memo="";var has=dn.querySelector(".dkq-memo-t");if(memo){if(has&&has.textContent===memo)return;if(!has)ds.dkSaved=Array.prototype.slice.call(dn.childNodes);dn.textContent="";dn.appendChild(el("span","qd-name dkq-memo-t",memo));ds.classList.add("dkq-memo")}else if(has){dn.textContent="";(ds.dkSaved||[]).forEach(function(n){dn.appendChild(n)});ds.dkSaved=null;ds.classList.remove("dkq-memo")}})}
+function rowSoon(){if(!rowQ){rowQ=true;requestAnimationFrame(rowMemo)}}
+try{new MutationObserver(rowSoon).observe(document.body,{childList:true,subtree:true,characterData:true})}catch(e){}rowSoon();
 })();
 </script>
