@@ -51,7 +51,7 @@ button{font:inherit;color:inherit}
 /* clinic tiles */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
 .clinic{display:grid;gap:8px;min-width:0}
-.cname{position:relative;display:grid;place-items:center;height:64px;background:var(--tile);font-size:clamp(28px,9vw,38px);font-weight:300;letter-spacing:2px}
+.cname{position:relative;display:grid;place-items:center;height:52px;background:var(--tile);font-size:clamp(24px,7.4vw,32px);font-weight:300;letter-spacing:2px}
 .cbody{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;height:var(--body-h,auto);padding:calc(14px * var(--k,1)) 10px;background:var(--tile)}
 .big{font-family:var(--num);font-size:calc(clamp(40px,13vw,52px) * var(--k,1));font-weight:300;line-height:1.05;font-variant-numeric:tabular-nums}
 .bar{width:58px;height:2px;margin:6px 0 8px;background:var(--ink)}
@@ -141,7 +141,7 @@ function valid(p){return p&&isFinite(p.lat)&&isFinite(p.lng)&&Math.abs(p.lat)<=9
 var seed=new Date().getDate()*97+13;
 function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
 var state=CLINICS.map(function(c){
-  return {name:c[0],lat:c[1],lng:c[2],docs:c[3].map(function(n){return {name:n,num:8+Math.floor(rnd()*52)}}),wait:Math.floor(rnd()*22),km:null,index:0};
+  return {name:c[0],lat:c[1],lng:c[2],docs:c[3].map(function(n){return {name:n,num:200+Math.floor(rnd()*91)}}),wait:20+Math.floor(rnd()*41),km:null,index:0};
 });
 state.forEach(function(s,i){s.index=i});
 
@@ -173,7 +173,7 @@ function tick(){
   left--;
   if(left<=0){
     left=10;today();
-    state.forEach(function(s){s.docs.forEach(function(d){if(rnd()<.45)d.num++});s.wait=Math.max(0,s.wait+(rnd()<.5?-1:1)*(rnd()<.6?1:0))});
+    state.forEach(function(s){s.docs.forEach(function(d){if(rnd()<.45&&d.num<300)d.num++});s.wait=Math.min(60,Math.max(20,s.wait+(rnd()<.5?-1:1)*(rnd()<.6?1:0)))});
     render();
   }
   cd.textContent=left+'秒後自動更新';
