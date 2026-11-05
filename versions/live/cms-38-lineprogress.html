@@ -64,7 +64,8 @@ html.qLineProgress body.qr #geo_bar .qRefresh[aria-busy="true"] svg{animation:qL
 <div id="geo_bar">&nbsp;</div>
 
 <div class="col-xs-12" id="showtrack">&nbsp;</div>
-<div class="qoh" hidden="hidden" aria-hidden="true"></div>
+
+<div aria-hidden="true" class="qoh" hidden="hidden">&nbsp;</div>
 <script>$(function(){ gettrack(); });</script>
 <style id="qSingleClinicType20261025" type="text/css">/* Single-clinic readable single-line type, 2026-10-25. */
 html body.qD #showtrack .elite_number>ul>li.qsc{padding-left:12px!important;padding-right:12px!important}
@@ -252,5 +253,17 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
     },true);
   }
   if(document.readyState===`loading`)document.addEventListener(`DOMContentLoaded`,install);else install();
+})();
+</script>
+<style id="dkRowMemo20261105" type="text/css">html body #qp#qp #ql#ql .qds.dkq-memo{grid-template-columns:minmax(0,1fr)!important}html body #qp#qp #ql#ql .qds.dkq-memo .qdl{display:none!important}
+</style>
+<script id="dkRowMemo20261105js">
+/* 20261105: when nobody is waiting, the clinic note (for example 14:00開始) replaces the doctor names in each clinic row, same as the official progress page. The doctor names are kept and put back when the note goes. To undo, delete this script and the dkRowMemo20261105 style above. */
+(function(){if(window.__dkRowMemo)return;window.__dkRowMemo=1;
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+var rowQ=false;function rowMemo(){rowQ=false;var list=document.getElementById("ql");if(!list)return;document.querySelectorAll("#showtrack .elite_number>ul>li").forEach(function(card){var nm=card.querySelector(".elite_name");if(!nm||!nm.firstChild)return;var name=nm.firstChild.textContent.trim().replace("院區","");var row=null;for(var i=0;i<list.children.length;i++){var x=list.children[i].querySelector(".qnm");if(x&&x.textContent===name){row=list.children[i];break}}if(!row)return;var ds=row.querySelector(".qds"),dn=row.querySelector(".qdns");if(!ds||!dn)return;var mt=card.querySelector(".memo_text"),memo=mt?mt.textContent.trim():"",wn=card.querySelector(".wait_num");if((wn&&Number(wn.textContent.trim())>0)||row.classList.contains("qlive"))memo="";var has=dn.querySelector(".dkq-memo-t");if(memo){if(has&&has.textContent===memo)return;if(!has)ds.dkSaved=Array.prototype.slice.call(dn.childNodes);dn.textContent="";dn.appendChild(el("span","qd-name dkq-memo-t",memo));ds.classList.add("dkq-memo")}else if(has){dn.textContent="";(ds.dkSaved||[]).forEach(function(n){dn.appendChild(n)});ds.dkSaved=null;ds.classList.remove("dkq-memo")}})}
+function rowSoon(){if(!rowQ){rowQ=true;requestAnimationFrame(rowMemo)}}
+function boot(){try{new MutationObserver(rowSoon).observe(document.body,{childList:true,subtree:true,characterData:true})}catch(e){}rowSoon()}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
 })();
 </script>
