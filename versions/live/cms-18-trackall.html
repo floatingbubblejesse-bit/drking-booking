@@ -23,7 +23,7 @@ html.dk-classic .commondetail>#geo_bar,html.dk-classic .commondetail>#qp{display
 html.dk-classic body .subtitle1,html.dk-classic body .bannerinpage,html.dk-classic body .marquee-area{display:none!important}
 html.dk-classic #dkClassic{display:block;color:#fff;font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
 /* header and page offsets do not wait for the site theme script (no flash of the white header on reload or rotation) */
-html.dk-classic body .top.top{--dkc-hh:clamp(72px,24.7vw,110px);position:relative!important;top:0!important;height:var(--dkc-hh)!important;min-height:var(--dkc-hh)!important;background:#3d8389!important;border:0!important;box-shadow:none!important}
+html.dk-classic body .top.top{--dkc-hh:clamp(64px,19.9vw,90px);position:relative!important;top:0!important;height:var(--dkc-hh)!important;min-height:var(--dkc-hh)!important;background:#3d8389!important;border:0!important;box-shadow:none!important}
 html.dk-classic body #indcon2#indcon2{padding-top:0!important}
 html.dk-classic body .bannercon.bannercon{padding:0!important;margin:0!important;min-height:0!important}
 html.dk-classic body #left-panel-link#left-panel-link{color:#fff!important}
@@ -50,8 +50,8 @@ html.dk-classic body .right_icon.right_icon{left:auto!important;right:12px!impor
 html.dk-classic body .right_icon.right_icon>a.LINE{box-sizing:border-box!important;width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;margin:0!important}
 html.dk-classic body .right_icon.right_icon>a.LINE::before{width:39px!important;height:39px!important}
 html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important;bottom:calc(70px + env(safe-area-inset-bottom,0px))!important;box-sizing:border-box!important;width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;margin:0!important}
-#dkClassic .dkc-marquee{display:block;height:36px;overflow:hidden;background:#6aa8ad;box-shadow:none;white-space:nowrap;color:#fff;text-decoration:none}
-#dkClassic .dkc-marquee span{display:inline-block;padding-left:100%;line-height:36px;font-size:16px;animation:dkcRun 14s linear infinite}
+#dkClassic .dkc-marquee{display:block;height:clamp(40px,13.9vw,62px);overflow:hidden;background:#6aa8ad;box-shadow:none;white-space:nowrap;color:#fff;text-decoration:none}
+#dkClassic .dkc-marquee span{display:inline-block;padding-left:100%;line-height:clamp(40px,13.9vw,62px);font-size:16px;animation:dkcRun 14s linear infinite}
 @keyframes dkcRun{to{transform:translateX(-100%)}}
 @media (prefers-reduced-motion:reduce){#dkClassic .dkc-marquee span{animation:none;padding-left:16px}}
 #dkClassic .dkc-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));color:#1f4a4e;font-size:clamp(11px,3.5vw,14px);line-height:1.3}
