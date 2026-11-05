@@ -510,7 +510,7 @@ else if(data.st!=='ok')row.append(element('span','closed','讀取中…'));
 else{
 /* clinic number = the larger room number, not the last room (20261104) */row.append(element("span","number",String((()=>{const v=data.rooms.map(r=>r.c).filter(c=>c!=null&&c!==""&&isFinite(c)).map(Number);return v.length?Math.max(...v):(data.rooms[data.rooms.length-1].c??"--")})())));
 const wait=element('span','waiting');wait.append(element('small','', '候診'),element('b','',String(data.sum??'--')));row.append(wait);
-const docs=element('span','doctors');docs.append(element('small','','醫師'));const names=element('span','');data.rooms.forEach(r=>names.append(element('b','',r.d||'--')));docs.append(names);row.append(docs);
+const docs=element('span','doctors');/* 20261105 clinic note (for example 14:00開始) instead of the doctors when nobody is waiting, same as the official progress page */const memo=Number(data.sum)>0?"":String(data.memo||"").trim();if(memo){const nt=element("span","");nt.append(element("b","dk-memo",memo));docs.append(nt)}else{docs.append(element('small','','醫師'));const names=element('span','');data.rooms.forEach(r=>names.append(element('b','',r.d||'--')));docs.append(names)}row.append(docs);
 }
 row.append(element('span','chevron','›'));list.append(row);
 });
