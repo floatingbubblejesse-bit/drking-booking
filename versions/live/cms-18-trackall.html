@@ -435,7 +435,7 @@ function tick(){if(document.hidden||!root.classList.contains("dk-classic"))retur
 /* sort by location (same saved position and refusal memory as the other pages) */
 function syncNear(){near.hidden=!!here}
 function got(pos){var p={lat:pos&&pos.coords&&pos.coords.latitude,lng:pos&&pos.coords&&pos.coords.longitude,at:Date.now()};if(!valid(p))return;here=p;save(LOC,JSON.stringify(p));save(DEN,"0");syncNear();render()}
-function failed(err){if(err&&err.code===1)save(DEN,"1");syncNear()}
+function failed(err){if(err&&err.code===1){save(DEN,"1");/* refused: stop sorting by the old saved position so the button shows */if(here){here=null;render()}}syncNear()}
 function locate(){if(!navigator.geolocation)return failed();try{navigator.geolocation.getCurrentPosition(got,failed,{enableHighAccuracy:false,maximumAge:0,timeout:10000})}catch(e){failed(e)}}
 near.addEventListener("click",locate);
 /* on opening the page always ask for the position (the phone shows its own allow prompt), even after an earlier 不允許 */
