@@ -47,7 +47,7 @@ html.dk-classic body .right_icon.right_icon{left:auto!important;right:12px!impor
 html.dk-classic body .right_icon.right_icon>a.LINE{box-sizing:border-box!important;width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;margin:0!important}
 html.dk-classic body .right_icon.right_icon>a.LINE::before{width:39px!important;height:39px!important}
 html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important;bottom:calc(70px + env(safe-area-inset-bottom,0px))!important;box-sizing:border-box!important;width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;margin:0!important}
-#dkClassic .dkc-marquee{display:block;height:36px;overflow:hidden;background:#6aa8ad;white-space:nowrap;color:#fff;text-decoration:none}
+#dkClassic .dkc-marquee{display:block;height:36px;overflow:hidden;background:#5f9da2;box-shadow:inset 0 3px 6px rgba(0,0,0,.38),inset 0 -2px 3px rgba(0,0,0,.12),inset 0 -1px 0 rgba(255,255,255,.18);white-space:nowrap;color:#fff;text-decoration:none}
 #dkClassic .dkc-marquee span{display:inline-block;padding-left:100%;line-height:36px;font-size:16px;animation:dkcRun 14s linear infinite}
 @keyframes dkcRun{to{transform:translateX(-100%)}}
 @media (prefers-reduced-motion:reduce){#dkClassic .dkc-marquee span{animation:none;padding-left:16px}}
@@ -89,7 +89,7 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
   document.querySelectorAll(`#indcon2 .subtitle1`).forEach(function(element){element.remove();});
 })();
 </script>
-<div class="col-xs-12" id="showtrack">&nbsp;</div>
+<div class="col-xs-12" id="showtrack"> </div>
 <script>$(function(){ gettrack(); });</script>
 <style id="qSingleClinicType20261025" type="text/css">/* Single-clinic readable single-line type, 2026-10-25. */
 html body.qD #showtrack .elite_number>ul>li.qsc{padding-left:12px!important;padding-right:12px!important}
@@ -495,5 +495,441 @@ autoLocate();
 var tries=0,boot=setInterval(function(){tries++;brand();center();fit();if(tries>20)clearInterval(boot)},500);
 setInterval(tick,1000);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){center();fit()});
+})();
+</script>
+<script type="text/plain" id="ecTrackBoardSrc">
+/* 看診進度-卡片看板 v1（2026-11-05）
+   trackall.html 改為深青色卡片看板：一個畫面四家院區、點卡片全螢幕、依定位排序、樹林固定最後。
+   資料讀官網原本的 #showtrack（不另外打 API）；PREVIEW_ONLY=true 時網址要帶 ?nv=1 才啟用。 */
+(function(){
+  if (window.__ecTrackBoard) return; window.__ecTrackBoard = 1;
+  if (!/¦/trackall¦.html$/.test(location.pathname)) return;
+
+  /* ===== 設定 ===== */
+  var PREVIEW_ONLY = true;                 // 正式上線改 false
+  var PIN_LAST = ['樹林院區'];              // 永遠排最後
+  var PER_SCREEN = 4;                      // 一個畫面幾家院區
+  var VID = 'UUDGBSNaUVSrb8V4Zb3Mjsug';      // 單院全螢幕下方自動播放的 YouTube 播放清單（擇木良食頻道全部上傳影片）；留空字串＝不放影片
+  /* 院區：[緯度, 經度, 地址, 醫療團隊頁編號]（與院區資訊頁、快捷彈窗同一份；搬遷要一起改） */
+  var C = {
+    '鶯歌院區':[24.9529837,121.3513375,'新北市鶯歌區國慶街167號',2],
+    '三樹院區':[24.9458761,121.3818186,'新北市樹林區學成路600號',3],
+    '樹林院區':[24.9806516,121.4176074,'新北市樹林區中華路124號',4],
+    '桃園院區':[24.9820308,121.3193793,'桃園市桃園區桃鶯路333號',5],
+    '土城院區':[24.976515,121.442198,'新北市土城區中央路二段155號',6],
+    '八德院區':[24.9304146,121.2911793,'桃園市八德區興豐路493號',7],
+    '龍潭院區':[24.8664383,121.2147782,'桃園市龍潭區北龍路154號',8],
+    '大溪院區':[24.8840177,121.2894696,'桃園市大溪區慈湖路13號',9],
+    '大竹院區':[25.0217492,121.2632595,'桃園市蘆竹區大竹路436號',10],
+    '大湳院區':[24.9641796,121.2997468,'桃園市八德區大智路13號',11],
+    '平鎮院區':[24.9008497,121.2110723,'桃園市平鎮區中豐路山頂段150-2號',12],
+    '埔心院區':[24.9099334,121.1822147,'桃園市楊梅區瑞溪路二段203號',13],
+    '觀音院區':[25.0468336,121.1422956,'桃園市觀音區大觀路二段113號',14],
+    '龍岡院區':[24.9328648,121.2557877,'桃園市中壢區龍東路390號',15]
+  };
+
+  try {
+    var q = location.search;
+    if (/[?&]nv=1/.test(q)) sessionStorage.setItem('ec_tb_pv', '1');
+    if (/[?&]nv=0/.test(q)) sessionStorage.removeItem('ec_tb_pv');
+  } catch (e) {}
+  var pv = false; try { pv = sessionStorage.getItem('ec_tb_pv') === '1'; } catch (e) {}
+  if (PREVIEW_ONLY && !pv) return;
+
+  /* ===== 樣式 ===== */
+  var U = 'calc(var(--u)*', Z = '*var(--z))';
+  var css = [
+  'html.ec_tb_on #indcon2>.bannercon{display:none!important}',
+  'html.ec_tb_on #indcon2{background:#3A7D8A}',
+  'html.ec_tb_lock,html.ec_tb_lock body{overflow:hidden!important}',
+  /* 手機版頁首：維持官網原本的白底表頭 */
+  'html.ec_tb_mh #dkClassicBrand,html.ec_tb_mh #dkClassicSearch{display:none!important}',
+  '#ec_tb,#ec_tb_fs,#ec_tb_sch{font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif;color:#fff;line-height:1.2;-webkit-text-size-adjust:100%;--u:1.8px;--z:1}',
+  '#ec_tb *,#ec_tb_fs *,#ec_tb_sch *{box-sizing:border-box}',
+  '#ec_tb{position:relative;clear:both;float:none;box-sizing:border-box;background:#3A7D8A;padding:8px 10px 28px;text-align:left}',
+  '#ec_tb .tb_in{max-width:1500px;margin:0 auto}',
+  '#ec_tb button,#ec_tb_fs button{font-family:inherit;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}',
+  '#ec_tb .tb_bar{display:flex;align-items:center;gap:6px;min-height:44px}',
+  '#ec_tb .tb_loc{display:inline-flex;align-items:center;gap:6px;color:#fff;background:transparent;border:0;font-size:19px;padding:8px 2px;white-space:nowrap}',
+  '#ec_tb .tb_loc svg{width:24px!important;height:24px!important;max-width:none!important;flex:none}',
+  '#ec_tb .tb_lim{-webkit-appearance:none;appearance:none;background:transparent url("data:image/svg+xml,%3Csvg xmlns=¦'http://www.w3.org/2000/svg¦' viewBox=¦'0 0 12 8¦'%3E%3Cpath d=¦'M1 1l5 5 5-5¦' fill=¦'none¦' stroke=¦'%23fff¦' stroke-width=¦'2¦'/%3E%3C/svg%3E") no-repeat right 4px center/12px 8px;color:#fff;border:0;font-size:19px;font-family:inherit;padding:8px 24px 8px 2px;width:auto;height:auto;cursor:pointer}',
+  '#ec_tb .tb_lim option{color:#222}',
+  '#ec_tb .tb_z{margin-left:auto;display:flex;gap:6px;flex:none}',
+  '#ec_tb .tb_z button{width:50px;height:50px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.08);color:#fff;font-size:22px;padding:0}',
+  '#ec_tb .tb_z button:disabled{opacity:.4}',
+  '@media (max-width:400px){#ec_tb .tb_loc,#ec_tb .tb_lim{font-size:17px}#ec_tb .tb_z button{width:46px;height:46px;font-size:20px}}',
+  '#ec_tb .tb_st{display:flex;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;font-size:13px;color:rgba(255,255,255,.88);padding:4px 2px 8px}',
+  '#ec_tb .tb_grid{display:grid;grid-template-columns:repeat(var(--cols,2),minmax(0,1fr));gap:10px}',
+  '#ec_tb .tb_card{display:flex;flex-direction:column;min-height:var(--ch,200px);background:#346F7C;border-radius:8px;overflow:hidden;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.28);outline:1px solid rgba(255,255,255,.07);transition:transform .12s}',
+  '#ec_tb .tb_card:active{transform:scale(.98)}',
+  '#ec_tb .tb_card:focus-visible{outline:3px solid #F6EBCF}',
+  '#ec_tb .tb_h{display:flex;align-items:baseline;justify-content:space-between;gap:6px;background:#2A6170;padding:' + U + '2.2) ' + U + '5)}',
+  '#ec_tb .tb_h b{font-size:' + U + '13' + Z + ';font-weight:500;white-space:nowrap}',
+  '#ec_tb .tb_h span{font-size:' + U + '6.5' + Z + ';white-space:nowrap}',
+  '#ec_tb .tb_near,#ec_tb_fs .tb_near{display:inline-block;background:#F6EBCF;color:#2A6170;border-radius:99px;padding:0 .5em;margin-right:.4em;font-weight:700}',
+  '#ec_tb .tb_nums{display:grid;grid-template-columns:1fr 1fr;align-items:end;background:#2F6876;padding:' + U + '2) ' + U + '3) ' + U + '3);border-bottom:1px solid rgba(255,255,255,.2);text-align:center}',
+  '#ec_tb .tb_nums i{display:block;font-style:normal;font-size:' + U + '6' + Z + ';opacity:.92}',
+  '#ec_tb .tb_nums strong{font-size:' + U + '22' + Z + ';font-weight:700;line-height:1.08}',
+  '#ec_tb .tb_nums .tb_w strong{font-size:' + U + '15' + Z + ';font-weight:500}',
+  '#ec_tb .tb_nums small{font-size:' + U + '6.5' + Z + ';margin-left:.25em}',
+  '#ec_tb .tb_docs{flex:1;display:flex;flex-direction:column;justify-content:center;gap:' + U + '1.2);padding:' + U + '3.5) ' + U + '5)}',
+  '#ec_tb .tb_doc{display:flex;align-items:baseline;justify-content:space-between;gap:6px}',
+  '#ec_tb .tb_doc span{font-size:' + U + '13.5' + Z + ';font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}',
+  '#ec_tb .tb_docs.n2 .tb_doc span{font-size:' + U + '12' + Z + '}',
+  '#ec_tb .tb_docs.n3 .tb_doc span{font-size:' + U + '9.5' + Z + '}',
+  '#ec_tb .tb_doc em{font-style:normal;font-size:' + U + '7' + Z + ';white-space:nowrap;flex:none}',
+  '#ec_tb .tb_note{font-size:' + U + '9' + Z + ';opacity:.92}',
+  '#ec_tb .tb_memo{background:#F6EBCF;color:#333;font-size:' + U + '7' + Z + ';padding:' + U + '1.5) ' + U + '5);white-space:pre-wrap;word-break:break-all}',
+  '#ec_tb .tb_empty{padding:40px 10px;text-align:center;font-size:18px;opacity:.9}',
+  /* 全螢幕 */
+  '#ec_tb_fs{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483600;background:#3A7D8A;display:flex;flex-direction:column;overflow:auto;-webkit-overflow-scrolling:touch}',
+  '#ec_tb_fs .fs_top{display:flex;align-items:center;gap:2vmin;background:#2A6170;padding:2vmin 3vmin;flex:none}',
+  '#ec_tb_fs .fs_x{flex:none;display:inline-flex;align-items:center;gap:.3em;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.1);color:#fff;border-radius:8px;font-size:max(16px,calc(3.6vmin' + Z + ');padding:.45em .8em;white-space:nowrap}',
+  '#ec_tb_fs .fs_x i{font-style:normal}',
+  '#ec_tb_fs .fs_t{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:2.5vmin;flex-wrap:wrap}',
+  '#ec_tb_fs .fs_t b{font-size:calc(8.5vmin' + Z + ';font-weight:500;white-space:nowrap}',
+  '#ec_tb_fs .fs_t span{font-size:max(14px,calc(3.8vmin' + Z + ');white-space:nowrap}',
+  '#ec_tb_fs .fs_pn{flex:none;display:flex;gap:1.5vmin}',
+  '#ec_tb_fs .fs_pn button{width:max(40px,9vmin);height:max(40px,9vmin);border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.1);color:#fff;font-size:max(18px,4.5vmin);padding:0;line-height:1}',
+  '#ec_tb_fs .fs_body{display:flex;flex-direction:column;gap:3vmin;padding:3vmin 5vmin;max-width:1100px;width:100%;margin:0 auto}',
+  '#ec_tb_fs .fs_nums{display:grid;grid-template-columns:1fr 1fr;align-items:end;text-align:center;background:#2F6876;border-radius:10px;padding:2.5vmin 2vmin 3.5vmin}',
+  '#ec_tb_fs .fs_nums i{display:block;font-style:normal;font-size:max(16px,calc(4.6vmin' + Z + ');opacity:.92}',
+  '#ec_tb_fs .fs_nums strong{font-size:calc(30vmin' + Z + ';font-weight:700;line-height:1.02}',
+  '#ec_tb_fs .fs_nums .tb_w strong{font-size:calc(20vmin' + Z + ';font-weight:500}',
+  '#ec_tb_fs .fs_nums small{font-size:max(16px,calc(5vmin' + Z + ');margin-left:.25em}',
+  '#ec_tb_fs .fs_docs{display:flex;flex-direction:column;gap:1.5vmin}',
+  '#ec_tb_fs .fs_doc{display:flex;align-items:baseline;gap:3vmin;background:#346F7C;border-radius:10px;padding:2vmin 4vmin}',
+  '#ec_tb_fs .fs_doc u{text-decoration:none;font-size:max(14px,calc(4.2vmin' + Z + ');opacity:.9;white-space:nowrap;flex:none}',
+  '#ec_tb_fs .fs_doc span{flex:1;min-width:0;font-size:calc(9vmin' + Z + ';font-weight:500}',
+  '#ec_tb_fs .fs_doc em{font-style:normal;font-size:max(16px,calc(5.5vmin' + Z + ');white-space:nowrap;flex:none}',
+  '#ec_tb_fs .fs_note{font-size:calc(7vmin' + Z + ';text-align:center;padding:4vmin 0}',
+  '#ec_tb_fs .fs_memo{background:#F6EBCF;color:#333;border-radius:10px;font-size:max(16px,calc(5vmin' + Z + ');padding:2vmin 4vmin;white-space:pre-wrap}',
+  '#ec_tb_fs .fs_up{font-size:max(13px,3vmin);opacity:.85;text-align:center}',
+  '#ec_tb_fs .fs_dyn{flex:0 0 auto}',
+  '#ec_tb_fs .fs_vid{flex:1 0 auto;display:flex;align-items:center;justify-content:center;padding:0 5vmin calc(3vmin + env(safe-area-inset-bottom,0px))}',
+  '#ec_tb_fs .fs_vid iframe{display:block;width:100%;max-width:1100px;aspect-ratio:16/9;height:auto;border:0;border-radius:10px;background:#000}',
+  '@media (orientation:portrait) and (max-width:700px){#ec_tb_fs .fs_x i{display:none}}',
+  '@media (orientation:landscape) and (min-width:900px){#ec_tb_fs{flex-direction:row}#ec_tb_fs .fs_dyn{flex:1 1 50%;min-width:0;display:flex;flex-direction:column}#ec_tb_fs .fs_dyn .fs_body{flex:1 0 auto;justify-content:center}#ec_tb_fs .fs_vid{flex:1 1 50%;min-width:0;padding:3vmin}}',
+  /* 門診表 */
+  '#ec_tb_sch{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483640;background:rgba(0,0,0,.86);overflow:auto;padding:56px 10px 20px;text-align:center}',
+  '#ec_tb_sch img{display:block;width:auto!important;height:auto!important;max-width:min(100%,1100px)!important;margin:0 auto 12px;border-radius:8px;background:#fff}',
+  '#ec_tb_sch button{position:fixed;right:12px;top:10px;border:0;border-radius:8px;background:#F6EBCF;color:#2A6170;font-size:17px;font-weight:700;padding:8px 16px;cursor:pointer}'
+  ].join('¦n');
+  var st = document.createElement('style'); st.id = 'ec_tb_css'; st.appendChild(document.createTextNode(css));
+  document.head.appendChild(st);
+
+  /* ===== 狀態 ===== */
+  var list = [], pos = null, limit = 0, zi = 1, openName = '', geoMsg = '', lastHtml = '', lastFs = '';
+  var ZS = [0.88, 1, 1.14, 1.28];
+  try { if (localStorage.getItem('geo_ok') === '1') { var g = JSON.parse(localStorage.getItem('geo_last') || 'null'); if (g && g.lat && g.lng) pos = {lat: +g.lat, lng: +g.lng}; } } catch (e) {}
+  var hadSaved = !!pos;
+
+  function esc(s){ var A = '&', M = {'&': A + 'amp;', '<': A + 'lt;', '>': A + 'gt;', '"': A + 'quot;'}; return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return M[c]; }); }
+  function txt(el){ return el ? el.textContent.replace(/ /g, ' ').replace(/¦s+/g, ' ').trim() : ''; }
+  function hav(a, b, c, d){ var R = 6371, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r, s = Math.sin(x / 2) * Math.sin(x / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) * Math.sin(y / 2); return 2 * R * Math.asin(Math.sqrt(s)); }
+  function fmtD(km){ if (km == null) return ''; if (km < 1) return Math.max(10, Math.round(km * 100) * 10) + ' m'; return (km < 100 ? km.toFixed(1) : Math.round(km)) + ' km'; }
+  function pinned(n){ return PIN_LAST.indexOf(n) >= 0; }
+
+  /* ===== 讀官網原本的資料 ===== */
+  function parse(root){
+    var out = [], lis = root.querySelectorAll('.elite_number > ul > li');
+    for (var i = 0; i < lis.length; i++) {
+      var li = lis[i], ne = li.querySelector('.elite_name'); if (!ne) continue;
+      var name = '';
+      for (var k = 0; k < ne.childNodes.length; k++) { var nd = ne.childNodes[k]; if (nd.nodeType === 3 && nd.nodeValue.replace(/¦s/g, '')) { name = nd.nodeValue.replace(/¦s/g, ''); break; } }
+      if (!name) { var mm = txt(ne).match(/[^¦s]+?院區/); name = mm ? mm[0] : txt(ne); }
+      var cm = (li.className || '').match(/(?:^|¦s)c(¦d+)(?:¦s|$)/);
+      var docs = [], rows = li.querySelectorAll('.elite_docs [class^="doc_row"]');
+      for (var j = 0; j < rows.length; j++) {
+        var t = txt(rows[j]); if (!t) continue;
+        var m = t.match(/^(?:(.{1,6}?)[：:])?¦s*(.+?)¦s*醫師¦s*診號[：:]¦s*(.*)$/);
+        docs.push(m ? {room: m[1] || '', name: m[2], num: m[3].trim()} : {room: '', name: t, num: ''});
+      }
+      var imgs = [], sc = li.querySelector('.open-schedule');
+      if (sc) for (var n = 1; n <= 4; n++) { var u = sc.getAttribute('data-img' + n); if (u) imgs.push(u); }
+      var tel = li.querySelector('a[href^="tel:"]');
+      out.push({
+        name: name, idx: cm ? +cm[1] : 100 + i, docs: docs,
+        note: txt(li.querySelector('.elite_close')),
+        wait: txt(li.querySelector('.wait_num')),
+        up: txt(li.querySelector('.updated_at')),
+        memo: (li.querySelector('.memo_text') ? li.querySelector('.memo_text').textContent : '').replace(/^¦s+|¦s+$/g, ''),
+        tel: tel ? tel.getAttribute('href') : '', imgs: imgs
+      });
+    }
+    return out;
+  }
+  function num(c){
+    var best = '', bv = -1;
+    for (var i = 0; i < c.docs.length; i++) { var v = parseInt(c.docs[i].num, 10); if (!isNaN(v) && v > bv) { bv = v; best = String(v); } else if (!best && c.docs[i].num) best = c.docs[i].num; }
+    return best;
+  }
+  function sorted(){
+    var a = list.slice().sort(function(x, y){ return x.idx - y.idx; });
+    for (var i = 0; i < a.length; i++) { var c = C[a[i].name]; a[i].d = (pos && c) ? hav(pos.lat, pos.lng, c[0], c[1]) : null; a[i].near = false; }
+    if (pos) a.sort(function(x, y){ return (pinned(x.name) - pinned(y.name)) || ((x.d == null ? 1e9 : x.d) - (y.d == null ? 1e9 : y.d)) || (x.idx - y.idx); });
+    else a = a.filter(function(x){ return !pinned(x.name); }).concat(a.filter(function(x){ return pinned(x.name); }));
+    if (pos && a.length && !pinned(a[0].name) && a[0].d != null) a[0].near = true;
+    return a;
+  }
+
+  /* ===== 版面 ===== */
+  var root = document.createElement('div'); root.id = 'ec_tb';
+  root.innerHTML = '<div class="tb_in"><div class="tb_bar">' +
+    '<button type="button" class="tb_loc" aria-label="依我的位置排序"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg><span></span></button>' +
+    '<select class="tb_lim" aria-label="顯示院區數"><option value="0">全部院區</option><option value="4">附近 4 院</option><option value="6">附近 6 院</option><option value="8">附近 8 院</option></select>' +
+    '</div><div class="tb_st"><span class="tb_s1"></span><span class="tb_s2"></span></div><div class="tb_grid"></div></div>';
+  var grid = root.querySelector('.tb_grid'), locBtn = root.querySelector('.tb_loc'), limSel = root.querySelector('.tb_lim');
+
+  function cardHtml(c){
+    var n = num(c), multi = c.docs.length > 1, h = '';
+    h += '<div class="tb_h"><b>' + esc(c.name.replace(/院區$/, '')) + '</b><span>' + (c.near ? '<span class="tb_near">最近</span>' : '') + esc(fmtD(c.d)) + '</span></div>';
+    h += '<div class="tb_nums"><div><i>' + (multi ? '院區診號' : '看診') + '</i><strong>' + esc(n || '—') + '</strong></div><div class="tb_w"><i>候診</i><strong>' + esc(c.docs.length && c.wait !== '' ? c.wait : '—') + '</strong><small>人</small></div></div>';
+    h += '<div class="tb_docs' + (c.docs.length > 2 ? ' n3' : multi ? ' n2' : '') + '">';
+    if (c.docs.length) for (var i = 0; i < c.docs.length; i++) h += '<div class="tb_doc"><span>' + esc(c.docs[i].name) + '</span>' + (multi && c.docs[i].num ? '<em>' + esc(c.docs[i].num) + ' 號</em>' : '') + '</div>';
+    else h += '<div class="tb_note">' + esc(c.note || '目前無門診') + '</div>';
+    h += '</div>' + (c.memo ? '<div class="tb_memo">' + esc(c.memo) + '</div>' : '');
+    return '<div class="tb_card" role="button" tabindex="0" data-n="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 看診進度，點擊放大">' + h + '</div>';
+  }
+  function upText(a){
+    var best = ''; for (var i = 0; i < a.length; i++) if (a[i].up > best) best = a[i].up;
+    var m = best.match(/(¦d{4})-(¦d¦d)-(¦d¦d)¦s+(¦d¦d):(¦d¦d)/);
+    return m ? '更新 ' + (+m[2]) + '/' + (+m[3]) + ' ' + m[4] + ':' + m[5] + '｜自動更新中' : '資料載入中…';
+  }
+  function render(){
+    var all = sorted(), a = (limit && pos) ? all.slice(0, limit) : all;
+    var h = a.length ? a.map(cardHtml).join('') : '<div class="tb_empty" style="grid-column:1/-1">看診資料載入中…</div>';
+    if (h !== lastHtml) { grid.innerHTML = h; lastHtml = h; }
+    locBtn.querySelector('span').textContent = pos ? '重新定位' : '就近排序';
+    root.querySelector('.tb_s1').textContent = upText(all);
+    root.querySelector('.tb_s2').textContent = geoMsg || (pos ? '由近至遠・直線距離' : '點卡片可放大');
+    root.style.setProperty('--z', ZS[zi]);
+    if (openName) renderFs(all);
+  }
+  function bottomInset(){
+    try {
+      var els = document.elementsFromPoint(window.innerWidth / 2, window.innerHeight - 3);
+      for (var i = 0; i < els.length; i++) {
+        var e = els[i]; if (root.contains(e) || e === document.documentElement || e === document.body) continue;
+        var p = e; while (p && p !== document.body) { if (getComputedStyle(p).position === 'fixed') { var rr = p.getBoundingClientRect(); if (rr.height < window.innerHeight * 0.3 && rr.width > window.innerWidth * 0.5) return Math.max(0, window.innerHeight - rr.top); break; } p = p.parentElement; }
+      }
+    } catch (e) {}
+    return 0;
+  }
+  function imp(el, o, on){ if (!el) return; for (var k in o) { if (on) el.style.setProperty(k, o[k], 'important'); else el.style.removeProperty(k); } }
+  function mobileHead(){
+    var hb = document.getElementById('left-panel-link'), on = false;
+    try { on = !!hb && getComputedStyle(hb).display !== 'none' && hb.getBoundingClientRect().width > 0; } catch (e) {}
+    var de = document.documentElement, was = de.classList.contains('ec_tb_mh');
+    if (!on && !was) return;
+    de.classList[on ? 'add' : 'remove']('ec_tb_mh');
+    var t = document.querySelector('.top'); if (!t) return;
+    var q = t.querySelector('.qCb');
+    imp(t, {'background': '#fff', 'height': '56px', 'box-shadow': '0 3px 8px #b5b5b5'}, on);
+    imp(t.querySelector('.logoie'), {'height': '56px'}, on);
+    imp(t.querySelector('.logo'), {'height': '56px', 'padding': '10px 0', 'text-align': 'center'}, on);
+    imp(t.querySelector('.logo > a:not(#dkClassicBrand)'), {'display': 'inline'}, on);
+    imp(q, {'display': 'inline-flex'}, on);
+    imp(t.querySelector('img.logosite'), q ? {'display': 'none'} : {'display': 'inline-block', 'visibility': 'visible', 'height': '36px', 'width': 'auto'}, on);
+    imp(hb, {'color': '#000', 'top': '28px'}, on);
+    imp(document.getElementById('dkClassicSearch'), {'display': 'none'}, on);
+  }
+  function topInset(){
+    try {
+      if (document.documentElement.classList.contains('ec_tb_mh')) { var th = document.querySelector('.top'); if (th) return Math.max(0, th.getBoundingClientRect().bottom); }
+      var els = document.elementsFromPoint(window.innerWidth / 2, 3);
+      for (var i = 0; i < els.length; i++) {
+        var e = els[i]; if (root.contains(e) || e === document.documentElement || e === document.body) continue;
+        var p = e; while (p && p !== document.body) { if (getComputedStyle(p).position === 'fixed') { var rr = p.getBoundingClientRect(); if (rr.height < window.innerHeight * 0.4 && rr.width > window.innerWidth * 0.5) { var bot = rr.bottom, ks = p.querySelectorAll('*'); for (var k = 0; k < ks.length && k < 300; k++) { var kr = ks[k].getBoundingClientRect(); if (kr.width > 0 && kr.height > 0 && kr.top < bot + 1 && kr.bottom < window.innerHeight * 0.4 && kr.bottom > bot) bot = kr.bottom; } return Math.max(0, bot); } break; } p = p.parentElement; }
+      }
+    } catch (e) {}
+    return 0;
+  }
+  /* 工具列若被其他固定元素（頁首等）蓋住，回傳遮蓋物的下緣 */
+  function coverBottom(br){
+    var best = 0, xs = [24, window.innerWidth / 2, window.innerWidth - 24];
+    try {
+      for (var i = 0; i < xs.length; i++) {
+        var e = document.elementFromPoint(xs[i], br.top + 6);
+        if (!e || root.contains(e)) continue;
+        var p = e, hit = null;
+        while (p && p !== document.body && p !== document.documentElement) { var ps = getComputedStyle(p).position; if (ps === 'fixed' || ps === 'sticky') hit = p; p = p.parentElement; }
+        var cands = hit ? [e, hit] : [e];
+        for (var k = 0; k < cands.length; k++) { var rr = cands[k].getBoundingClientRect(); if (rr.height < window.innerHeight * 0.4 && rr.bottom > best) best = rr.bottom; }
+      }
+    } catch (x) {}
+    return best;
+  }
+  function layout(){
+    mobileHead();
+    var w = document.documentElement.clientWidth, h = window.innerHeight;
+    root.style.left = '0px'; root.style.width = '';
+    var r = root.getBoundingClientRect();
+    root.style.left = (-r.left) + 'px'; root.style.width = w + 'px';
+    var cols = (w >= 900 && w > h) ? PER_SCREEN : 2, rowsN = Math.max(1, Math.round(PER_SCREEN / cols));
+    var inner = Math.min(w - 20, 1500), cw = (inner - (cols - 1) * 10) / cols;
+    var sy = window.pageYOffset || 0;
+    root.style.paddingTop = Math.max(8, topInset() - (r.top + sy) + 8) + 'px';
+    if (sy < 3 && !openName) {
+      var bar = root.querySelector('.tb_bar');
+      for (var gi = 0; gi < 3; gi++) {
+        var br = bar.getBoundingClientRect(), cv = coverBottom(br);
+        if (cv <= br.top + 1) break;
+        root.style.paddingTop = (parseFloat(root.style.paddingTop) + (cv - br.top) + 8) + 'px';
+      }
+    }
+    var avail = h - (grid.getBoundingClientRect().top + sy) - bottomInset() - 8;
+    var ch = Math.floor((avail - (rowsN - 1) * 10) / rowsN);
+    var minH = cw * 0.92;
+    root.style.setProperty('--cols', cols);
+    root.style.setProperty('--ch', Math.max(Math.min(ch, cols === 2 ? cw * 1.6 : cw * 1.3), minH) + 'px');
+    root.style.setProperty('--u', (Math.min(cw, 430) / 100) + 'px');
+  }
+
+  /* ===== 全螢幕單院 ===== */
+  var fs = null;
+  function renderFs(all){
+    var c = null, i; for (i = 0; i < all.length; i++) if (all[i].name === openName) { c = all[i]; break; }
+    if (!c) return;
+    var n = num(c), multi = c.docs.length > 1, info = C[c.name], h = '';
+    h += '<div class="fs_top"><button type="button" class="fs_x" data-a="close" aria-label="返回全部院區">✕<i> 返回</i></button>' +
+      '<div class="fs_t"><b>' + esc(c.name) + '</b><span>' + (c.near ? '<span class="tb_near">最近</span>' : '') + esc(c.d != null ? '距離約 ' + fmtD(c.d) : '') + '</span></div>' +
+      '<div class="fs_pn"><button type="button" data-a="prev" aria-label="上一個院區">‹</button><button type="button" data-a="next" aria-label="下一個院區">›</button></div></div>';
+    h += '<div class="fs_body"><div class="fs_nums"><div><i>' + (multi ? '院區診號' : '看診號碼') + '</i><strong>' + esc(n || '—') + '</strong></div><div class="tb_w"><i>候診人數</i><strong>' + esc(c.docs.length && c.wait !== '' ? c.wait : '—') + '</strong><small>人</small></div></div>';
+    if (c.docs.length) { h += '<div class="fs_docs">'; for (i = 0; i < c.docs.length; i++) h += '<div class="fs_doc">' + (c.docs[i].room ? '<u>' + esc(c.docs[i].room) + '</u>' : '') + '<span>' + esc(c.docs[i].name) + ' 醫師</span>' + (c.docs[i].num ? '<em>' + esc(c.docs[i].num) + ' 號</em>' : '') + '</div>'; h += '</div>'; }
+    else h += '<div class="fs_note">' + esc(c.note || '目前無門診') + '</div>';
+    if (c.memo) h += '<div class="fs_memo">' + esc(c.memo) + '</div>';
+    if (c.up) h += '<div class="fs_up">更新時間 ' + esc(c.up.replace(/^¦d{4}-/, '').replace(/:¦d¦d$/, '')) + '｜自動更新中</div>';
+    h += '</div>';
+    if (h !== lastFs) { var sy = fs.scrollTop; fs.firstChild.innerHTML = h; fs.scrollTop = sy; lastFs = h; }
+    fs.style.setProperty('--z', ZS[zi]);
+  }
+  function known(name){ for (var i = 0; i < list.length; i++) if (list[i].name === name) return true; return false; }
+  function openFs(name, push){
+    if (!known(name)) return;
+    if (!fs) {
+      fs = document.createElement('div'); fs.id = 'ec_tb_fs'; fs.setAttribute('role', 'dialog'); fs.setAttribute('aria-modal', 'true');
+      fs.innerHTML = '<div class="fs_dyn"></div><div class="fs_vid"></div>';
+      fs.addEventListener('click', function(e){
+        var b = e.target.closest ? e.target.closest('[data-a]') : null; if (!b) return;
+        var a = b.getAttribute('data-a');
+        if (a === 'close') { if (history.state && history.state.ecTb && history.state.pushed) history.back(); else closeFs(true); }
+        else if (a === 'prev' || a === 'next') step(a === 'next' ? 1 : -1);
+        else if (a === 'sch') openSch();
+      });
+    }
+    var wasPushed = !!(history.state && history.state.ecTb && history.state.pushed);
+    openName = name; lastFs = '';
+    if (!fs.parentNode) {
+      fs.lastChild.innerHTML = VID ? '<iframe src="https://www.youtube.com/embed/videoseries?list=' + VID + '&autoplay=1&mute=1&playsinline=1&loop=1&rel=0" title="擇木良食影片" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>' : '';
+      document.body.appendChild(fs);
+    }
+    document.documentElement.classList.add('ec_tb_lock');
+    try {
+      if (push) history.pushState({ecTb: name, pushed: true}, '', '#ec-' + encodeURIComponent(name));
+      else history.replaceState({ecTb: name, pushed: wasPushed}, '', '#ec-' + encodeURIComponent(name));
+    } catch (e) {}
+    fs.scrollTop = 0; renderFs(sorted());
+  }
+  function closeFs(fixUrl){
+    openName = ''; closeSch();
+    if (fs && fs.parentNode) fs.parentNode.removeChild(fs);
+    document.documentElement.classList.remove('ec_tb_lock');
+    if (fixUrl) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  }
+  function step(d){
+    var a = sorted(), i, k = -1; for (i = 0; i < a.length; i++) if (a[i].name === openName) k = i;
+    if (k < 0 || !a.length) return;
+    openFs(a[(k + d + a.length) % a.length].name, false);
+  }
+  function openSch(){
+    var c = null; for (var i = 0; i < list.length; i++) if (list[i].name === openName) c = list[i];
+    if (!c || !c.imgs.length) return;
+    closeSch();
+    var s = document.createElement('div'); s.id = 'ec_tb_sch';
+    s.innerHTML = '<button type="button">關閉</button>' + c.imgs.map(function(u){ return '<img src="' + esc(u) + '" alt="' + esc(c.name) + ' 門診表">'; }).join('');
+    s.onclick = function(e){ if (e.target.tagName !== 'IMG') closeSch(); };
+    document.body.appendChild(s);
+  }
+  function closeSch(){ var s = document.getElementById('ec_tb_sch'); if (s) s.parentNode.removeChild(s); }
+  window.addEventListener('popstate', function(e){
+    if (e.state && e.state.ecTb) openFs(e.state.ecTb, false); else if (openName) closeFs(false);
+  });
+  document.addEventListener('keydown', function(e){
+    if (!openName) return;
+    if (e.key === 'Escape') { if (document.getElementById('ec_tb_sch')) closeSch(); else if (history.state && history.state.ecTb && history.state.pushed) history.back(); else closeFs(true); }
+    else if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
+  });
+
+  /* ===== 操作 ===== */
+  grid.addEventListener('click', function(e){ var c = e.target.closest ? e.target.closest('.tb_card') : null; if (c) openFs(c.getAttribute('data-n'), true); });
+  grid.addEventListener('keydown', function(e){ if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('tb_card')) { e.preventDefault(); openFs(e.target.getAttribute('data-n'), true); } });
+  locBtn.addEventListener('click', function(){ locate(false); });
+  limSel.addEventListener('change', function(){ limit = +limSel.value || 0; if (limit && !pos) locate(false); else render(); });
+
+  function locate(auto){
+    if (!navigator.geolocation) { geoMsg = '此裝置不支援定位'; render(); return; }
+    geoMsg = auto ? '已依上次位置排序，更新定位中…' : '定位中…'; render();
+    var done = false, wd = setTimeout(function(){ if (!done) fail(); }, 12000);
+    function fail(){
+      done = true; clearTimeout(wd);
+      geoMsg = auto ? '' : '無法取得定位，請確認已允許位置權限後再試一次';
+      if (!pos) { limit = 0; limSel.value = '0'; }
+      render();
+    }
+    navigator.geolocation.getCurrentPosition(function(p){
+      done = true; clearTimeout(wd);
+      pos = {lat: p.coords.latitude, lng: p.coords.longitude}; geoMsg = '';
+      try { localStorage.setItem('geo_ok', '1'); localStorage.setItem('geo_last', JSON.stringify({lat: pos.lat, lng: pos.lng, t: Date.now()})); } catch (e) {}
+      render();
+    }, function(){ if (!done) fail(); }, {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000});
+  }
+
+  /* ===== 啟動 ===== */
+  var src = null, timer = 0;
+  function refresh(){
+    var l = src ? parse(src) : [];
+    if (l.length) { list = l; render(); layout(); }
+    return l.length;
+  }
+  function selfFetch(){
+    var x = new XMLHttpRequest(); x.open('POST', '/gettrack.html');
+    x.onload = function(){ if (x.status === 200) { var d = document.createElement('div'); d.innerHTML = x.responseText; var l = parse(d); if (l.length) { list = l; render(); layout(); } } };
+    x.send();
+  }
+  function start(){
+    src = document.getElementById('showtrack');
+    var ban = document.querySelector('#indcon2 > .bannercon');
+    var host = ban ? ban.parentNode : (src ? src.parentNode : null);
+    if (!host) return;
+    host.insertBefore(root, ban || host.firstChild);
+    if (!ban && src) src.style.display = 'none';
+    document.documentElement.classList.add('ec_tb_on');
+    render(); layout();
+    if (src) {
+      new MutationObserver(function(){ clearTimeout(timer); timer = setTimeout(refresh, 150); }).observe(src, {childList: true, subtree: true, characterData: true});
+      refresh();
+    }
+    /* 保險：官網原本的更新沒動時，自己每分鐘抓一次 */
+    setTimeout(function(){ if (!list.length) selfFetch(); }, 6000);
+    setInterval(function(){ if (!src || !parse(src).length) selfFetch(); }, 60000);
+    var rt = 0; function onRz(){ clearTimeout(rt); rt = setTimeout(layout, 120); }
+    window.addEventListener('resize', onRz); window.addEventListener('orientationchange', onRz);
+    setTimeout(layout, 800); setTimeout(layout, 2500); setTimeout(layout, 5000); setTimeout(layout, 9000);
+    window.addEventListener('load', function(){ setTimeout(layout, 60); });
+    if (hadSaved) locate(true);
+    var hm = (location.hash || '').match(/^#ec-(.+)$/);
+    if (hm) { var nm = hm[1]; try { nm = decodeURIComponent(nm); } catch (e) {} var tries = 0; (function w(){ if (list.length) openFs(nm, false); else if (tries++ < 40) setTimeout(w, 250); })(); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+<script id="ecTrackBoard20261105">
+/* 看診進度-卡片看板（預覽中，網址帶 nv=1 才啟用）載入器。後台存檔會吃掉反斜線，所以程式本體放在上面的 ecTrackBoardSrc，反斜線以「¦」代替，這裡還原後執行。 */
+(function(){
+  try {
+    var el = document.getElementById("ecTrackBoardSrc"); if (!el) return;
+    (0, eval)(el.textContent.split(String.fromCharCode(166)).join(String.fromCharCode(92)));
+  } catch (e) { if (window.console) console.error("ecTrackBoard", e); }
 })();
 </script>
