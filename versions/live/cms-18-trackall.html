@@ -77,6 +77,8 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
 #dkClassic .dkc-doc:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,.32)}
 #dkClassic .dkc-doc span{max-width:100%;min-width:0;font-size:clamp(13px,4vw,16px);line-height:1.3;white-space:nowrap;overflow:hidden}
 #dkClassic .dkc-doc b{font-family:-apple-system,"Helvetica Neue",Roboto,system-ui,sans-serif;font-size:clamp(15px,4.6vw,18px);line-height:1.15;font-weight:500;font-variant-numeric:tabular-nums}
+/* clinic note (for example 14:00開始 during the midday break) shown where the doctor button is; a plain label, not a button */
+#dkClassic .dkc-doc.dkc-memo{cursor:default;box-shadow:none}#dkClassic .dkc-doc.dkc-memo:active{transform:none;box-shadow:none}#dkClassic .dkc-doc.dkc-memo span{white-space:normal}
 </style>
 <script id="dkClassicEarly20261105">(function(){try{if(window.matchMedia("(max-width: 767px)").matches&&location.hash.indexOf("#ec-")!==0)document.documentElement.classList.add("dk-classic")}catch(e){}})();</script>
 <style id="qOfficialNoDistance20261027" type="text/css">html body.qr.qD #showtrack .qA>.qkm{display:none!important}html body.qr.qD #showtrack .qA>.qnav{margin-left:auto!important}
@@ -445,8 +447,10 @@ function render(){
       body.appendChild(el("div","dkc-big",String(top)));body.appendChild(el("div","dkc-bar"));
       var w=el("div","dkc-wait","候診");w.appendChild(el("b","",String(data.sum==null?"--":data.sum)));body.appendChild(w);
       var docs=el("div","dkc-docs"+(rooms.length===1?" dkc-one":""));
-      rooms.forEach(function(r){var d=el("div","dkc-doc");if(r.d)d.setAttribute("data-doctor",r.d);d.appendChild(el("span","",r.d||"--"));if(rooms.length>1)d.appendChild(el("b","",String(r.c==null||r.c===""?"--":r.c)));docs.appendChild(d)});
-      body.appendChild(docs);a.setAttribute("aria-label",c[0]+"院區，診號 "+top+"，候診 "+data.sum+" 人");
+      var memo=String(data.memo||"").trim();/* like the old app: with patients waiting the doctor shows, even if an old note (for example 颱風休診) was left on */if(Number(data.sum)>0)memo="";
+      if(memo){docs.className="dkc-docs dkc-one";var mm=el("div","dkc-doc dkc-memo");mm.appendChild(el("span","",memo));docs.appendChild(mm)}
+      else rooms.forEach(function(r){var d=el("div","dkc-doc");if(r.d)d.setAttribute("data-doctor",r.d);d.appendChild(el("span","",r.d||"--"));if(rooms.length>1)d.appendChild(el("b","",String(r.c==null||r.c===""?"--":r.c)));docs.appendChild(d)});
+      body.appendChild(docs);a.setAttribute("aria-label",c[0]+"院區，診號 "+top+"，候診 "+data.sum+" 人"+(memo?"，"+memo:""));
     }
     a.appendChild(body);frag.appendChild(a);
   });
