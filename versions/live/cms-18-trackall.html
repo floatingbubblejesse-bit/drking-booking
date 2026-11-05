@@ -78,10 +78,11 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
 #dkClassic .dkc-wait{display:flex;align-items:center;gap:calc(12px * var(--dkc-k,1));font-size:calc(clamp(15px,4.75vw,19px) * var(--dkc-k,1));line-height:1}
 #dkClassic .dkc-wait b{font-family:-apple-system,"Helvetica Neue",Roboto,system-ui,sans-serif;font-size:calc(clamp(21px,6.65vw,26.6px) * var(--dkc-k,1));line-height:1;font-weight:400;font-variant-numeric:tabular-nums}
 #dkClassic .dkc-docs{align-self:stretch;display:grid;grid-template-columns:repeat(2,auto);justify-content:center;gap:calc(8px * var(--dkc-k,1));margin-top:calc(12px * var(--dkc-k,1))}
-#dkClassic .dkc-docs.dkc-one{grid-template-columns:auto;justify-content:center}
+#dkClassic .dkc-docs.dkc-one{grid-template-columns:auto;justify-content:center;min-height:calc(2 * (clamp(17px,5.4vw,21px) * 1.15 + 9px) + 8px * var(--dkc-k,1));align-content:center}
 #dkClassic .dkc-docs.dkc-one .dkc-doc{padding:2px 5px;font-size:21px}
 #dkClassic .dkc-docs.dkc-one .dkc-doc span{font-size:clamp(18px,5.4vw,21px)}
 /* two doctors: one cell per line, number right of the name, bigger and taller */
+/* one doctor keeps the same height as two (cell in the middle), so the numbers line up across a row */
 #dkClassic .dkc-docs:not(.dkc-one){grid-template-columns:auto;justify-content:center;justify-items:center}#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc{flex-direction:row;align-items:baseline;gap:8px;padding:4px 7px}#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc span{font-size:clamp(15px,4.6vw,18px)}#dkClassic .dkc-docs:not(.dkc-one) .dkc-doc b{font-size:clamp(17px,5.4vw,21px)}
 #dkClassic .dkc-doc{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;min-width:0;padding:2px 4px;border-radius:5px;background:#4b9499;box-shadow:none;text-align:center;font-size:16px;-webkit-tap-highlight-color:transparent;transition:transform .1s,box-shadow .1s}
 #dkClassic .dkc-doc:active{transform:translateY(1px);box-shadow:none}
