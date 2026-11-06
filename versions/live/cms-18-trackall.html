@@ -381,7 +381,7 @@ html body.qr.qD #showtrack .qsc>.qOfficialMemo{display:block;margin:12px 0;paddi
   }
   function update(){
     pending=false;
-    var date=new Intl.DateTimeFormat(`zh-TW`,{timeZone:`Asia/Taipei`,month:`numeric`,day:`numeric`,weekday:`long`}).format(new Date()).replace(`星期`,`週`);
+    var date=new Intl.DateTimeFormat(`zh-TW`,{timeZone:`Asia/Taipei`,month:`numeric`,day:`numeric`,weekday:`long`}).format(new Date()).replace(`星期`,`週`).split("週").join("");
     document.querySelectorAll(`#geo_bar .qdate`).forEach(function(source){
       var visible=source.parentElement.querySelector(`.qOfficialDate`);
       if(!visible){visible=document.createElement(`span`);visible.className=`qOfficialDate`;source.after(visible);}
