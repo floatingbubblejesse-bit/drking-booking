@@ -91,9 +91,19 @@ html.dk-classic body .scrollup.scrollup{left:auto!important;right:12px!important
 /* clinic note (for example 14:00開始 during the midday break) shown where the doctor button is; a plain label, not a button */
 #dkClassic .dkc-doc.dkc-memo{cursor:default;box-shadow:none}#dkClassic .dkc-doc.dkc-memo:active{transform:none;box-shadow:none}#dkClassic .dkc-doc.dkc-memo span{white-space:normal}
 </style>
-<style id="dkStatusInk20261106" type="text/css">/* 20261106 看診進度狀態列（院區列表與單院頁）：日期、N秒後更新 字色改成和院區名（鄰近院區／XX院區）同一個深色 #526357 */html body #geo_bar#geo_bar .qsr .qOfficialDate,html body #geo_bar#geo_bar .qsr .qdate,html body #geo_bar#geo_bar .qsr .qcd,html body #geo_bar#geo_bar .qsr .qcd *{color:#526357!important}
+<style id="dkStatusLine20261106" type="text/css">/* 20261106 看診進度狀態列（院區列表與單院頁）比照 LINE 院區詳細資訊頁：院區名 18px 粗、日期與 N 秒後更新 14px 灰、日期置中、倒數左邊加更新鈕；整條高 58px，左右位置同 LINE */html body #geo_bar#geo_bar{gap:0!important;letter-spacing:0!important;padding:10px 4px!important;min-height:0!important;height:auto!important;align-items:center!important}html body #geo_bar#geo_bar .qsr{grid-template-columns:max-content minmax(0,1fr) max-content max-content!important;column-gap:5px!important;align-items:center!important;min-height:38px;letter-spacing:normal!important}html body #geo_bar#geo_bar .qsr .qnt{margin:0!important;padding:0!important;font-size:18px!important;font-weight:600!important;color:#52685b!important;letter-spacing:normal!important}html body #geo_bar#geo_bar .qsr .qOfficialDate,html body #geo_bar#geo_bar .qsr .qdate{font-size:14px!important;font-weight:400!important;color:#879186!important;letter-spacing:normal!important}html body #geo_bar#geo_bar .qsr .qcd{grid-column:4!important;font-size:14px!important;font-weight:400!important;color:#879186!important;letter-spacing:normal!important}html body #geo_bar#geo_bar .qsr .qcd *{font-size:14px!important;color:#879186!important;letter-spacing:normal!important}html body #geo_bar#geo_bar .qsr .qdigit{min-width:0!important;width:auto!important}html body #geo_bar#geo_bar .qsr .dkq-refresh{grid-column:3;grid-row:1;display:grid;place-items:center;width:30px;height:38px;margin:0 -3px 0 0;padding:4px;border:0;border-radius:8px;background:transparent;color:#557367;cursor:pointer;-webkit-tap-highlight-color:transparent}html body #geo_bar#geo_bar .qsr .dkq-refresh:active{background:#e8f0e8}html body #geo_bar#geo_bar .qsr .dkq-refresh svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 </style>
-<script id="dkDemo20261105">
+<script id="dkStatusLine20261106js">
+/* 20261106 狀態列更新鈕（比照 LINE）：插在倒數前面；按了立刻重抓看診進度、倒數重新計時（用官網原本的 stopTrackPolling／startTrackPolling） */
+(function(){
+var NS="http://www.w3.org/2000/svg";
+function refresh(){try{if(typeof window.stopTrackPolling==="function"&&typeof window.startTrackPolling==="function"){window.stopTrackPolling();window.startTrackPolling();}else if(typeof window.fetchTrackBatch==="function"){window.fetchTrackBatch();}}catch(e){}}
+function add(){var qs=document.querySelectorAll("#geo_bar .qsr");for(var i=0;i<qs.length;i++){var q=qs[i];if(q.querySelector(".dkq-refresh"))continue;var c=q.querySelector(".qcd");if(!c)continue;var b=document.createElement("button");b.type="button";b.className="dkq-refresh";b.setAttribute("aria-label","重新整理看診進度");var s=document.createElementNS(NS,"svg");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("aria-hidden","true");var p=document.createElementNS(NS,"path");p.setAttribute("d","M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7");s.appendChild(p);b.appendChild(s);b.addEventListener("click",refresh);q.insertBefore(b,c);}}
+add();
+var n=0,t=setInterval(function(){add();if(++n>=60)clearInterval(t);},500);
+try{new MutationObserver(function(){var q=document.querySelector("#geo_bar .qsr");if(q&&!q.querySelector(".dkq-refresh"))add();}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+})();
+</script><script id="dkDemo20261105">
 /* 示意模式 20261105：只有網址加 ?demo=1 才啟動，休診時用示意的診號、醫師顯示看診進度（含雙診、大竹 14:00開始），畫面上方標「示意資料」；一般網址完全不受影響。刪掉這個 script 就移除示意模式 */
 (function(){
 if(!/(^|[?&])demo=1(&|$)/.test(location.search))return;
