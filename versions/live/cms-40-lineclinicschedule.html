@@ -560,7 +560,7 @@ const doctor=element('span','doctor-group');doctor.append(button(room.d||'--','d
 if(room.s)row.append(element('span','stop','停止掛號'));panel.append(row);
 });
 }else panel.append(element('div','closed-state',!clinic.id||clinic.progressAvailable===false&&!data?'建置中':!state.items?(state.error?'看診進度暫時無法更新':'讀取中…'):data?.st==='closed'||!data?.rooms?.length?'休診中':'讀取中…'));
-const wait=element('div','wait-row');wait.append(element('span','','候診人數'),element('b','current',String(data?.st==='ok'?data.sum??'--':'--')));panel.append(wait);
+const wait=element('div','wait-row');wait.append(element('span','','候診'),element('b','current',String(data?.st==='ok'?data.sum??'--':'--')));panel.append(wait);
 if(data?.memo)panel.append(element('p','memo',String(data.memo)));
 observeProgressText(panel);
 root.querySelector('.team .sw-board')?.dispatchEvent(new Event('line-progress-doctor'));

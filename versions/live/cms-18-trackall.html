@@ -103,6 +103,9 @@ add();
 var n=0,t=setInterval(function(){add();if(++n>=60)clearInterval(t);},500);
 try{new MutationObserver(function(){var q=document.querySelector("#geo_bar .qsr");if(q&&!q.querySelector(".dkq-refresh"))add();}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
 })();
+</script><script id="dkWaitAlign20261106js">
+/* 20261106 單院頁：「候診人數」改「候診」，候診數字和上面診號數字用同一欄寬（取最寬的），所以「診」和上面的「號」對齊、數字右緣也對齊 */
+(function(){function kids(e,tag){var o=[];for(var i=0;i<e.children.length;i++){if(e.children[i].tagName===tag)o.push(e.children[i]);}return o;}function fix(){var cards=document.querySelectorAll("#showtrack .qdd");for(var i=0;i<cards.length;i++){var c=cards[i];if(!c.offsetParent)continue;var rows=c.querySelectorAll(".qdr");var wr=null,bs=[];for(var j=0;j<rows.length;j++){var r=rows[j];if(r.classList.contains("qdw")){wr=r;var lab=kids(r,"SPAN")[0];if(lab&&lab.textContent.trim()==="候診人數")lab.textContent="候診";}var b=kids(r,"B")[0];if(b)bs.push(b);}if(!wr||bs.length<2)continue;var mx=0;for(var k=0;k<bs.length;k++){bs[k].style.minWidth="";}for(var k2=0;k2<bs.length;k2++){mx=Math.max(mx,bs[k2].getBoundingClientRect().width);}for(var k3=0;k3<bs.length;k3++){bs[k3].style.minWidth=Math.ceil(mx)+"px";bs[k3].style.textAlign="right";}}}fix();var n=0,t=setInterval(function(){fix();if(++n>=40)clearInterval(t);},500);window.addEventListener("hashchange",function(){setTimeout(fix,50);setTimeout(fix,400);});try{new MutationObserver(function(){fix();}).observe(document.body||document.documentElement,{childList:true,subtree:true,characterData:true});}catch(e){}})();
 </script><script id="dkDemo20261105">
 /* 示意模式 20261105：只有網址加 ?demo=1 才啟動，休診時用示意的診號、醫師顯示看診進度（含雙診、大竹 14:00開始），畫面上方標「示意資料」；一般網址完全不受影響。刪掉這個 script 就移除示意模式 */
 (function(){
