@@ -495,11 +495,16 @@ const API_TIMEOUT = 30000;   // ✨ v19.1 逾時保護：請求不再無限卡�
    這些都是唯讀查詢，逾時不會造成重複送出，訊息也一併改掉。
    根本解法（在預約表存簡訊狀態，不再掃通知紀錄）另案處理。 */
 const API_TIMEOUT_SLOW = 120000;
-const SLOW_ACTIONS = { auditUnsentBookings: 1, stopNow: 1 };   /* ✨ v31.91 一鍵停診發送可能超過 30 秒 */
+const SLOW_ACTIONS = { auditUnsentBookings: 1, stopNow: 1,   /* ✨ v31.91 一鍵停診發送可能超過 30 秒 */
+  /* ✨ v31.97（2026-11-06 三樹）療程一次建 7 週實測 25–40 秒，30 秒就被掐斷顯示失敗，
+     其實後端已經建好 —— 櫃檯重按 3 次就建了 3 組。建立／試算／改期一律等 2 分鐘。 */
+  previewCourse: 1, createCounterBooking: 1, courseMovePreview: 1, courseMove: 1 };
 function _friendlyErr(e, action) {
   if (!(e && e.name === 'AbortError')) return String(e);
-  return SLOW_ACTIONS[action]
+  return action === 'auditUnsentBookings'
     ? '查詢逾時（這項要掃整張通知紀錄，會隨資料成長變慢）。請按重試；若一直失敗請回報。'
+    : action === 'createCounterBooking'
+    ? '系統回應太慢。預約可能已經建立了，請先按 🔄 看看診表有沒有這筆，沒有再重新建立（不要直接重按）'
     : '系統繁忙逾時。請先重新整理並查詢確認是否已成功，避免重複送出';
 }
 /* 工作階段失效（過期、被登出、後端重新部署）→ 清乾淨並退回登入畫面。
