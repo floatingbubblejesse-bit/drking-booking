@@ -252,7 +252,7 @@ function render(docs){
   function close(){lb.hidden=true;document.body.style.overflow='';}
   Array.prototype.forEach.call(box.querySelectorAll('img[data-ec-zoom]'),function(im){im.addEventListener('click',function(){big.src=im.src;big.alt=im.alt;lb.hidden=false;document.body.style.overflow='hidden';});});
   // Jump buttons scroll to the card directly: a site-wide hashchange handler (footer script) scrolls back to the top whenever the hash changes.
-  Array.prototype.forEach.call(box.querySelectorAll('.ec-jump a[href^="#ec-"]'),function(a){a.addEventListener('click',function(e){var tg=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));if(!tg)return;e.preventDefault();try{tg.scrollIntoView({behavior:'smooth',block:'start'});}catch(x){tg.scrollIntoView();}});});
+  Array.prototype.forEach.call(box.querySelectorAll('.ec-jump a[href^="#ec-"]'),function(a){a.addEventListener('click',function(e){var tg=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));if(!tg)return;e.preventDefault();var stop=false;function cancel(){stop=true;}window.addEventListener('touchstart',cancel,{once:true,passive:true});window.addEventListener('wheel',cancel,{once:true,passive:true});try{tg.scrollIntoView({behavior:'smooth',block:'start'});}catch(x){tg.scrollIntoView();}setTimeout(function(){if(stop)return;var m=parseFloat(getComputedStyle(tg).scrollMarginTop)||0;if(Math.abs(tg.getBoundingClientRect().top-m)>6){try{tg.scrollIntoView({behavior:'smooth',block:'start'});}catch(x){tg.scrollIntoView();}}},1000);});});
   if(location.hash&&/^#ec-/.test(location.hash)){var tg=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(tg)tg.scrollIntoView();}
 }
 var done=false;
