@@ -1,0 +1,147 @@
+{
+ "items": [
+  {
+   "key": "cms-01-about",
+   "title": "CMS 1 診所介紹",
+   "source": "/about.html",
+   "admin": "/sys_manage/common.php?act=edit&id=1",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-01-about.html",
+   "length": 1633,
+   "sha256": "ded4cd786a6d42f7a7d79dce388ad5ec16a8a599f32cbbffb37c6a36fd281186"
+  },
+  {
+   "key": "cms-02-info_all",
+   "title": "CMS 2 院區資訊",
+   "source": "/info_all.html",
+   "admin": "/sys_manage/common.php?act=edit&id=2",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-02-info_all.html",
+   "length": 29002,
+   "sha256": "dd5b0cc3e24dabf29ee58d601bf4a29496f59597e243f57fe3c8db12bc251af1"
+  },
+  {
+   "key": "cms-03-track",
+   "title": "CMS 3 看診進度",
+   "source": "/track.html",
+   "admin": "/sys_manage/common.php?act=edit&id=3",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-03-track.html",
+   "length": 123,
+   "sha256": "42bc22e9b3a58da44524e7aadb97a7c5aeab5cc941a82b5d0d1a633e3b88980c"
+  },
+  {
+   "key": "cms-04-info_newtaipei",
+   "title": "CMS 4 院區資訊-新北市",
+   "source": "/info_newtaipei.html",
+   "admin": "/sys_manage/common.php?act=edit&id=4",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-04-info_newtaipei.html",
+   "length": 23282,
+   "sha256": "49945d2798f295253de3b51d534e073528e8b60700dacde3263542636b771229"
+  },
+  {
+   "key": "cms-05-info_taoyuan",
+   "title": "CMS 5 院區資訊-桃園市",
+   "source": "/info_taoyuan.html",
+   "admin": "/sys_manage/common.php?act=edit&id=5",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-05-info_taoyuan.html",
+   "length": 26710,
+   "sha256": "281ee53928092ee777e63df59c628c9168917aaaace132c31fcb57d3baa48fc5"
+  },
+  {
+   "key": "cms-06-contact_el",
+   "title": "CMS 6 聯絡我們",
+   "source": "/contact_el.html",
+   "admin": "/sys_manage/common.php?act=edit&id=6",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-06-contact_el.html",
+   "length": 2752,
+   "sha256": "cd2343b47372802009029efc5b2f80aa3f1e48fd233586bfce09193b3e0868f6"
+  },
+  {
+   "key": "cms-18-trackall",
+   "title": "CMS 18 點選可看單院看診進度",
+   "source": "/trackall.html",
+   "admin": "/sys_manage/common.php?act=edit&id=18",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-18-trackall.html",
+   "length": 116974,
+   "sha256": "ff0446d4386f7f47b562648fed2c6d413273bfb73045e9f0c37160909ed5c722"
+  },
+  {
+   "key": "cms-38-lineprogress",
+   "title": "CMS 38 點選可看單院詳細進度",
+   "source": "/lineprogress.html",
+   "admin": "/sys_manage/common.php?act=edit&id=38",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-38-lineprogress.html",
+   "length": 28343,
+   "sha256": "004da6c6c5511c4399beeb6dd8065bd9babcdf611226615df97f5732f67d983c"
+  },
+  {
+   "key": "cms-39-lineclinicinfo",
+   "title": "CMS 39 點選可看單院詳細資訊",
+   "source": "/lineclinicinfo.html",
+   "admin": "/sys_manage/common.php?act=edit&id=39",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-39-lineclinicinfo.html",
+   "length": 243891,
+   "sha256": "7fb24d54dbb1a4d9665a2e302bc7b35bc31761cab8f44ea92f4d6001d198f595"
+  },
+  {
+   "key": "cms-40-lineclinicschedule",
+   "title": "CMS 40 滑動可查未來四週班表",
+   "source": "/lineclinicschedule.html",
+   "admin": "/sys_manage/common.php?act=edit&id=40",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-40-lineclinicschedule.html",
+   "length": 243215,
+   "sha256": "6ae85beb4da646e7dbe3c7d050a145378ab46b8b21f32dac17b8d000720d455e"
+  },
+  {
+   "key": "cms-41-linedoctorschedule",
+   "title": "CMS 41 醫師個人班表",
+   "source": "/linedoctorschedule.html",
+   "admin": "/sys_manage/common.php?act=edit&id=41",
+   "field": "content",
+   "encoding": "cms",
+   "file": "cms-41-linedoctorschedule.html",
+   "length": 221398,
+   "sha256": "a4285fc9584cf4c06ac901af8f498c47909d02ea5570a7dfd20187d5f2167b5f"
+  },
+  {
+   "key": "footer-info",
+   "title": "頁尾資訊",
+   "source": "/trackall.html",
+   "admin": "/sys_manage/config.php?act=bottominfo",
+   "field": "contents[91]",
+   "encoding": "cms",
+   "file": "footer-info.html",
+   "length": 59470,
+   "sha256": "4150786113c18e0cfe96bc9d5a69baac37ab0aa4ee29db16f581d5c2f393906a"
+  },
+  {
+   "key": "head-code",
+   "title": "追蹤碼設定 轉換代碼",
+   "source": "/trackall.html",
+   "admin": "/sys_manage/config.php?act=code",
+   "field": "gadsevent",
+   "encoding": "raw",
+   "file": "head-code.html",
+   "length": 7255,
+   "sha256": "4316adbc7e26f386ba76876b7642a28ae99b74b5dd4707706a248aec19f6959a"
+  }
+ ]
+}
