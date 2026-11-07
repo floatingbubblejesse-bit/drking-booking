@@ -74,8 +74,8 @@
    "field": "content",
    "encoding": "cms",
    "file": "cms-18-trackall.html",
-   "length": 183261,
-   "sha256": "418239f9948e1a3feac68a61d2b9d62fde9597d0422c4e746b00b0538fecd5ef"
+   "length": 183215,
+   "sha256": "cd26935e4c50736f379ee915ddef1fa2a3c4f4f83fca6b2cdc6db806e8193ac8"
   },
   {
    "key": "cms-38-lineprogress",
@@ -141,7 +141,7 @@
    "encoding": "raw",
    "file": "head-code.html",
    "length": 7806,
-   "sha256": "d644536d309c958f52d5d590776370e04b70fce737e9a9cdef3e48f52254b9a7"
+   "sha256": "0d7e9a23de0d2cc4a1a8683199ec35ff62b3f84042080bb97f6c00d02d14a66d"
   }
  ]
 }
