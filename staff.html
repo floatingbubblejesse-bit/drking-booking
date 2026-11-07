@@ -2764,6 +2764,24 @@ async function loadCDayGrid() {
      （2026-10-08 黃錦崧 19:45：被 19:30 的蒲秀慧初診 19:30–20:00 蓋住）。
      這裡把「被蓋住但自己沒有預約」的格子標成延續，不再顯示可預約。
      自己有預約的格子維持原樣照畫，不會蓋掉任何一位病人。 */
+  /* ✨ v31.99（2026-11-07）同一天有 10 分與 15 分的醫師時，格線會變 5 分鐘一列。
+     原本每位醫師每一列都出現「＋ 預約」—— 15 分的醫師出現 09:05、09:10 這種約不了的格子，
+     10 分的醫師在舊的 15 分預約旁邊也會出現會撞到的格子。
+     改成：只在「這位醫師自己的時段起點」（從診次開始算，每隔他自己的複診分鐘）才顯示，
+     而且這一段 [起點, 起點＋複診分鐘) 不能壓到既有預約；其他列留白不能點。 */
+  const docIv = {};
+  appts.forEach(a => {
+    const dn = normDoc(a.doctor || a['醫師'] || '');
+    const st = t2m(apptTime(a)); if (!Number.isFinite(st)) return;
+    (docIv[dn] = docIv[dn] || []).push([st, apptEndMin(a, dn)]);
+  });
+  const slotOk = (dn, t) => {
+    const own = Number(cfgFor(dn, clinic, date).followMin) || gridStep;
+    const ses = (docRanges[dn] || []).find(([s0, e0]) => t >= s0 && t < e0);
+    if (!ses) return true;
+    if ((t - ses[0]) % own !== 0) return false;
+    return !(docIv[dn] || []).some(([a0, b0]) => t < b0 && a0 < t + own);
+  };
   const coverBy = {};
   appts.forEach(a => {
     const dn = normDoc(a.doctor || a['醫師'] || '');
@@ -2819,7 +2837,8 @@ async function loadCDayGrid() {
       const cell = byDocT[dn+'|'+tt] || [];
       /* ✨ v31.52 這格自己沒預約，但被上面比較長的診次蓋住 → 不是空位 */
       const _cov = (!cell.length && on) ? (coverBy[dn+'|'+tt] || null) : null;
-      const _clickable = on && !_cov;
+      const _sub = on && !cell.length && !_cov && !slotOk(dn, t);   /* ✨ v31.99 不是這位醫師的時段起點、或會壓到既有預約 → 留白不能點 */
+      const _clickable = on && !_cov && !_sub;
       h += `<td class="${on?'':'off'}" ${_clickable ? `data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}" style="cursor:copy" title="點空白處掛號 ${esc(dn)} ${tt}"` : ''}>` + cell.map((a, _ii) => {
         const st = a.status || a['狀態'] || '';
         const cls = st==='checked_in'||st==='已報到' ? 'done' : st==='rescheduled'||st==='已改約' ? 're' : (a.type==='初診'||a['類型']==='初診') ? 'i' : '';
@@ -2859,7 +2878,7 @@ async function loadCDayGrid() {
              return `<div class="apt ${_cc}" title="這一格被上面那筆佔著：${_nm}（看到 ${_to}）。報到與否都一樣佔著，不是待處理狀態。"
                style="opacity:.55;border-style:dashed;cursor:not-allowed;font-size:12.5px">↑ ${_nm}（到 ${_to}）</div>`;
            })()
-           : (on && !cell.length ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : ''))
+           : (on && !cell.length && !_sub ? `<div class="slot-add" data-act="cd-slot" data-doc="${esc(dn)}" data-t="${tt}">＋ 預約</div>` : ''))
         + `</td>`;
     });
     h += `</tr>`;
