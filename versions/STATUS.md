@@ -19,7 +19,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261107-1220-pre-classic 比較
 
@@ -31,13 +31,13 @@
 | CMS 4 院區資訊-新北市 | `common.php?act=edit&id=4` | 相同 |
 | CMS 5 院區資訊-桃園市 | `common.php?act=edit&id=5` | 相同 |
 | CMS 6 聯絡我們 | `common.php?act=edit&id=6` | 相同 |
-| CMS 18 點選可看單院看診進度 | `common.php?act=edit&id=18` | 相同 |
+| CMS 18 點選可看單院看診進度 | `common.php?act=edit&id=18` | **已變更** |
 | CMS 38 點選可看單院詳細進度 | `common.php?act=edit&id=38` | 相同 |
-| CMS 39 點選可看單院詳細資訊 | `common.php?act=edit&id=39` | 相同 |
+| CMS 39 點選可看單院詳細資訊 | `common.php?act=edit&id=39` | **已變更** |
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | 相同 |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | 相同 |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261107-1215-pre-classic 比較
 
@@ -55,7 +55,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | 相同 |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | 相同 |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261107-1024-pre-classic 比較
 
@@ -73,7 +73,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | 相同 |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | 相同 |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261107-1012-pre-classic 比較
 
@@ -91,7 +91,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261106 比較
 
@@ -109,7 +109,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261105-pre-classic 比較
 
@@ -127,7 +127,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261105-classic2 比較
 
@@ -145,7 +145,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261105-classic 比較
 
@@ -163,7 +163,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261104-night2 比較
 
@@ -181,7 +181,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261104-night 比較
 
@@ -199,7 +199,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261103-night 比較
 
@@ -217,7 +217,7 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
 
 ## 與 stable-20261103 比較
 
@@ -235,4 +235,4 @@
 | CMS 40 滑動可查未來四週班表 | `common.php?act=edit&id=40` | **已變更** |
 | CMS 41 醫師個人班表 | `common.php?act=edit&id=41` | **已變更** |
 | 頁尾資訊 | `config.php?act=bottominfo` | 相同 |
-| 追蹤碼設定 轉換代碼 | `config.php?act=code` | 相同 |
+| 追蹤碼設定 轉換代碼 | `config.php?act=code` | **已變更** |
