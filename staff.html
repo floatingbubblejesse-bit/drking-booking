@@ -725,12 +725,19 @@ function ask(title, fields, okText) {
 const thumb = (u, w) => { u = String(u || ''); return u.indexOf('data:') === 0 ? u : u.replace(/sz=w\d+/, 'sz=w' + w); };
 
 /* ───── 預約時長規則 ───── */
-function cfgFor(doc, cli) {
-  const n = normDoc(doc);
-  return (cli && S.timeCfg.clinicOv && S.timeCfg.clinicOv[n + '|' + cli])
-    || S.timeCfg.overrides[n] || S.timeCfg.defaults;
+/* ✨ v31.98（2026-11-07）時長生效日：與後端 _cfgOn_ 同規則。看診日 ≥ 時長生效日 → 改用新初診／新複診分鐘。
+   凡是「算時長、切時段」的地方都要帶看診日（第三個參數），沒帶＝用目前的時長。 */
+function cfgOn(cfg, date) {
+  if (!cfg || !cfg.durFrom || !date || String(date).slice(0, 10) < cfg.durFrom || !(cfg.initMin2 || cfg.followMin2)) return cfg;
+  return Object.assign({}, cfg, { initMin: cfg.initMin2 || cfg.initMin, followMin: cfg.followMin2 || cfg.followMin });
 }
-const durFor = (type, doc, cli) => type === 'initial' ? cfgFor(doc, cli).initMin : cfgFor(doc, cli).followMin;
+function cfgFor(doc, cli, date) {
+  const n = normDoc(doc);
+  return cfgOn((cli && S.timeCfg.clinicOv && S.timeCfg.clinicOv[n + '|' + cli])
+    || S.timeCfg.overrides[n] || S.timeCfg.defaults, date);
+}
+const durFor = (type, doc, cli, date) => type === 'initial' ? cfgFor(doc, cli, date).initMin : cfgFor(doc, cli, date).followMin;
+const durNote = c => (c && c.durFrom && (c.initMin2 || c.followMin2)) ? '・📅 ' + c.durFrom.slice(5).replace('-', '/') + ' 起 ' + (c.initMin2 || c.initMin) + '/' + (c.followMin2 || c.followMin) : '';
 /* ✨ v31.46 以系統設定的時長為準，不再採用資料表寫的結束時間。
    原本只要 a['結束時段'] 比設定長就直接回傳它。搜博／紙本匯入的預約普遍多寫 5 分鐘
    （複診設定 15 分卻寫 15:00–15:20），於是 15:15 這種明明沒人的格子被算成已佔用，
@@ -772,7 +779,7 @@ function apptEndMin(a, docN) {
   const st = t2m(apptTime(a));
   { const _so = soloCell(docN, a.clinic || a['院區'] || '', String(a.date || a['看診日期'] || '').slice(0, 10), st); if (_so) return _so.end; }   /* ✨ v31.79 單診一格整格佔用 */
   const type = String(a.type || a['類型'] || '') === '初診' ? 'initial' : 'followup';
-  return st + durFor(type, docN, a.clinic || a['院區'] || '');
+  return st + durFor(type, docN, a.clinic || a['院區'] || '', String(a.date || a['看診日期'] || '').slice(0, 10));
 }
 async function loadTimeCfg() {
   const res = await api.get('getTimeSettings');
@@ -1325,7 +1332,7 @@ function htmlStep3() {
   const banner = b.anyDoc
     ? `<div style="background:#dbeafe;color:#1e3a8a;padding:9px 13px;border-radius:8px;margin-bottom:12px;font-size:15.5px;font-weight:600">🏥 ${esc(b.clinic)} · 不指定醫師模式 <span style="font-weight:400;color:#475569">挑時段時系統會自動配對醫師</span></div>`
     : `<div class="muted" style="margin-bottom:12px">已選：<b style="color:var(--txt)">${esc(b.doctor)} 醫師 · ${esc(b.clinic)}</b></div>`;
-  const cfgTxt = b.anyDoc ? ['依各醫師設定','依各醫師設定'] : [cfgFor(b.doctor, b.clinic).initMin+' 分鐘', cfgFor(b.doctor, b.clinic).followMin+' 分鐘'];
+  const cfgTxt = b.anyDoc ? ['依各醫師設定','依各醫師設定'] : [cfgFor(b.doctor, b.clinic, b.date).initMin+' 分鐘', cfgFor(b.doctor, b.clinic, b.date).followMin+' 分鐘'];
   return `<h2 style="font-size:22px">Step 3 · 選擇看診日期與時段</h2>
     <div style="margin-top:10px">${banner}</div>
     <div style="max-width:460px;display:flex;align-items:center;gap:10px;margin:6px 0 2px">
@@ -1413,7 +1420,7 @@ async function loadStep3Slots() {
   // 依各醫師設定切格：間隔=複診分鐘；本次預約時長=初診分鐘或複診分鐘
   const fine = [];
   rows.forEach(r => {
-    const cfg = cfgFor(r.doctor, b.clinic);
+    const cfg = cfgFor(r.doctor, b.clinic, b.date);
     const dur = b.type === 'initial' ? cfg.initMin : cfg.followMin;
     const endM = t2m(r.end);
     for (let t = t2m(r.start); t + dur <= endM; t += cfg.followMin) {
@@ -1465,7 +1472,7 @@ async function loadStep3Slots() {
       let fuBusy = false;   // ✨ v31.13 初診：2 週後回診時段檢查
       if (!full && blocks14) {
         const dn14 = normDoc(f.doctor);
-        const fDur = cfgFor(f.doctor, b.clinic).followMin;
+        const fDur = cfgFor(f.doctor, b.clinic, d14).followMin;
         const st14 = dayStat(b.clinic, d14, f.doctor);
         fuBusy = st14 === '滿診' || st14 === '停診'
           || (blocks14[dn14] || []).some(([bs, be]) => f.m < be && bs < f.m + fDur);
@@ -1523,7 +1530,7 @@ function htmlStep4() {
     <div>
       <div class="frow"><label>就診類型（於上一步選擇）</label>
         <div style="padding:10px 14px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;font-weight:700;color:#1e40af">
-        ${b.type==='initial'?'初診':'複診'} · ${durFor(b.type, b.anyDoc ? b.slotDoctor : b.doctor, b.clinic)} 分鐘</div></div>
+        ${b.type==='initial'?'初診':'複診'} · ${durFor(b.type, b.anyDoc ? b.slotDoctor : b.doctor, b.clinic, b.date)} 分鐘</div></div>
       ${(S.bindings || []).length ? `<div class="frow"><label>快速帶入</label><div style="display:flex;gap:8px;flex-wrap:wrap">
         ${S.bindings.map(x => `<button type="button" class="btn btn-o btn-sm" data-act="f-fill" data-n="${esc(x.name || '')}" data-p="${esc(x.phone)}">${esc(x.name || x.phone)}</button>`).join('')}
       </div></div>` : ''}
@@ -1560,7 +1567,7 @@ function htmlStep5() {
     <div style="margin-top:12px;max-width:560px">
     ${row('預約醫師', esc(doc) + ' 醫師')}
     ${row('看診院區', esc(b.clinic))}
-    ${row('就診類型', (b.type==='initial'?'初診':'複診') + '（' + durFor(b.type, b.anyDoc ? b.slotDoctor : b.doctor, b.clinic) + ' 分鐘）')}
+    ${row('就診類型', (b.type==='initial'?'初診':'複診') + '（' + durFor(b.type, b.anyDoc ? b.slotDoctor : b.doctor, b.clinic, b.date) + ' 分鐘）')}
     ${row('看診時間', `${esc(b.date)}（週${wd}）${esc(b.slot)}`)}
     ${b.type==='initial' ? row('🩸 抽血安排', b.blood.mode==='external' ? '外院 14 天內報告（初診日攜帶）' : b.blood.date ? mdTxt(b.blood.date) + ' 到院抽血' : '初診當日提早 30 分鐘抽血') : ''}
     ${b.type!=='initial' && b.course ? row('💉 針劑療程', `${esc(b.course.name)}・連續 <b>${b.course.weeks} 週</b>（每週${WDS[new Date(b.date+'T00:00').getDay()]} ${esc(b.slot)}・系統自動預約）`) : ''}
@@ -1579,7 +1586,7 @@ async function confirmBooking() {
   const b = S.bk;
   const doc = b.anyDoc ? b.slotDoctor : b.doctor;
   // 最後驗證：時段在班別內
-  const dur = durFor(b.type, doc, b.clinic);
+  const dur = durFor(b.type, doc, b.clinic, b.date);
   const inSched = sched.slotsFor(doc, b.clinic, b.weekday)
     .some(s => t2m(b.slot) >= t2m(s.start) && t2m(b.slot) + dur <= t2m(s.end));
   if (!inSched) { toast('⚠️ 此時段無法容納' + (b.type==='initial'?'初診':'複診') + '（' + dur + ' 分鐘），請重新選擇', 'var(--red)'); S.bk.step = 3; renderStep(); return; }
@@ -1787,7 +1794,7 @@ async function rsFillTimes(m) {
   timeSel.innerHTML = '<option value="">載入中…</option>';
   const a = S.lookupResults[+m.dataset.apptIdx];
   const type = String(a.type || a['類型'] || '複診') === '初診' ? 'initial' : 'followup';
-  const cfg = cfgFor(doc, cli);
+  const cfg = cfgFor(doc, cli, ds);
   const dur = type === 'initial' ? cfg.initMin : cfg.followMin;
   const wd = isoWd(ds);
   const appts = (await getAppts(cli, ds)).filter(x => !isDead(x));
@@ -1870,7 +1877,7 @@ async function reschGoInit(m, btn) {
   const a = S.lookupResults[+m.dataset.apptIdx];
   const nd = m.dataset.newDate, nt = m.dataset.newTime, doc = m.dataset.newDoc, cli = m.dataset.newCli;
   btn.disabled = true;
-  const dur = durFor('initial', doc, cli);
+  const dur = durFor('initial', doc, cli, nd);
   const oldNote = String(a.note || a['備註'] || '');
   // 抽血標記帶進新預約（有重選用新的，否則沿用舊標記）
   let bloodTag = '';
@@ -1901,7 +1908,7 @@ async function reschGo(m, btn) {
   const medCli = weeks ? (m.querySelector('#rs-medcli')?.dataset.v || cli) : '';
   btn.disabled = true;
   const type = String(a.type || a['類型'] || '複診');
-  const dur = durFor(type === '初診' ? 'initial' : 'followup', doc, cli);
+  const dur = durFor(type === '初診' ? 'initial' : 'followup', doc, cli, nd);
   const res = await api.post('rescheduleAppointment', {
     oldApptId: a.apptId || a.id || a['預約編號'] || '', clinic: cli,
     date: nd, startTime: nt, endTime: m2t(t2m(nt) + dur),
@@ -2711,7 +2718,7 @@ async function loadCDayGrid() {
   minM = Math.floor(minM/60)*60; maxM = Math.ceil(maxM/60)*60;
   // 格線間隔 = 當日醫師複診分鐘的最大公因數（例：15 與 10 混合 → 5 分鐘格）
   const gcd2 = (a2,b2) => b2 ? gcd2(b2, a2 % b2) : a2;
-  const gridStep = docs.map(dn => cfgFor(dn, clinic).followMin).reduce((g, v) => gcd2(g, v), 60) || 15;
+  const gridStep = docs.map(dn => cfgFor(dn, clinic, date).followMin).reduce((g, v) => gcd2(g, v), 60) || 15;
   const rowsPerHour = Math.round(60 / gridStep);
   const byDocT = {};
   const docCnt = {};   /* ✨ v31.25 每診初診／複診人數 */
@@ -3084,7 +3091,7 @@ function bkbRefresh(preferT) {
   const date = S.cDate, clinic = S.cClinic, wd = isoWd(date);
   const type = box.dataset.type || '複診';
   const doc = bkb.querySelector('#bkb-doc').value;
-  const cfg = cfgFor(doc, clinic);
+  const cfg = cfgFor(doc, clinic, date);
   const dur = type === '初診' ? cfg.initMin : cfg.followMin;
   const appts = (S.apptCache.get(clinic + '|' + date) || []).filter(a => !isDead(a));
   const blocks = [];
@@ -3204,7 +3211,7 @@ async function bkbSave(btn) {
     return;
   }
   btn.disabled = true; btn.textContent = '建立中…';
-  const dur = durFor(type === '初診' ? 'initial' : 'followup', doc, clinic);
+  const dur = durFor(type === '初診' ? 'initial' : 'followup', doc, clinic, date);
   let qNote = bkb.querySelector('#bkb-note').value.trim();
   if (type === '初診') {
     let selB = null; try { selB = JSON.parse(box.dataset.blood || 'null'); } catch(_){}
@@ -3394,7 +3401,7 @@ function refreshQkTimes(m, preferT) {
   const _dsq = daySessions(clinic, date).list;
   const docs = docSel === '__any__' ? [...new Set(_dsq.map(s => s.doctor))] : [docSel];
   docs.forEach(dn => {
-    const cfg = cfgFor(dn, clinic);
+    const cfg = cfgFor(dn, clinic, date);
     const dur = type === '初診' ? cfg.initMin : cfg.followMin;
     _dsq.filter(r => r.doctor === normDoc(dn)).forEach(r => {
       for (let t = t2m(r.start); t + dur <= t2m(r.end); t += cfg.followMin) {
@@ -3431,7 +3438,7 @@ function refreshQkTimes(m, preferT) {
   // 固定模式：更新頂欄結束時間；若該時段裝不下(如初診30分)→解鎖時段下拉讓櫃檯改選
   if (fixed) {
     const type = m.dataset.type || '複診';
-    const dur = durFor(type === '初診' ? 'initial' : 'followup', fixedDoc, clinic);
+    const dur = durFor(type === '初診' ? 'initial' : 'followup', fixedDoc, clinic, date);
     const hasFixed = free.some(f => f.t === fixedT && f.dn === fixedDoc);
     const endEl = m.querySelector('#qk-banner-end');
     const row = m.querySelector('#qk-time-row');
@@ -3470,7 +3477,7 @@ async function qkSave(m, btn) {
   const _needQk = requireNamePhone(name, phone);
   if (_needQk) { toast('⚠️ ' + _needQk, 'var(--amber)'); return; }
   btn.disabled = true; btn.textContent = '建立中…';
-  const dur = durFor(type === '初診' ? 'initial' : 'followup', dn, $('#q-clinic') ? $('#q-clinic').value : S.cClinic);
+  const dur = durFor(type === '初診' ? 'initial' : 'followup', dn, $('#q-clinic') ? $('#q-clinic').value : S.cClinic, date);
   let qNote = m.querySelector('#qk-note').value.trim();
   if (type === '初診') {
     let selB = null; try { selB = JSON.parse(m.dataset.blood || 'null'); } catch(_){}
@@ -3876,7 +3883,7 @@ async function eaRefresh(m) {
   const d = JSON.parse(m.dataset.ea), want = m.querySelector('#ea-type').value;
   const box = m.querySelector('#ea-typebox'), bb = m.querySelector('#ea-blood');
   if (want === d.curType) { box.innerHTML = ''; bb.innerHTML = ''; return; }
-  const st = t2m(d.t), dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic);
+  const st = t2m(d.t), dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic, d.date);
   box.innerHTML = '<div class="muted" style="font-size:14px">檢查時段…</div>';
   let clash = [];
   try {
@@ -3909,7 +3916,7 @@ async function eaSave(m, btn) {
   if (_needEa) { toast('⚠️ ' + _needEa, 'var(--amber)'); return; }
   let note = d.note;
   if (want !== d.curType) {
-    const dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic);
+    const dur = durFor(want === '初診' ? 'initial' : 'followup', d.doctor, d.clinic, d.date);
     fields['類型'] = want;
     fields['開始時段'] = d.t;
     fields['結束時段'] = m2t(t2m(d.t) + dur);
@@ -3963,7 +3970,7 @@ async function cActionGo(m, action) {
        後端 _apptCompleteness 會判成「時段不在醫師排班內」，於是一直掛在「待補登」，
        但櫃檯完全沒有對應的修正按鈕，只能看著它跳 —— 這裡補上。
        時段選項直接由該醫師當天的班表產生，不會再選到班表外的時間。 */
-    const _cfg = cfgFor(a.doctor, a.clinic);
+    const _cfg = cfgFor(a.doctor, a.clinic, String(a.date || a['看診日期'] || '').slice(0, 10));
     const _dur = (a.type === '初診') ? _cfg.initMin : _cfg.followMin;
     /* ✨ v31.66 兩件事：
        ① 時段來源改用診次（與看診表一致），不再讀雲端硬碟同步的班表。
@@ -4189,7 +4196,7 @@ async function quickBook() {
   if (!phone || !clinic || !date || !time) { toast('請填必填欄位', 'var(--amber)'); return; }
   const doc = $('#q-doc').value || '系統指派';
   const type = $('#q-type').value;
-  const qDur = durFor(type === '初診' ? 'initial' : 'followup', doc === '系統指派' ? '' : doc, clinic);
+  const qDur = durFor(type === '初診' ? 'initial' : 'followup', doc === '系統指派' ? '' : doc, clinic, date);
   let qNote = $('#q-note').value.trim();
   if (type === '初診' && !/🩸/.test(qNote)) {
     const win = bloodWindowDates(date, clinic);
@@ -5735,7 +5742,7 @@ function htmlATimeCfg() {
     const c = cfgFor(d.shortName);
     const ov = !!S.timeCfg.overrides[d.shortName];
     return `<tr data-d="${esc(d.shortName)}">
-      <td><b>${esc(d.shortName)}</b> 醫師<div class="muted" style="font-size:13px">${d.clinics.map(esc).join('・')}</div></td>
+      <td><b>${esc(d.shortName)}</b> 醫師<div class="muted" style="font-size:13px">${d.clinics.map(esc).join('・')}</div>${durNote(c) ? '<div style="font-size:12.5px;color:#7c3aed;font-weight:700">' + esc(durNote(c).slice(1)) + '</div>' : ''}</td>
       <td><input type="number" class="tc-i" value="${c.initMin}" min="5" max="60" step="5" style="width:76px"> 分</td>
       <td><input type="number" class="tc-f" value="${c.followMin}" min="5" max="60" step="5" style="width:76px"> 分</td>
       <td><input type="number" class="tc-cap" value="${c.initCap || 0}" min="0" max="20" step="1" style="width:66px" title="0＝不限制"> 位${(c.initCap || 0) ? '' : ' <span class="muted" style="font-size:12.5px">(不限)</span>'}</td>
@@ -5753,7 +5760,7 @@ function htmlATimeCfg() {
       ${(d.clinics.length < 2 && !d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl])) ? '' : `<tr data-d="${esc(d.shortName)}" class="tcc-row" style="${d.clinics.some(cl => (S.timeCfg.clinicOv||{})[d.shortName+'|'+cl]) ? '' : 'display:none'}"><td colspan="10" style="background:#f8fafc;padding:7px 12px">
         <span style="font-size:13px;color:#64748b;margin-right:6px">🏥 院區別（優先於上列設定）：</span>
         ${d.clinics.map(cl => { const k = d.shortName + '|' + cl; const co = (S.timeCfg.clinicOv||{})[k];
-          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin}${(co.initCap||0)?'・初診上限 '+co.initCap+(co.capFrom?'（'+co.capFrom.slice(5).replace('-','/')+' 起）':'（立即）'):''}${(co.openDays||0)?'・限 '+co.openDays+' 天內':''}${soloTxt(co)} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
+          return co ? `<span class="tag tag-b" style="margin-right:6px">${esc(cl)} ${co.initMin}/${co.followMin}${esc(durNote(co))}${(co.initCap||0)?'・初診上限 '+co.initCap+(co.capFrom?'（'+co.capFrom.slice(5).replace('-','/')+' 起）':'（立即）'):''}${(co.openDays||0)?'・限 '+co.openDays+' 天內':''}${soloTxt(co)} <a data-act="tc-del-cli" data-d="${esc(d.shortName)}" data-c="${esc(cl)}" style="cursor:pointer;color:#b91c1c;font-weight:800;margin-left:2px">✕</a></span>` : ''; }).join('')}
         <select class="tcc-cli" style="padding:4px 6px;font-size:13px">${d.clinics.map(cl => `<option>${esc(cl)}</option>`).join('')}</select>
         初 <input type="number" class="tcc-i" value="${c.initMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
         複 <input type="number" class="tcc-f" value="${c.followMin}" min="5" max="60" step="5" style="width:58px;padding:4px">
