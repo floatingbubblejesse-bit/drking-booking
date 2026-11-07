@@ -96,8 +96,8 @@
    "field": "content",
    "encoding": "cms",
    "file": "cms-39-lineclinicinfo.html",
-   "length": 279990,
-   "sha256": "919b035dfe27257c3feea95d3346eabbc683d1090dbef0aeeb5f72e69e111a0c"
+   "length": 280879,
+   "sha256": "ba2e35d45de994bd184d34d5cce9b48122787e744e9d3fd1d73d78849280c914"
   },
   {
    "key": "cms-40-lineclinicschedule",
@@ -108,7 +108,7 @@
    "encoding": "cms",
    "file": "cms-40-lineclinicschedule.html",
    "length": 281482,
-   "sha256": "8f05efb6a3ff06c1ff3df886112746ccbcc74a7edd17b3eb50499d3e6a6df23f"
+   "sha256": "04cc5ad3a5e9375fd78cd37e4e80b7815545d35ddb9b81b1299d602456c58f4b"
   },
   {
    "key": "cms-41-linedoctorschedule",
@@ -119,7 +119,7 @@
    "encoding": "cms",
    "file": "cms-41-linedoctorschedule.html",
    "length": 253155,
-   "sha256": "1c689dfc93f4f381f3e7eb4722355cd5c4680cfbff1411b51758327d6dbb0448"
+   "sha256": "605310bb0b96bb56a8b37b4df262847984457f34f3b57b5d9a2d9f733293c85b"
   },
   {
    "key": "footer-info",
