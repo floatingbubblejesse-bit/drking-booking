@@ -74,8 +74,8 @@
    "field": "content",
    "encoding": "cms",
    "file": "cms-18-trackall.html",
-   "length": 132992,
-   "sha256": "1cd9b68407505266b27d5b83dcdaaf1c5efdb5f9b55d9a420dba0c8f23353ac9"
+   "length": 132367,
+   "sha256": "958d0652e2e838e196244d65205d51f05001345d441cad1de31fbde6d74ab0fc"
   },
   {
    "key": "cms-38-lineprogress",
@@ -96,8 +96,8 @@
    "field": "content",
    "encoding": "cms",
    "file": "cms-39-lineclinicinfo.html",
-   "length": 257301,
-   "sha256": "a28bf5ef9c41574f889eeda30b5100a3141432b5b87b2019274e194d21f416b4"
+   "length": 256842,
+   "sha256": "c6f21a5bc6f4eb314f1c9824ce7e5f2c7c40508722e667a36dd59fe9e4b086c6"
   },
   {
    "key": "cms-40-lineclinicschedule",
