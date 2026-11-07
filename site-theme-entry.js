@@ -251,6 +251,7 @@ function render(docs){
   var big=lb.querySelector('img');
   function close(){lb.hidden=true;document.body.style.overflow='';}
   Array.prototype.forEach.call(box.querySelectorAll('img[data-ec-zoom]'),function(im){im.addEventListener('click',function(){big.src=im.src;big.alt=im.alt;lb.hidden=false;document.body.style.overflow='hidden';});});
+  // Jump buttons scroll to the card directly: a site-wide hashchange handler (footer script) scrolls back to the top whenever the hash changes.
   Array.prototype.forEach.call(box.querySelectorAll('.ec-jump a[href^="#ec-"]'),function(a){a.addEventListener('click',function(e){var tg=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));if(!tg)return;e.preventDefault();try{tg.scrollIntoView({behavior:'smooth',block:'start'});}catch(x){tg.scrollIntoView();}});});
   if(location.hash&&/^#ec-/.test(location.hash)){var tg=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(tg)tg.scrollIntoView();}
 }
